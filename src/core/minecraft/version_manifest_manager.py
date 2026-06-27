@@ -40,20 +40,26 @@ class VersionManifestManager:
 
     @staticmethod
     def _latest_version(is_snapshot=False) -> str:
-        manifest_path = VersionManifestManager._download_manifest()
-        manifest_data = VersionManifestManager._load_manifest(manifest_path)
-        return manifest_data["latest"]["snapshot"] if is_snapshot else manifest_data["latest"]["release"]
+        try:
+            manifest_path = VersionManifestManager._download_manifest()
+            manifest_data = VersionManifestManager._load_manifest(manifest_path)
+            return manifest_data["latest"]["snapshot"] if is_snapshot else manifest_data["latest"]["release"]
+        except:
+            return ""
 
     @staticmethod
     def _parse_manifest(manifest:dict) -> list[VersionManifest]:
-        versions_manifest: list[VersionManifest] = []
-        for version in manifest["versions"]:
-            versions_manifest.extend(
-                [VersionManifest(
-                    id=version["id"],
-                    type = version["type"],
-                    url=version["url"],
-                    release_time=datetime.fromisoformat(version["releaseTime"]),
-                )]
-            )
-        return versions_manifest
+        try:
+            versions_manifest: list[VersionManifest] = []
+            for version in manifest["versions"]:
+                versions_manifest.extend(
+                    [VersionManifest(
+                        id=version["id"],
+                        type = version["type"],
+                        url=version["url"],
+                        release_time=datetime.fromisoformat(version["releaseTime"]),
+                    )]
+                )
+            return versions_manifest
+        except:
+            return []
