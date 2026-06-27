@@ -40,7 +40,9 @@ class VersionManifestManager:
 
     @staticmethod
     def _latest_version(is_snapshot=False) -> str:
-        ...
+        manifest_path = VersionManifestManager._download_manifest()
+        manifest_data = VersionManifestManager._load_manifest(manifest_path)
+        return manifest_data["latest"]["snapshot"] if is_snapshot else manifest_data["latest"]["release"]
 
     @staticmethod
     def _parse_manifest(manifest:dict) -> list[VersionManifest]:
