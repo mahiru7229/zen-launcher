@@ -1,2 +1,10 @@
+*.pyc
 launcher.py
-./data
+*.pyc
+cache/
+data/
+downloads/
+instances/
+logs/
+profiles/
+runtime/
