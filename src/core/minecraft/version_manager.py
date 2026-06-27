@@ -19,7 +19,7 @@ import json
 #  'type'])
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 VERSIONS_DIR = PROJECT_ROOT / "downloads" / "versions" 
-
+VERSIONS_PATH = ""
 
 
 class VersionManager:
@@ -42,6 +42,7 @@ class VersionManager:
 
     @staticmethod
     def _download_version(version:VersionManifestManager) -> Path | None:
+        global VERSIONS_PATH
         VERSIONS_DIR.mkdir(parents=True,exist_ok=True)
         try:
             req = requests.get(version.url, timeout=10)
@@ -69,7 +70,8 @@ class VersionManager:
                 assets= version_data["assets"],
                 main_class=version_data["mainClass"],
                 java_version=version_data["javaVersion"],
-                raw_json=version_data
+                raw_json=version_data,
+                path=VERSIONS_PATH
             )
         except:
             return None

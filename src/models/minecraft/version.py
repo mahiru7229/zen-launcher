@@ -1,8 +1,9 @@
 from dataclasses import dataclass
-
+from pathlib import Path
 @dataclass(slots=True)
 class Version:
     id: str
+    path: Path
     arguments: dict
     libraries: list
     downloads: dict
