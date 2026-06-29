@@ -17,3 +17,13 @@ class Paths:
     @staticmethod
     def libraries():
         return Paths.ROOT / "libraries"
+    
+    
+    @staticmethod
+    def version_manifest() -> Path:
+        return Paths.ROOT / "manifest" / "version_manifest_v2.json"
+
+
+    @staticmethod
+    def version_json(version) -> Path:
+        return Paths.version_dir(version) / f"{version.id}.json"

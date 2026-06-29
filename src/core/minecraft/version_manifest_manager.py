@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from src.models.minecraft.version_manifest import VersionManifest
+from src.core.fs.paths import Paths
 from pathlib import Path
 from datetime import datetime
 import requests
@@ -8,9 +9,8 @@ import json
 
 
 MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-MANIFEST_DIR = PROJECT_ROOT / "downloads" / "manifest" 
-MANIFEST_PATH = MANIFEST_DIR / "version_manifest_v2.json"
+
+
 
 class VersionManifestManager:
     @staticmethod
@@ -22,11 +22,11 @@ class VersionManifestManager:
 
     @staticmethod
     def _download_manifest() -> Path | None:
-        MANIFEST_DIR.mkdir(exist_ok=True, parents=True)
+        Paths.version_manifest().parent.mkdir(exist_ok=True, parents=True)
         try:
             req = requests.get(MANIFEST_URL, timeout=10)
-            MANIFEST_PATH.write_text(req.text, encoding="utf-8")
-            return MANIFEST_PATH
+            Paths.version_manifest().write_text(req.text, encoding="utf-8")
+            return Paths.version_manifest()
         except requests.RequestException:
             return None
 

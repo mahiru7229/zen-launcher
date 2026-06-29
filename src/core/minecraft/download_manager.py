@@ -18,7 +18,6 @@ class DownloadClientManager:
         client_dir.mkdir(parents=True, exist_ok=True)
 
         client_path = Paths.client(version)
-        print("CLIENT PATH:", client_path)
 
         if (
             client_path.exists()

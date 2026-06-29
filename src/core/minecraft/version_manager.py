@@ -1,5 +1,6 @@
 from src.models.minecraft.version import Version
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
+from src.core.fs.paths import Paths
 from pathlib import Path
 import requests
 import json
@@ -17,9 +18,8 @@ import json
 #  'releaseTime',
 #  'time',
 #  'type'])
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-VERSIONS_DIR = PROJECT_ROOT / "downloads" / "versions" 
-VERSIONS_PATH = ""
+
+
 
 
 class VersionManager:
@@ -30,7 +30,11 @@ class VersionManager:
         """
         version_path = VersionManager._download_version(VersionManager._choosing_version(id))
         version_data = VersionManager._load_version(version_path)
-        return VersionManager._parse_version(version_data)
+
+        if version_path is None:
+            raise RuntimeError("Cannot download version metadata")
+
+        return VersionManager._parse_version(version_data, version_path)
     
 
 
@@ -42,15 +46,12 @@ class VersionManager:
 
     @staticmethod
     def _download_version(version:VersionManifestManager) -> Path | None:
-        global VERSIONS_PATH
-        global VERSIONS_DIR
-        VERSIONS_DIR = VERSIONS_DIR / version.id
-        VERSIONS_DIR.mkdir(parents=True,exist_ok=True)
+        version_path = Paths.version_json(version)
+        version_path.parent.mkdir(parents=True,exist_ok=True)
         try:
             req = requests.get(version.url, timeout=10)
-            VERSIONS_PATH = VERSIONS_DIR  / f"{version.id}.json"
-            VERSIONS_PATH.write_text(req.text, encoding="utf-8")
-            return VERSIONS_PATH
+            version_path.write_text(req.text, encoding="utf-8")
+            return version_path
         except requests.RequestException:
             return None
     
@@ -61,7 +62,7 @@ class VersionManager:
         except json.JSONDecodeError:
             return {}
     @staticmethod
-    def _parse_version(version_data:dict) -> Version | None:
+    def _parse_version(version_data:dict,version_path:str) -> Version | None:
         try:
             return Version(
                 id=version_data["id"],
@@ -73,7 +74,7 @@ class VersionManager:
                 main_class=version_data["mainClass"],
                 java_version=version_data["javaVersion"],
                 raw_json=version_data,
-                path=VERSIONS_PATH
+                path=version_path
             )
         except:
             return None

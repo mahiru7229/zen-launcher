@@ -6,7 +6,7 @@ from src.core.fs.paths import Paths
 import hashlib
 import httpx
 import json
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
 class DownloadLibraryManager:
 
     @staticmethod
