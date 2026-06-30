@@ -25,14 +25,14 @@ class JavaRuntime:
             bufsize=1
         )
 
-        # 🔥 realtime stdout
+
         threading.Thread(
             target=JavaRuntime._stream,
             args=(process.stdout,),
             daemon=True
         ).start()
 
-        # 🔥 realtime stderr
+
         threading.Thread(
             target=JavaRuntime._stream,
             args=(process.stderr,),
