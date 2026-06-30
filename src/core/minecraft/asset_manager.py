@@ -1,6 +1,9 @@
 from src.core.fs.paths import Paths
+from src.models.minecraft.version import Version
+from src.core.minecraft.asset_index_manager import AssetIndexManager
 from pathlib import Path
 from src.models.minecraft.assets import DownloadAsset
+from src.core.network.httpx_downloader import HttpDownloader
 import json
 
 MAIN_LINK = "https://resources.download.minecraft.net"
@@ -8,9 +11,21 @@ MAIN_LINK = "https://resources.download.minecraft.net"
 
 class AssetManager:
     @staticmethod
-    def load():
-        ...
+    def load(version: Version) -> Path:
+        asset_index_path = AssetIndexManager.load(version)
+        assets_data = AssetManager._load_asset_index(asset_index_path)
 
+        assets = AssetManager._parse_assets(assets_data)
+        for asset in assets:
+            asset_path = Paths.asset_object(asset)
+            if (asset_path.exists() and HttpDownloader.verify_sha1(asset_path, asset.sha1)):
+                continue
+            HttpDownloader.delete_file(asset_path)
+            downloaded = HttpDownloader.download(asset,asset_path)
+            # print(f"Current: {asset.logical_name}")
+            if downloaded is None:
+                raise RuntimeError(f"Cannot download asset: "f"{asset.logical_name}\n({asset.sha1})")
+        return Paths.asset_index_dir()
 
 
     @staticmethod

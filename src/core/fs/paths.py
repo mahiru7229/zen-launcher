@@ -1,5 +1,6 @@
 from pathlib import Path
 from src.models.minecraft.version import Version
+from src.models.minecraft.assets import DownloadAsset
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -32,3 +33,14 @@ class Paths:
     @staticmethod
     def asset_index(version:Version):
         return Paths.ROOT / "assets" / "indexes" / f"{version.assets}.json"
+    
+    @staticmethod
+    def asset_index_dir():
+        return Paths.ROOT / "assets" / "objects" 
+
+
+    @staticmethod
+    def asset_object(asset: DownloadAsset):
+        directory = Paths.ROOT / "assets" / "objects" / asset.sha1[:2] 
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory / asset.sha1
