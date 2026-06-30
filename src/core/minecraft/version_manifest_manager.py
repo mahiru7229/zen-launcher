@@ -39,7 +39,7 @@ class VersionManifestManager:
             return {}
 
     @staticmethod
-    def _latest_version(is_snapshot=False) -> str:
+    def latest_version(is_snapshot=False) -> str:
         try:
             manifest_path = VersionManifestManager._download_manifest()
             manifest_data = VersionManifestManager._load_manifest(manifest_path)

@@ -24,7 +24,7 @@ import json
 
 class VersionManager:
     @staticmethod
-    def load(id:str=VersionManifestManager._latest_version()) -> Version:
+    def load(id:str=VersionManifestManager.latest_version()) -> Version:
         """
         Default: Loading newest version of Minecraft
         """
@@ -64,6 +64,7 @@ class VersionManager:
     @staticmethod
     def _parse_version(version_data:dict,version_path:str) -> Version | None:
         try:
+            print(version_data)
             return Version(
                 id=version_data["id"],
                 arguments=version_data["arguments"],
@@ -74,7 +75,9 @@ class VersionManager:
                 main_class=version_data["mainClass"],
                 java_version=version_data["javaVersion"],
                 raw_json=version_data,
-                path=version_path
+                path=version_path,
+                type=version_data.get("type", "release")
+                
             )
         except:
             return None

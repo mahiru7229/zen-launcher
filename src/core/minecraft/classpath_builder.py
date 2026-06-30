@@ -1,5 +1,6 @@
 from src.models.minecraft.version import Version
 from pathlib import Path
+import os
 
 
 
@@ -25,4 +26,4 @@ class ClasspathBuilder:
             library_path = libraries_dir / Path(artifact["path"])
             classpath.append(str(library_path))
         classpath.append(str(client_path))
-        print(classpath)
+        return os.pathsep.join(classpath)

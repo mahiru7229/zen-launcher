@@ -44,3 +44,11 @@ class Paths:
         directory = Paths.ROOT / "assets" / "objects" / asset.sha1[:2] 
         directory.mkdir(parents=True, exist_ok=True)
         return directory / asset.sha1
+    
+    @staticmethod
+    def assets_dir():
+        return Paths.ROOT / "assets" 
+    
+    @staticmethod
+    def natives(version:Version):
+        return Paths.ROOT / "downloads" / "natives" / version.id
