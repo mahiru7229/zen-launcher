@@ -5,9 +5,10 @@ from pathlib import Path
 from src.models.minecraft.assets import DownloadAsset
 from src.core.network.httpx_downloader import HttpDownloader
 import json
+import concurrent.futures 
 
 MAIN_LINK = "https://resources.download.minecraft.net"
-
+MAX_WORKERS = 10
 
 class AssetManager:
     @staticmethod
@@ -16,17 +17,33 @@ class AssetManager:
         assets_data = AssetManager._load_asset_index(asset_index_path)
 
         assets = AssetManager._parse_assets(assets_data)
-        for asset in assets:
-            asset_path = Paths.asset_object(asset)
-            if (asset_path.exists() and HttpDownloader.verify_sha1(asset_path, asset.sha1)):
-                continue
-            HttpDownloader.delete_file(asset_path)
-            downloaded = HttpDownloader.download(asset,asset_path)
-            # print(f"Current: {asset.logical_name}")
-            if downloaded is None:
-                raise RuntimeError(f"Cannot download asset: "f"{asset.logical_name}\n({asset.sha1})")
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            # Giao việc cho các luồng
+            futures = [executor.submit(AssetManager._download_single_asset, asset) for asset in assets]
+            
+
+            for future in concurrent.futures.as_completed(futures):
+                future.result() 
+
+
+        HttpDownloader.close_client()
+        
         return Paths.asset_index_dir()
 
+    @staticmethod
+    def _download_single_asset(asset: DownloadAsset) -> None:
+        """✨ Hàm mới mình thêm vào để các luồng có thể tự gọi và xử lý từng file"""
+        asset_path = Paths.asset_object(asset)
+        if (asset_path.exists() and HttpDownloader.verify_sha1(asset_path, asset.sha1)):
+            return
+            
+        HttpDownloader.delete_file(asset_path)
+        downloaded = HttpDownloader.download(asset, asset_path, max_retry=5)
+        print(f"Current: {asset.logical_name}")
+        
+        if downloaded is None:
+            raise RuntimeError(f"Cannot download asset: {asset.logical_name}\n({asset.sha1})")
 
     @staticmethod
     def _load_asset_index(path:Path) -> dict:
@@ -47,9 +64,8 @@ class AssetManager:
                 size = obj["size"]
                 ))
         return assets
+        
     @staticmethod
     def _build_download_url(asset_hash:str) -> str:
         hash_prefix = asset_hash[:2]
         return f"{MAIN_LINK}/{hash_prefix}/{asset_hash}"
-
-    
