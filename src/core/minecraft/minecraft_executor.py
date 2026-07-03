@@ -13,6 +13,7 @@ from src.core.minecraft.launcher_manager import LauncherManager
 from src.core.minecraft.context_builder import ContextBuilder
 from src.models.minecraft.version import Version
 from src.models.instance.instance import Instance
+from src.core.instance.settings_manager import SettingsManager
 
 
 
@@ -26,6 +27,7 @@ class MinecraftExecutor:
         DownloadClientManager.load(version)
         DownloadLibraryManager.load(version)
         AssetManager.load(version)
+        settings = SettingsManager.load(instance)
         context = ContextBuilder.build(instance,version)
-        cmd = LauncherManager.build(version, context)
+        cmd = LauncherManager.build(version, context, settings)
         JavaRuntime.run(LauncherManager.select_java(), cmd)

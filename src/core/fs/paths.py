@@ -10,6 +10,44 @@ class Paths:
     CACHE_ROOT = PROJECT_ROOT / "cache" # place that saves minecraft contents
     INSTANCES_ROOT = PROJECT_ROOT / "instances"
 
+
+    @staticmethod
+    def instance_settings_path(instance:Instance) -> Path:
+        instance_settings_path = Paths.INSTANCES_ROOT / instance.name / "settings.json"
+        if not instance_settings_path.exists():
+            Paths.instance_settings_create(instance)
+        return instance_settings_path
+        
+
+
+    @staticmethod
+    def instance_settings_create(instance:Instance) -> Path:
+        """
+        Default settings.
+        """
+        instance_settings_path = Paths.INSTANCES_ROOT / instance.name / "settings.json"
+        settings = {
+            "java": {
+                "path": "",
+                "min_memory": 1024,
+                "max_memory": 2048,
+                "arguments": []
+            },
+
+            "window": {
+                "width": 1280,
+                "height": 720,
+                "fullscreen": False
+            },
+
+            "launch": {
+                "game_arguments": []
+            }
+}
+        instance_settings_path.write_text(json.dumps(settings, indent=4),encoding="utf-8")
+        return instance_settings_path
+
+
     @staticmethod
     def instances_root() -> Path:
         instance_dir = Paths.INSTANCES_ROOT

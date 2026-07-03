@@ -3,7 +3,7 @@ from src.core.minecraft.classpath_builder import ClasspathBuilder
 from src.core.minecraft.argument_builder import ArgumentBuilder
 from src.models.minecraft.version import Version
 from src.core.fs.paths import Paths
-
+from src.models.instance.settings import InstanceSettings
 
 class LauncherManager:
     @staticmethod
@@ -20,7 +20,7 @@ class LauncherManager:
 
 
     @staticmethod
-    def build(version:Version, context) -> list[str]:
+    def build(version:Version, context, settings:InstanceSettings) -> list[str]:
 
 
         classpath = ClasspathBuilder.build(
@@ -29,7 +29,7 @@ class LauncherManager:
             Paths.libraries()
         )
 
-        jvm_args, game_args = ArgumentBuilder.build(version, context)
+        jvm_args, game_args = ArgumentBuilder.build(version, context, settings)
 
         main_class = version.main_class
 
