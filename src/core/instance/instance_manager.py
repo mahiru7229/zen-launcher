@@ -9,6 +9,41 @@ import shutil
 class InstanceManager:
 
     @staticmethod
+    def rename(instance_name: str, new_name: str) -> Path:
+        if not InstanceManager.is_instance_exist(instance_name):
+            raise RuntimeError(
+                f"Instance '{instance_name}' does not exist!"
+            )
+
+        if InstanceManager.is_instance_exist(new_name):
+            raise RuntimeError(
+                f"Instance '{new_name}' already exists!"
+            )
+
+        if instance_name == new_name:
+            return Paths.load_instance_dir(instance_name)
+
+        old_dir = Paths.load_instance_dir(instance_name)
+        new_dir = Paths.load_instance_dir(new_name)
+
+        old_dir.rename(new_dir)
+
+        instances_data = InstanceManager._load_instances_data()
+
+        for instance in instances_data.get("instances", []):
+            if instance.get("name") == instance_name:
+                instance["name"] = new_name
+                instance["instance_dir"] = str(new_dir)
+                break
+
+        InstanceManager._save_instances(instances_data)
+
+        return new_dir
+
+
+
+
+    @staticmethod
     def load(name: str) -> Instance:
         instance_data = InstanceManager._find_instance_data(name)
 
@@ -100,7 +135,7 @@ class InstanceManager:
         return Instance(
             name=instance_data.get("name"),
             version_id=instance_data.get("version_id"),
-            instance_dir=instance_data.get("instance_dir"),
+            instance_dir=Path(instance_data.get("instance_dir")),
             mod_loader=instance_data.get("mod_loader")
         )
 

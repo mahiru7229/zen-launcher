@@ -3,7 +3,6 @@ from src.core.minecraft.classpath_builder import ClasspathBuilder
 from src.models.instance.settings import InstanceSettings
 class ArgumentBuilder:
     @staticmethod
-    @staticmethod
     def build(version: Version, context, settings:InstanceSettings):
         jvm_args = []
         game_args = []

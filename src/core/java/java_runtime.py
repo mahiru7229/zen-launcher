@@ -1,7 +1,7 @@
 import subprocess
 import threading
 from pathlib import Path
-
+from src.models.instance.instance import Instance
 
 class JavaRuntime:
 
@@ -14,11 +14,12 @@ class JavaRuntime:
             pass
 
     @staticmethod
-    def run(java_path: Path, cmd: list[str]) -> subprocess.Popen:
+    def run(java_path: Path, cmd: list[str], instance:Instance) -> subprocess.Popen:
         full_cmd = [str(java_path), *cmd]
 
         process = subprocess.Popen(
             full_cmd,
+            cwd=str(instance.instance_dir),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
