@@ -2,13 +2,14 @@ from src.core.fs.paths import Paths
 from src.models.minecraft.version import Version
 from src.core.minecraft.classpath_builder import ClasspathBuilder
 from src.models.instance.instance import Instance
+from src.models.auth.authentication import Authentication
 from pathlib import Path
 
 
 class ContextBuilder:
 
     @staticmethod
-    def build(instance:Instance,version:Version):
+    def build(instance:Instance,version:Version, player_data:Authentication):
         classpath = ClasspathBuilder.build(
             version,
             Paths.client(version),
@@ -26,11 +27,11 @@ class ContextBuilder:
 
             "version_name": version.id,
 
-            "auth_player_name": "Steve",
-            "auth_uuid": "00000000-0000-0000-0000-000000000000",
-            "auth_access_token": "0",
-            "auth_xuid": "0",
-            "clientid": "0",
+            "auth_player_name": player_data.player_name,
+            "auth_uuid": player_data.uuid,
+            "auth_access_token": player_data.access_token,
+            "auth_xuid": player_data.xuid,
+            "clientid": player_data.client_id,
 
             "version_type": version.raw_json.get("type", "release"),
         }

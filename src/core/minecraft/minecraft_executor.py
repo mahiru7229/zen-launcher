@@ -14,6 +14,7 @@ from src.core.minecraft.context_builder import ContextBuilder
 from src.models.minecraft.version import Version
 from src.models.instance.instance import Instance
 from src.core.instance.settings_manager import SettingsManager
+from src.models.auth.authentication import Authentication
 
 
 
@@ -21,13 +22,13 @@ from src.core.instance.settings_manager import SettingsManager
 
 class MinecraftExecutor:
     @staticmethod
-    def run(instance:Instance):
+    def run(instance:Instance, player_data:Authentication):
         VersionManifestManager.get()
         version = VersionManager.load(instance.version_id)
         DownloadClientManager.load(version)
         DownloadLibraryManager.load(version)
         AssetManager.load(version)
         settings = SettingsManager.load(instance)
-        context = ContextBuilder.build(instance,version)
+        context = ContextBuilder.build(instance,version, player_data)
         cmd = LauncherManager.build(version, context, settings)
         JavaRuntime.run(LauncherManager.select_java(), cmd)
