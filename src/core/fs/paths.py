@@ -61,10 +61,17 @@ class Paths:
         return instance_dir
     
     @staticmethod
-    def load_instance_dir(instance_name:str) -> Path:
-        instance_dir = Paths.INSTANCES_ROOT / instance_name
-        instance_dir.mkdir(parents=True, exist_ok=True)
-        return instance_dir
+    def load_instance_dir(name: str) -> Path:
+        return Paths.instances_root() / name
+
+
+    @staticmethod
+    def create_instance_dir(name: str) -> Path:
+        path = Paths.load_instance_dir(name)
+        path.mkdir(parents=True, exist_ok=False)
+        return path
+    
+
     
     @staticmethod
     def instance_data_path_create():

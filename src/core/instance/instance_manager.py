@@ -63,7 +63,51 @@ class InstanceManager:
         return instances
 
 
+    @staticmethod
+    def clone(
+        source_name: str,
+        new_name: str,
+        include_saves: bool = False
+    ) -> Instance:
+        if not InstanceManager.is_instance_exist(source_name):
+            raise RuntimeError(f"Instance '{source_name}' does not exist.")
 
+        if InstanceManager.is_instance_exist(new_name):
+            raise RuntimeError(f"Instance '{new_name}' already exists.")
+
+        source_dir = Paths.load_instance_dir(source_name)
+        target_dir = Paths.load_instance_dir(new_name)
+
+        ignore = None
+
+        if not include_saves:
+            ignore = shutil.ignore_patterns(
+                "saves",
+                "logs",
+                "crash-reports"
+            )
+
+        shutil.copytree(
+            source_dir,
+            target_dir,
+            ignore=ignore
+        )
+
+        instance = InstanceManager.load(new_name)
+
+        instance.instance_id = str(uuid.uuid4())
+        instance.name = new_name
+
+        InstanceManager._save_instance_metadata(instance)
+
+        # Legacy instances.json
+        instances_data = InstanceManager._add_instances_data(
+            InstanceManager._load_instances_data(),
+            instance
+        )
+        InstanceManager._save_instances(instances_data)
+
+        return instance
 
 
 
@@ -127,6 +171,15 @@ class InstanceManager:
 
         return instance
 
+
+    @staticmethod
+    def _migrate_instance(instance: Instance) -> None:
+        """
+        Migrate a legacy instance to the new per-instance metadata format.
+        """
+
+        InstanceManager._save_instance_metadata(instance)
+
     @staticmethod
     def create(
         name: str,
@@ -142,7 +195,8 @@ class InstanceManager:
         # Đảm bảo cấu trúc thư mục launcher tồn tại
         Paths.instances_root()
         Paths.instance_data_path_create()
-
+        # tạo thư mục
+        Paths.create_instance_dir(name)
         # Tạo instance object
         instance = InstanceManager._add_instance(
             name,
