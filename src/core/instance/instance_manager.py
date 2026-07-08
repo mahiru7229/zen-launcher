@@ -1,6 +1,8 @@
 from src.models.minecraft.version import Version
 from src.models.instance.instance import Instance
 from pathlib import Path
+from zipfile import ZipFile, ZIP_DEFLATED
+from pathlib import Path
 from src.core.fs.paths import Paths
 import json
 import shutil
@@ -110,6 +112,51 @@ class InstanceManager:
         return instance
 
 
+    @staticmethod
+    def export(
+        instance_name: str,
+        output_path: Path,
+        include_saves: bool = False
+    ) -> Path:
+
+        if not InstanceManager.is_instance_exist(instance_name):
+            raise RuntimeError(
+                f"Instance '{instance_name}' does not exist."
+            )
+
+        instance_dir = Paths.load_instance_dir(instance_name)
+
+        output_path.parent.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+
+        if output_path.suffix.lower() != ".zip":
+            output_path = output_path.with_suffix(".zip")
+
+        with ZipFile(
+            output_path,
+            "w",
+            compression=ZIP_DEFLATED
+        ) as archive:
+
+            for path in instance_dir.rglob("*"):
+
+                if path.is_dir():
+                    continue
+
+                if (
+                    not include_saves
+                    and "saves" in path.parts
+                ):
+                    continue
+
+                archive.write(
+                    path,
+                    arcname=path.relative_to(instance_dir)
+                )
+
+        return output_path
 
 
 
