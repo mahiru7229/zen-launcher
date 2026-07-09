@@ -1,9 +1,9 @@
 from src.models.minecraft.version import Version
 from src.models.instance.instance import Instance
-from pathlib import Path
-from zipfile import ZipFile, ZIP_DEFLATED
-from pathlib import Path
 from src.core.fs.paths import Paths
+from src.core.package.package_manager import PackageManager
+
+from pathlib import Path
 import json
 import shutil
 import uuid
@@ -12,30 +12,43 @@ import uuid
 class InstanceManager:
 
     @staticmethod
-    def _save_instance_metadata(instance: Instance):
+    def _save_instance_metadata(instance: Instance) -> None:
         path = Paths.instance_metadata(instance.name)
-        path.write_text(json.dumps({
-            "id":instance.instance_id,
-            "name": instance.name,
-            "version_id": instance.version_id,
-            "mod_loader": instance.mod_loader,
 
-            "created_at": "",
-            "updated_at" : "",
-            "last_played":"",
+        path.parent.mkdir(
+            parents=True,
+            exist_ok=True
+        )
 
-            "icon": "grass_block",
-            "notes": "",
+        path.write_text(
+            json.dumps(
+                {
+                    "id": instance.instance_id,
+                    "name": instance.name,
+                    "version_id": instance.version_id,
+                    "mod_loader": instance.mod_loader,
 
-            "launcher_version": "v0.2.2-alpha",
-            "metadata_version": 1
+                    "created_at": "",
+                    "updated_at": "",
+                    "last_played": "",
 
-        },indent=4), encoding="utf-8")
+                    "icon": "grass_block",
+                    "notes": "",
 
+                    "launcher_version": "v0.2.2-alpha",
+                    "metadata_version": 1
+                },
+                indent=4,
+                ensure_ascii=False
+            ),
+            encoding="utf-8"
+        )
 
     @staticmethod
     def _load_instance_metadata(path: Path) -> Instance:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(
+            path.read_text(encoding="utf-8")
+        )
 
         return Instance(
             instance_id=data["id"],
@@ -64,7 +77,6 @@ class InstanceManager:
 
         return instances
 
-
     @staticmethod
     def clone(
         source_name: str,
@@ -72,10 +84,14 @@ class InstanceManager:
         include_saves: bool = False
     ) -> Instance:
         if not InstanceManager.is_instance_exist(source_name):
-            raise RuntimeError(f"Instance '{source_name}' does not exist.")
+            raise RuntimeError(
+                f"Instance '{source_name}' does not exist."
+            )
 
         if InstanceManager.is_instance_exist(new_name):
-            raise RuntimeError(f"Instance '{new_name}' already exists.")
+            raise RuntimeError(
+                f"Instance '{new_name}' already exists."
+            )
 
         source_dir = Paths.load_instance_dir(source_name)
         target_dir = Paths.load_instance_dir(new_name)
@@ -102,7 +118,6 @@ class InstanceManager:
 
         InstanceManager._save_instance_metadata(instance)
 
-        # Legacy instances.json
         instances_data = InstanceManager._add_instances_data(
             InstanceManager._load_instances_data(),
             instance
@@ -111,63 +126,89 @@ class InstanceManager:
 
         return instance
 
-
     @staticmethod
     def export(
         instance_name: str,
         output_path: Path,
         include_saves: bool = False
     ) -> Path:
+        instance = InstanceManager.load(instance_name)
 
-        if not InstanceManager.is_instance_exist(instance_name):
-            raise RuntimeError(
-                f"Instance '{instance_name}' does not exist."
-            )
+        return PackageManager.export_instance(
+            instance,
+            output_path,
+            include_saves
+        )
 
-        instance_dir = Paths.load_instance_dir(instance_name)
+    @staticmethod
+    def import_instance(package_path: Path) -> Instance:
+        temp_dir = Paths.instances_root() / "_import_temp"
 
-        output_path.parent.mkdir(
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+
+        temp_dir.mkdir(
             parents=True,
             exist_ok=True
         )
 
-        if output_path.suffix.lower() != ".zip":
-            output_path = output_path.with_suffix(".zip")
+        try:
+            PackageManager.extract(
+                package_path,
+                temp_dir
+            )
 
-        with ZipFile(
-            output_path,
-            "w",
-            compression=ZIP_DEFLATED
-        ) as archive:
+            metadata_files = list(
+                temp_dir.rglob("instance.json")
+            )
 
-            for path in instance_dir.rglob("*"):
-
-                if path.is_dir():
-                    continue
-
-                if (
-                    not include_saves
-                    and "saves" in path.parts
-                ):
-                    continue
-
-                archive.write(
-                    path,
-                    arcname=path.relative_to(instance_dir)
+            if len(metadata_files) != 1:
+                raise RuntimeError(
+                    "Invalid package: missing or duplicated instance.json."
                 )
 
-        return output_path
+            metadata_path = metadata_files[0]
+            imported_dir = metadata_path.parent
 
+            instance = InstanceManager._load_instance_metadata(
+                metadata_path
+            )
 
+            if InstanceManager.is_instance_exist(instance.name):
+                raise RuntimeError(
+                    f"Instance '{instance.name}' already exists."
+                )
 
+            target_dir = Paths.load_instance_dir(instance.name)
+
+            shutil.move(
+                str(imported_dir),
+                str(target_dir)
+            )
+
+            instances_data = InstanceManager._add_instances_data(
+                InstanceManager._load_instances_data(),
+                instance
+            )
+            InstanceManager._save_instances(instances_data)
+
+            return instance
+
+        finally:
+            if temp_dir.exists():
+                shutil.rmtree(temp_dir)
 
     @staticmethod
     def rename(instance_name: str, new_name: str) -> Path:
         if not InstanceManager.is_instance_exist(instance_name):
-            raise RuntimeError(f"Instance '{instance_name}' does not exist!")
+            raise RuntimeError(
+                f"Instance '{instance_name}' does not exist!"
+            )
 
         if InstanceManager.is_instance_exist(new_name):
-            raise RuntimeError(f"Instance '{new_name}' already exists!")
+            raise RuntimeError(
+                f"Instance '{new_name}' already exists!"
+            )
 
         if instance_name == new_name:
             return Paths.load_instance_dir(instance_name)
@@ -182,8 +223,8 @@ class InstanceManager:
 
         InstanceManager._save_instance_metadata(instance)
 
-        # update legacy instances.json nếu còn
         instances_data = InstanceManager._load_instances_data()
+
         for item in instances_data.get("instances", []):
             if item.get("name") == instance_name:
                 item["name"] = new_name
@@ -192,11 +233,6 @@ class InstanceManager:
         InstanceManager._save_instances(instances_data)
 
         return new_dir
-
-
-    @staticmethod
-    def _convert_legacy_instance(instance: Instance):
-        InstanceManager._save_instance_metadata(instance)
 
     @staticmethod
     def load(name: str) -> Instance:
@@ -209,8 +245,9 @@ class InstanceManager:
         instance_data = InstanceManager._find_instance_data(name)
 
         if instance_data is None:
-            raise RuntimeError(f"Instance '{name}' not found.")
-        
+            raise RuntimeError(
+                f"Instance '{name}' not found."
+            )
 
         instance = InstanceManager._parse_instance(instance_data)
 
@@ -218,13 +255,8 @@ class InstanceManager:
 
         return instance
 
-
     @staticmethod
     def _migrate_instance(instance: Instance) -> None:
-        """
-        Migrate a legacy instance to the new per-instance metadata format.
-        """
-
         InstanceManager._save_instance_metadata(instance)
 
     @staticmethod
@@ -233,32 +265,27 @@ class InstanceManager:
         version: Version,
         mod_loader=("vanilla", "-1")
     ) -> Instance:
-
         if InstanceManager.is_instance_exist(name):
             raise RuntimeError(
                 f"Instance '{name}' already exists."
             )
 
-        # Đảm bảo cấu trúc thư mục launcher tồn tại
         Paths.instances_root()
         Paths.instance_data_path_create()
-        # tạo thư mục
         Paths.create_instance_dir(name)
-        # Tạo instance object
+
         instance = InstanceManager._add_instance(
             name,
             version,
             mod_loader
         )
 
-        # Legacy (tạm thời)
         instances_data = InstanceManager._add_instances_data(
             InstanceManager._load_instances_data(),
             instance
         )
         InstanceManager._save_instances(instances_data)
 
-        # New metadata
         InstanceManager._save_instance_metadata(instance)
 
         return instance
@@ -272,7 +299,6 @@ class InstanceManager:
 
         if instance_dir.exists():
             shutil.rmtree(instance_dir)
-
 
         Paths.instances_root()
         Paths.instance_data_path_create()
@@ -313,7 +339,6 @@ class InstanceManager:
         version: Version,
         mod_loader: tuple
     ) -> Instance:
-
         return Instance(
             instance_id=str(uuid.uuid4()),
             name=name,
@@ -324,7 +349,9 @@ class InstanceManager:
     @staticmethod
     def _parse_instance(instance_data: dict) -> Instance:
         return Instance(
-            instance_id=instance_data.get("instance_id"),
+            instance_id=instance_data.get("id")
+            or instance_data.get("instance_id")
+            or str(uuid.uuid4()),
             name=instance_data.get("name"),
             version_id=instance_data.get("version_id"),
             mod_loader=instance_data.get("mod_loader")
@@ -334,7 +361,9 @@ class InstanceManager:
     def _load_instances_data() -> dict:
         try:
             return json.loads(
-                Paths.instance_data_path().read_text(encoding="utf-8")
+                Paths.instance_data_path().read_text(
+                    encoding="utf-8"
+                )
             )
         except (FileNotFoundError, json.JSONDecodeError):
             return {"instances": []}
@@ -344,12 +373,12 @@ class InstanceManager:
         pre_data: dict,
         instance_data: Instance
     ) -> dict:
-
         if "instances" not in pre_data:
             pre_data["instances"] = []
 
         pre_data["instances"].append(
             {
+                "id": instance_data.instance_id,
                 "name": instance_data.name,
                 "version_id": instance_data.version_id,
                 "mod_loader": instance_data.mod_loader
@@ -359,11 +388,15 @@ class InstanceManager:
         return pre_data
 
     @staticmethod
-    def _save_instances(data: dict):
+    def _save_instances(data: dict) -> Path:
         instance_data_path = Paths.instance_data_path()
 
         instance_data_path.write_text(
-            json.dumps(data, indent=4),
+            json.dumps(
+                data,
+                indent=4,
+                ensure_ascii=False
+            ),
             encoding="utf-8"
         )
 
