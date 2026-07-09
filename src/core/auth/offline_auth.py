@@ -1,4 +1,5 @@
 from src.models.auth.authentication import Authentication
+from src.models.account.account import Account
 import hashlib
 import uuid
 
@@ -7,10 +8,10 @@ import uuid
 class OfflineAuthentication:
 
     @staticmethod
-    def load(player_name:str) -> Authentication:
+    def authenticate(account:Account) -> Authentication:
         return Authentication(
-            player_name=player_name,
-            uuid=OfflineAuthentication._uuid_generator(player_name),
+            player_name=account.username,
+            uuid=account.uuid,
             access_token="0",
             xuid="0",
             client_id="0",
@@ -18,7 +19,7 @@ class OfflineAuthentication:
         )
 
     @staticmethod
-    def _uuid_generator(player_name:str) -> str:
+    def uuid_generator(player_name:str) -> str:
         data = f"OfflinePlayer:{player_name}".encode("utf-8")
 
         md5 = bytearray(hashlib.md5(data).digest())

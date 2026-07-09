@@ -9,6 +9,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 class Paths:
     CACHE_ROOT = PROJECT_ROOT / "cache" # place that saves minecraft contents
     INSTANCES_ROOT = PROJECT_ROOT / "instances"
+    ACCOUNTS_ROOT = PROJECT_ROOT / "accounts"
+
+
+    @staticmethod
+    def accounts_path() -> Path:
+        return Paths.ACCOUNTS_ROOT / "accounts.json"
+
+
+
 
     @staticmethod
     def instance_metadata(instance_name: str) -> Path:

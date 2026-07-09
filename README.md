@@ -4,6 +4,7 @@ A lightweight Minecraft Launcher written in Python.
 
 > ⚠️ This project is currently under active development.
 
+> This document was created with assistance from ChatGPT.
 ---
 
 ## Features

@@ -62,11 +62,7 @@ class SettingsManager:
         )
 
     @staticmethod
-    def update_memory(
-        instance: Instance,
-        min_memory: int,
-        max_memory: int
-    ) -> InstanceSettings:
+    def update_memory(instance: Instance, min_memory: int, max_memory: int) -> InstanceSettings:
         settings = SettingsManager.load(instance)
 
         settings.min_memory = min_memory
@@ -77,10 +73,7 @@ class SettingsManager:
         return settings
 
     @staticmethod
-    def update_java_path(
-        instance: Instance,
-        java_path: str
-    ) -> InstanceSettings:
+    def update_java_path(instance: Instance, java_path: str) -> InstanceSettings:
         settings = SettingsManager.load(instance)
 
         settings.java_path = java_path
@@ -90,12 +83,7 @@ class SettingsManager:
         return settings
 
     @staticmethod
-    def update_window(
-        instance: Instance,
-        width: int,
-        height: int,
-        fullscreen: bool
-    ) -> InstanceSettings:
+    def update_window(instance: Instance, width: int, height: int, fullscreen: bool) -> InstanceSettings:
         settings = SettingsManager.load(instance)
 
         settings.width = width
@@ -107,10 +95,7 @@ class SettingsManager:
         return settings
 
     @staticmethod
-    def update_jvm_arguments(
-        instance: Instance,
-        arguments: list[str]
-    ) -> InstanceSettings:
+    def update_jvm_arguments(instance: Instance, arguments: list[str]) -> InstanceSettings:
         settings = SettingsManager.load(instance)
 
         settings.jvm_arguments = arguments
@@ -120,10 +105,7 @@ class SettingsManager:
         return settings
 
     @staticmethod
-    def update_game_arguments(
-        instance: Instance,
-        arguments: list[str]
-    ) -> InstanceSettings:
+    def update_game_arguments(instance: Instance, arguments: list[str]) -> InstanceSettings:
         settings = SettingsManager.load(instance)
 
         settings.game_arguments = arguments
