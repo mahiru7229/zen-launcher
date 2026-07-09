@@ -88,7 +88,7 @@ package.mcwpack
 Current version:
 
 ```
-v0.2.3-alpha
+v0.3.0-alpha
 ```
 
 Implemented:
