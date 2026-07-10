@@ -24,7 +24,8 @@ class JavaRuntime:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            bufsize=1
+            bufsize=1,
+            creationflags=subprocess.CREATE_NO_WINDOW
         )
 
 

@@ -3,7 +3,11 @@ from src.models.minecraft.version import Version
 from src.models.minecraft.assets import DownloadAsset
 from src.models.instance.instance import Instance
 import json
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+import sys
+if getattr(sys, "frozen", False):
+    PROJECT_ROOT = Path(sys.executable).parent
+else:
+    PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Paths:
@@ -12,7 +16,14 @@ class Paths:
     ACCOUNTS_ROOT = PROJECT_ROOT / "accounts"
     CONFIG_ROOT = PROJECT_ROOT / "config"
 
+    @staticmethod
+    def root() -> Path:
+        if getattr(sys, "frozen", False):
+            # chạy từ exe
+            return Path(sys.executable).parent
 
+        # chạy từ source
+        return Path(__file__).resolve().parents[3]
     @staticmethod
     def microsoft_config_root()->Path:
         return Paths.CONFIG_ROOT / "microsoft.json"

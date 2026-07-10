@@ -10,3 +10,6 @@ profiles/
 runtime/
 accounts/
 launcher.py
+build/
+dist/
+MCW-Launcher.spec
