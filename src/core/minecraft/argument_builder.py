@@ -42,7 +42,6 @@ class ArgumentBuilder:
             if isinstance(arg, str):
                 game_args.append(ArgumentBuilder.resolve(arg, context))
         if account.account_type == AccountSource.OFFLINE and settings.offline_multiplayer_enabled:
-            print("IM HERE, YOU SEE ME ????")
             jvm_args.extend(ArgumentBuilder.OFFLINE_MULTIPLAYER_ARGUMENTS)
 
         return jvm_args, game_args
