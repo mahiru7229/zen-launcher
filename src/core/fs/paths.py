@@ -13,6 +13,11 @@ class Paths:
 
 
     @staticmethod
+    def account_database_path():
+        return Paths.ACCOUNTS_ROOT / "accounts.db"
+
+
+    @staticmethod
     def accounts_path() -> Path:
         return Paths.ACCOUNTS_ROOT / "accounts.json"
 
