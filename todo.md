@@ -1,267 +1,385 @@
-# Zen Launcher v0.3.0-alpha
+# Zen Launcher - UI Asset Checklist
 
-## Giới thiệu
+Mục tiêu:
 
-Zen Launcher là một Minecraft Launcher đang trong giai đoạn phát triển, được thiết kế theo hướng:
+Danh sách toàn bộ asset cần thiết để hoàn thiện giao diện Zen Launcher.
 
-- Quản lý nhiều Instance
-- Đơn giản
-- Hiện đại
-- Dễ mở rộng
-- Tập trung vào trải nghiệm người dùng
+Thiết kế được tự do sáng tạo.
 
-Hiện tại launcher đã có backend khá hoàn chỉnh, vì vậy có thể bắt đầu thiết kế giao diện.
+Không giới hạn phong cách.
 
 ---
 
-# Những tính năng đã hoàn thành
+# 1. Logo
 
-## 1. Instance System
+Thiết kế:
 
-Đây là trung tâm của launcher.
+- Logo Launcher
+- Icon Launcher
+- Splash Logo (nếu có)
 
-Mỗi Instance là một môi trường Minecraft độc lập.
+Output:
 
-Hiện tại hỗ trợ:
-
-- Tạo Instance
-- Đổi tên Instance
-- Xóa Instance
-- Clone Instance
-- Export Instance
-- Import Instance
-- Chỉnh sửa thông tin Instance
+- SVG
+- PNG
+- ICO
 
 ---
 
-## 2. Package System
+# 2. Mascot
 
-Launcher sử dụng định dạng package riêng:
+Một nhân vật đại diện cho launcher.
 
-```
-.mcwpack
-```
+Không giới hạn phong cách.
 
-Package hỗ trợ:
+Cần các trạng thái:
 
-- Export Instance
-- Import Instance
-- Metadata riêng
-- Có thể lựa chọn:
-  - Bao gồm Save
-  - Không bao gồm Save
+- Idle
+- Happy
+- Thinking
+- Download
+- Launch
+- Sleep
+- Error
+- Celebrate
+
+Nếu có animation thì càng tốt.
 
 ---
 
-## 3. Settings
+# 3. Sidebar
 
-Mỗi Instance có Settings riêng.
+Thiết kế icon cho:
+
+- Home
+- Instances
+- Accounts
+- Downloads
+- Settings
+- About
+
+Trạng thái:
+
+- Normal
+- Hover
+- Selected
+- Disabled
+
+---
+
+# 4. Home
+
+Thiết kế:
+
+- Banner
+- Background
+- Welcome Area
+- Launch Area
+
+Có thể có:
+
+- Mascot
+- Illustration
+
+---
+
+# 5. Instance
+
+Thiết kế Card gồm:
+
+- Thumbnail
+- Version
+- Loader
+- Java
+- Launch Button
+
+Trạng thái:
+
+- Normal
+- Hover
+- Selected
+
+---
+
+# 6. Account
+
+Thiết kế:
+
+Card Account
+
+Hiển thị:
+
+- Avatar
+- Username
+- Account Type
+
+Có trạng thái:
+
+Offline
+
+Microsoft
+
+---
+
+# 7. Download
+
+Thiết kế:
+
+- Progress Bar
+- Download Card
+- Speed Indicator
+- Download Complete
+
+---
+
+# 8. Settings
+
+Thiết kế:
+
+Card cho:
+
+- Java
+- Memory
+- Window
+- Launch
+
+Thiết kế:
+
+- Checkbox
+- Switch
+- Slider
+- TextBox
+- Dropdown
+
+---
+
+# 9. Button
+
+Thiết kế:
+
+- Primary
+- Secondary
+- Danger
+- Icon Button
+
+Các trạng thái:
+
+- Normal
+- Hover
+- Pressed
+- Disabled
+
+---
+
+# 10. Input
+
+Thiết kế:
+
+- TextBox
+- SearchBox
+- Password
+- Number Input
+
+---
+
+# 11. Dialog
+
+Thiết kế:
+
+- Confirm
+- Delete
+- Error
+- Warning
+- Success
+- Information
+
+---
+
+# 12. Notification
+
+Toast Notification
+
+Các loại:
+
+- Success
+- Error
+- Warning
+- Info
+
+---
+
+# 13. Progress
+
+Thiết kế:
+
+- Loading Circle
+- Loading Bar
+- Infinite Loading
+
+---
+
+# 14. Empty State
+
+Thiết kế minh họa khi:
+
+- Không có Instance
+- Không có Account
+- Không tìm thấy Java
+- Download thất bại
+- Không có Internet
+
+---
+
+# 15. Icons
+
+Các icon cần có:
+
+Launcher
+
+Minecraft
+
+Java
+
+Folder
+
+Download
+
+Upload
+
+Import
+
+Export
+
+Clone
+
+Delete
+
+Rename
+
+Edit
+
+Search
+
+Refresh
+
+Settings
+
+Play
+
+Pause
+
+Stop
+
+Account
+
+Offline
+
+Microsoft
+
+Package
+
+Library
+
+Assets
+
+Mods
+
+Forge
+
+Fabric
+
+NeoForge
+
+Quilt
+
+Success
+
+Warning
+
+Error
+
+Github
+
+Discord
+
+Website
+
+---
+
+# 16. Background
+
+Có thể thiết kế:
+
+Home
+
+Settings
+
+About
+
+Loading
+
+---
+
+# 17. Animation
+
+Nếu muốn.
 
 Ví dụ:
 
-- Java Path
-- RAM tối thiểu
-- RAM tối đa
-- Java Arguments
-- Game Arguments
-- Độ phân giải
-- Fullscreen
+Hover
 
----
+Click
 
-## 4. Account System
-
-Đã hoàn thành Offline Account.
-
-Hiện tại hỗ trợ:
-
-- Tạo Offline Account
-- Xóa Account
-- Danh sách Account
-- Chọn Account mặc định
-- Luôn đảm bảo có Selected Account hợp lệ
-
-Trong tương lai sẽ hỗ trợ:
-
-- Microsoft Account
-
----
-
-## 5. Launch System
-
-Launcher đã có thể:
-
-- Chọn Java
-- Chuẩn bị Launch Context
-- Khởi chạy Minecraft
-- Đọc Settings của từng Instance
-- Đọc Account đang được chọn
-
----
-
-## 6. Download System
-
-Đã hỗ trợ:
-
-- Download Version
-- Download Libraries
-- Download Assets
-- Download Client
-
-Đã tối ưu tốc độ download.
-
----
-
-# Những gì chưa có
-
-Hiện tại chưa có GUI.
-
-Mọi thao tác vẫn thực hiện bằng code.
-
-Đây là lý do bắt đầu thiết kế giao diện.
-
----
-
-# Định hướng UI
-
-Launcher hướng tới:
-
-- Modern
-- Minimal
-- Pixel Art
-- Dễ sử dụng
-
-Không hướng tới giao diện quá nhiều nút.
-
----
-
-# Điều quan trọng
-
-Launcher lấy **Instance** làm trung tâm.
-
-Không phải Version.
-
-Luồng sử dụng mong muốn:
-
-```
-Mở Launcher
-
-↓
-
-Chọn Instance
-
-↓
+Download
 
 Launch
-```
+
+Loading
+
+Popup
+
+Notification
 
 ---
 
-# Những màn hình dự kiến
+# 18. Window Decoration
 
-## Trang chủ
+Nếu launcher dùng custom title bar:
 
-Hiển thị danh sách Instance.
+- Close
+- Maximize
+- Minimize
 
-Mỗi Instance có:
+Hover
 
-- Tên
-- Phiên bản Minecraft
-- Mod Loader
-- Nút Launch
-
----
-
-## Chi tiết Instance
-
-Cho phép chỉnh:
-
-- Tên
-- Java
-- RAM
-- Resolution
-- Fullscreen
-- Launch Arguments
+Pressed
 
 ---
 
-## Account
+# 19. Splash Screen
 
-Danh sách Account.
+Nếu có.
 
-Có thể:
+Hiển thị:
 
-- Thêm Account
-- Chọn Account
-- Xóa Account
+Logo
 
-Trong tương lai sẽ thêm Microsoft Login.
+Loading
 
----
-
-## Settings
-
-Cài đặt chung của Launcher.
+Version
 
 ---
 
-## Package
+# 20. Future Assets
 
-Import / Export Package.
+Không cần làm ngay.
 
----
+Dành cho sau này:
 
-## Download
-
-Hiển thị tiến trình download.
-
----
-
-## Log
-
-Hiển thị log launcher.
-
----
-
-# Phong cách thiết kế
-
-Launcher hướng tới phong cách:
-
-- Pixel Art
-- Màu tối
-- Card UI
-- Icon Pixel
-- Animation nhẹ
-
-Ví dụ:
-
-- Mascot Pixel
-- Animation đào đá khi Download
-- Animation chạy khi Launch
-- Animation thành công / thất bại
-
----
-
-# Điều mong muốn
-
-Không cần thiết kế giống:
-
-- PCL2
-- HMCL
-- Prism Launcher
-
-Có thể sáng tạo theo phong cách riêng.
-
-Launcher mong muốn có bản sắc riêng và dễ nhận diện.
-
----
-
-# Mục tiêu
-
-Thiết kế một launcher:
-
-- Hiện đại
-- Gọn gàng
-- Dễ sử dụng
-- Có cảm giác "vui" khi sử dụng nhờ Pixel Art
-- Đủ chuyên nghiệp để sử dụng hằng ngày
+- Marketplace
+- Mod Browser
+- Resource Pack
+- Shader Pack
+- Skin Viewer
+- News
+- Changelog
