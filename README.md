@@ -1,4 +1,4 @@
-# Zen Launcher
+# MCW Launcher
 
 A lightweight Minecraft Launcher written in Python.
 
@@ -62,7 +62,7 @@ src/
 
 ## Package Format
 
-Zen Launcher uses its own package format:
+MCW Launcher uses its own package format:
 
 ```
 .mcwpack
