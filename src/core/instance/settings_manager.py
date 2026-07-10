@@ -19,18 +19,17 @@ class SettingsManager:
             "fullscreen": False
         },
         "launch": {
-            "game_arguments": []
+            "game_arguments": [],
+            "offline_multiplayer_enabled": False
         }
     }
 
     @staticmethod
     def load(instance: Instance) -> InstanceSettings:
         data = SettingsManager._load_instance_settings(instance)
-
         if not data:
             SettingsManager.save_default(instance)
             data = SettingsManager.DEFAULT_SETTINGS
-
         return SettingsManager._parse_instance_settings(data)
 
     @staticmethod
@@ -127,7 +126,7 @@ class SettingsManager:
         java = data.get("java", {})
         window = data.get("window", {})
         launch = data.get("launch", {})
-
+        print(data)
         return InstanceSettings(
             java_path=java.get("path", ""),
             min_memory=int(java.get("min_memory", 1024)),
@@ -136,7 +135,8 @@ class SettingsManager:
             game_arguments=launch.get("game_arguments", []),
             width=int(window.get("width", 1280)),
             height=int(window.get("height", 720)),
-            fullscreen=bool(window.get("fullscreen", False))
+            fullscreen=bool(window.get("fullscreen", False)),
+            offline_multiplayer_enabled=launch.get("offline_multiplayer_enabled",False)
         )
 
     @staticmethod
@@ -154,6 +154,7 @@ class SettingsManager:
                 "fullscreen": settings.fullscreen
             },
             "launch": {
-                "game_arguments": settings.game_arguments
+                "game_arguments": settings.game_arguments,
+                "offline_multiplayer_enabled": settings.offline_multiplayer_enabled
             }
         }

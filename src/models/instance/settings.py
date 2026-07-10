@@ -12,6 +12,8 @@ class InstanceSettings:
     jvm_arguments: list[str] = field(default_factory=list)
     game_arguments: list[str] = field(default_factory=list)
 
+    offline_multiplayer_enabled: bool = False
+
     width: int = 854
     height: int = 480
     fullscreen: bool = False

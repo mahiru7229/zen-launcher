@@ -1,6 +1,7 @@
 from src.core.fs.paths import Paths
 from src.core.auth.offline_auth import OfflineAuthentication
 from src.models.account.account import Account
+from src.models.account.account_source import AccountSource
 import json
 import uuid
 
@@ -52,14 +53,14 @@ class AccountManager:
             )
         account = Account(
             account_id=str(uuid.uuid4()),
-            account_type="offline",
+            account_type=AccountSource.OFFLINE,
             username=username,
             uuid=OfflineAuthentication.uuid_generator(username)
         )
 
         data["accounts"].append({
             "account_id": account.account_id,
-            "account_type": account.account_type,
+            "account_type": account.source.value,
             "username": account.username,
             "uuid": account.uuid
         })
@@ -115,7 +116,10 @@ class AccountManager:
     @staticmethod
     def _parse_account(data:dict) -> Account | None:
         account_id = data.get("account_id")
-        account_type = data.get("account_type")
+
+        account_type = AccountSource(data.get("source", "offline"))
+        
+        
         username = data.get("username")
         user_uuid = data.get("uuid")
 

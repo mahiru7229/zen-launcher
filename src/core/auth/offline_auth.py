@@ -15,7 +15,7 @@ class OfflineAuthentication:
             access_token="0",
             xuid="0",
             client_id="0",
-            user_type="legacy"
+            user_type="offline"
         )
 
     @staticmethod

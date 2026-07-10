@@ -41,25 +41,6 @@ class Paths:
         Default settings.
         """
         instance_settings_path = Paths.INSTANCES_ROOT / instance.name / "settings.json"
-        settings = {
-            "java": {
-                "path": "",
-                "min_memory": 1024,
-                "max_memory": 2048,
-                "arguments": []
-            },
-
-            "window": {
-                "width": 1280,
-                "height": 720,
-                "fullscreen": False
-            },
-
-            "launch": {
-                "game_arguments": []
-            }
-}
-        instance_settings_path.write_text(json.dumps(settings, indent=4),encoding="utf-8")
         return instance_settings_path
 
 

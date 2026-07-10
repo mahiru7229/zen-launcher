@@ -1,9 +1,18 @@
 from src.models.minecraft.version import Version
 from src.core.minecraft.classpath_builder import ClasspathBuilder
 from src.models.instance.settings import InstanceSettings
+from src.models.account.account_source import AccountSource
+from src.models.auth.authentication import Authentication
+from src.models.account.account import Account
 class ArgumentBuilder:
+    OFFLINE_MULTIPLAYER_ARGUMENTS = [
+    "-Dminecraft.api.auth.host=https://nope.invalid",
+    "-Dminecraft.api.account.host=https://nope.invalid",
+    "-Dminecraft.api.session.host=https://nope.invalid",
+    "-Dminecraft.api.services.host=https://nope.invalid",
+]
     @staticmethod
-    def build(version: Version, context, settings:InstanceSettings):
+    def build(version: Version, context, settings:InstanceSettings, account:Account):
         jvm_args = []
         game_args = []
 
@@ -32,6 +41,9 @@ class ArgumentBuilder:
         for arg in args.get("game", []):
             if isinstance(arg, str):
                 game_args.append(ArgumentBuilder.resolve(arg, context))
+        if account.account_type == AccountSource.OFFLINE and settings.offline_multiplayer_enabled:
+            print("IM HERE, YOU SEE ME ????")
+            jvm_args.extend(ArgumentBuilder.OFFLINE_MULTIPLAYER_ARGUMENTS)
 
         return jvm_args, game_args
     @staticmethod
