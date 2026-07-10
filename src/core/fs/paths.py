@@ -10,7 +10,12 @@ class Paths:
     CACHE_ROOT = PROJECT_ROOT / "cache" # place that saves minecraft contents
     INSTANCES_ROOT = PROJECT_ROOT / "instances"
     ACCOUNTS_ROOT = PROJECT_ROOT / "accounts"
+    CONFIG_ROOT = PROJECT_ROOT / "config"
 
+
+    @staticmethod
+    def microsoft_config_root()->Path:
+        return Paths.CONFIG_ROOT / "microsoft.json"
 
     @staticmethod
     def account_database_path():

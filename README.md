@@ -85,12 +85,6 @@ package.mcwpack
 
 ## Current Status
 
-Current version:
-
-```
-v0.3.0-alpha.6
-```
-
 Implemented:
 
 - Java Runtime
