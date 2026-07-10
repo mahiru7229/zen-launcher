@@ -39,9 +39,11 @@ class AssetManager:
                     try:
                         future.result()
                     except Exception as e:
-                        raise RuntimeError(
-                            f"Failed to download asset: {asset.logical_name}"
-                        ) from e
+                            print(type(e))
+                            print(e)
+                            raise RuntimeError(
+                                f"Failed to download asset: {asset.logical_name}"
+                            ) from e
 
         finally:
             HttpDownloader.close_client()

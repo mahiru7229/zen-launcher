@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 
 
-@dataclass
+@dataclass(slots=True)
 class DownloadAsset:
     logical_name: str 
     url: str

@@ -6,18 +6,6 @@ from src.core.fs.paths import Paths
 from src.models.instance.settings import InstanceSettings
 
 class LauncherManager:
-    @staticmethod
-    def select_java():
-        javas = JavaManager.find_installation()
-
-        if not javas:
-            raise RuntimeError("No Java found")
-
-        return max(javas, key=lambda j: j.version).executable
-    
-
-
-
 
     @staticmethod
     def build(version:Version, context, settings:InstanceSettings) -> list[str]:

@@ -9,3 +9,4 @@ class DownloadLibrary:
     sha1:str
     size:int
     path:Path
+    is_native: bool = False

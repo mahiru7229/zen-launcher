@@ -4,10 +4,124 @@ from pathlib import Path
 import subprocess
 import re
 import os
+import winreg
 
 
 class JavaManager:
+    JAVA_VENDOR_DIRECTORIES = (
+    "Java",
+    "Eclipse Adoptium",
+    "Microsoft",
+    "Amazon Corretto",
+    "BellSoft",
+    "Zulu",
+    "Azul Systems",
+    )
+    JAVA_REGISTRY_KEYS = (
+    r"SOFTWARE\JavaSoft\Java Runtime Environment",
+    r"SOFTWARE\JavaSoft\JRE",
+    r"SOFTWARE\JavaSoft\Java Development Kit",
+    r"SOFTWARE\JavaSoft\JDK",
+    )
 
+
+
+    @staticmethod
+    def find_installation() -> list[JavaInstallation]:
+        javas: list[JavaInstallation] = []
+
+        javas.extend(JavaManager._scan_java_home())
+        javas.extend(JavaManager._scan_path())
+        javas.extend(JavaManager._scan_program_files())
+        javas.extend(JavaManager._scan_registry())
+        return JavaManager._remove_duplicates(javas)
+
+    @staticmethod
+    def _scan_registry() -> list[JavaInstallation]:
+        return JavaManager._scan_source(
+            JavaManager._get_java_in_registry(),
+            JavaSource.REGISTRY,
+        )
+    @staticmethod
+    def _get_java_in_registry() -> list[Path]:
+        java_paths: list[Path] = []
+
+        registry_views = (
+            winreg.KEY_WOW64_64KEY,
+            winreg.KEY_WOW64_32KEY,
+        )
+
+        for key_path in JavaManager.JAVA_REGISTRY_KEYS:
+            for registry_view in registry_views:
+                java_paths.extend(
+                    JavaManager._get_java_homes_from_registry_key(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        key_path,
+                        registry_view,
+                    )
+                )
+
+        return java_paths
+
+    @staticmethod
+    def _get_java_homes_from_registry_key(root: int, key_path: str, access: int,) -> list[Path]:
+        java_homes: list[Path] = []
+        try:
+            with winreg.OpenKey(root, key_path, 0,winreg.KEY_READ | access,
+            ) as key:
+                index = 0
+                while True:
+                    try:
+                        version_name = winreg.EnumKey(key, index)
+                        index += 1
+                    except OSError:
+                        break
+                    try:
+                        with winreg.OpenKey(key, version_name) as version_key:
+                            java_home, _ = winreg.QueryValueEx(
+                                version_key,
+                                "JavaHome",
+                            )
+                    except (FileNotFoundError, OSError):
+                        continue
+                    java_path = Path(java_home) / "bin" / "java.exe"
+                    if java_path.is_file():
+                        java_homes.append(java_path)
+        except (FileNotFoundError, PermissionError, OSError):
+            return []
+
+        return java_homes
+
+    @staticmethod
+    def _get_program_files_dirs() -> list[Path]:
+        directories: list[Path] = []
+        program_files = os.environ.get("ProgramFiles")
+        program_files_x86 = os.environ.get("ProgramFiles(x86)")
+        if program_files:
+            directories.append(Path(program_files))
+        if program_files_x86:
+            directories.append(Path(program_files_x86))
+        return directories
+
+    @staticmethod
+    def _get_java_in_program_files() -> list[Path]:
+        java_paths: list[Path] = []
+        for program_files_dir in JavaManager._get_program_files_dirs():
+            for vendor_dir_name in JavaManager.JAVA_VENDOR_DIRECTORIES:
+                vendor_dir = program_files_dir / vendor_dir_name
+                if not vendor_dir.is_dir():
+                    continue
+                for java_home in vendor_dir.iterdir():
+                    java_executable = java_home / "bin" / "java.exe"
+                    if java_executable.is_file():
+                        java_paths.append(java_executable)
+        return java_paths
+    @staticmethod
+    def _scan_program_files() -> list[JavaInstallation]:
+        return JavaManager._scan_source(
+            JavaManager._get_java_in_program_files(),
+            JavaSource.PROGRAM_FILES
+        )
     @staticmethod
     def _scan_source(paths:list[Path] | None, source:JavaSource) -> list[JavaInstallation]:
         if not paths:
@@ -31,14 +145,7 @@ class JavaManager:
 
 
 
-    @staticmethod
-    def find_installation() -> list[JavaInstallation]:
-        javas: list[JavaInstallation] = []
 
-        javas.extend(JavaManager._scan_java_home())
-        javas.extend(JavaManager._scan_path())
-
-        return JavaManager._remove_duplicates(javas)
     
     @staticmethod
     def _get_java_in_java_home() -> list[Path] | None:
@@ -49,7 +156,7 @@ class JavaManager:
         candidates = [
             home_path / "bin" / "java.exe",
             home_path / "java.exe",
-        ] # they can return include "bin" dir, so making this crash
+        ] # they can return include "bin" dir, making this crash, so we tried 2 paths
         for java_path in candidates:
             if java_path.is_file():
                 return [java_path]
@@ -99,13 +206,23 @@ class JavaManager:
 
     @staticmethod
     def _remove_duplicates(javas: list[JavaInstallation]) -> list[JavaInstallation]:
-        unique: dict[Path, JavaInstallation] = {}
+        source_priority = {
+            JavaSource.PROGRAM_FILES: 3,
+            JavaSource.JAVA_HOME: 2,
+            JavaSource.REGISTRY: 1,
+            JavaSource.PATH: 0,
+        }
+
+        unique: dict[int, JavaInstallation] = {}
         for java in javas:
-            try:
-                executable = java.executable.resolve(strict=False)
-            except (OSError, RuntimeError):
+            current = unique.get(java.version)
+            if current is None:
+                unique[java.version] = java
                 continue
-            unique.setdefault(executable, java)
+            current_priority = source_priority.get(current.source, -1)
+            new_priority = source_priority.get(java.source, -1)
+            if new_priority > current_priority:
+                unique[java.version] = java
         return list(unique.values())
     
 
