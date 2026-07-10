@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from src.models.java.java_source import JavaSource
 from pathlib import Path
 
 
@@ -6,4 +7,4 @@ from pathlib import Path
 class JavaInstallation:
     version: int
     executable: Path
-    source: str
+    source: JavaSource
