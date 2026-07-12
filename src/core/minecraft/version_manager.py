@@ -67,16 +67,20 @@ class VersionManager:
             # print(version_data) -> for debugging
             return Version(
                 id=version_data["id"],
-                arguments=version_data["arguments"],
+                arguments=version_data.get("arguments"),
+                minecraft_arguments=version_data.get(
+                    "minecraftArguments"
+                ),
                 libraries=version_data["libraries"],
                 downloads=version_data["downloads"],
                 asset_index=version_data["assetIndex"],
                 assets= version_data["assets"],
                 main_class=version_data["mainClass"],
-                java_version=version_data["javaVersion"],
+                java_version=version_data.get("javaVersion", {"component": "jre-legacy","majorVersion": 8,}),
                 raw_json=version_data,
                 path=version_path,
-                type=version_data.get("type", "release")
+                type=version_data.get("type", "release"),
+                
                 
             )
         except:

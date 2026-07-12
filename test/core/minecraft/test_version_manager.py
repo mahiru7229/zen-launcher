@@ -114,15 +114,13 @@ def test_parse_version_defaults_type_to_release(
 
 @pytest.mark.parametrize(
     "missing_key",
-    [
+        [
         "id",
-        "arguments",
         "libraries",
         "downloads",
         "assetIndex",
         "assets",
         "mainClass",
-        "javaVersion",
     ],
 )
 def test_parse_version_returns_none_when_required_field_is_missing(

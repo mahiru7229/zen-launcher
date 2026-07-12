@@ -10,7 +10,7 @@
 
 ### Minecraft
 
-- ✅ Support Minecraft **1.13 → Latest**
+- ✅ Support **all** Minecraft versions.
 - ✅ Automatic Java selection
 - ✅ Vanilla launcher support
 - ✅ Progress callback system

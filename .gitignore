@@ -13,3 +13,4 @@ launcher.py
 build/
 dist/
 MCW-Launcher.spec
+test.py

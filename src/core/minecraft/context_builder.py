@@ -30,8 +30,10 @@ class ContextBuilder:
             "auth_player_name": player_data.player_name,
             "auth_uuid": player_data.uuid,
             "auth_access_token": player_data.access_token,
+            "user_properties": "{}",
             "auth_xuid": player_data.xuid,
             "clientid": player_data.client_id,
 
             "version_type": version.raw_json.get("type", "release"),
+            "user_type": getattr(player_data, "user_type", "legacy")
         }

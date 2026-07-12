@@ -397,9 +397,11 @@ def test_build_returns_exact_public_context_keys(
         "auth_player_name",
         "auth_uuid",
         "auth_access_token",
+        "user_properties",
         "auth_xuid",
         "clientid",
         "version_type",
+        "user_type",
     }
 
 

@@ -4,7 +4,6 @@ from pathlib import Path
 class Version:
     id: str
     path: Path
-    arguments: dict
     libraries: list
     downloads: dict
     asset_index: dict
@@ -13,3 +12,9 @@ class Version:
     java_version: dict
     raw_json: dict
     type:str
+
+
+
+    #for legacy version support
+    arguments: dict |  None
+    minecraft_arguments: str | None
