@@ -201,29 +201,47 @@ class JavaManager:
     @staticmethod
     def _get_major_version(java_path: Path) -> int | None:
         try:
-            info = subprocess.run(
+            result = subprocess.run(
                 [str(java_path), "-version"],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
+                timeout=8,
             )
 
-            version_text = info.stderr.splitlines()[0]
-            match = re.search(r'"([^"]+)"', version_text)
+        except (
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired,
+            FileNotFoundError,
+            PermissionError,
+            OSError,
+        ):
+            return None
 
-            if not match:
-                return None
+        output = result.stderr.strip()
 
-            version = match.group(1)
+        if not output:
+            return None
 
-            if version.startswith("1."):
-                return int(version.split(".")[1])
+        lines = output.splitlines()
 
-            return int(version.split(".")[0])
+        if not lines:
+            return None
 
+        first_line = lines[0]
 
+        match = re.search(
+            r'version "(?:1\.)?(\d+)',
+            first_line,
+        )
 
-        except (subprocess.CalledProcessError, FileNotFoundError):
+        if match is None:
+            return None
+
+        try:
+            return int(match.group(1))
+
+        except ValueError:
             return None
 
     @staticmethod

@@ -1,0 +1,45 @@
+name: MCW Launcher Tests
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python 3.12 tests
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install project dependencies
+        shell: pwsh
+        run: |
+          if (Test-Path "requirements.txt") {
+            python -m pip install -r requirements.txt
+          }
+
+          python -m pip install pytest pytest-cov
+          python -m pip install requests httpx cryptography
+
+      - name: Run tests
+        run: python -m pytest test -v
