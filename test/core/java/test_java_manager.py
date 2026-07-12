@@ -469,6 +469,7 @@ def test_get_java_in_path_uses_where_with_timeout(
         "text": True,
         "check": True,
         "timeout": 8,
+        "creationflags": JavaManager._creation_flags(),
     }
 
 
@@ -592,6 +593,7 @@ def test_get_major_version_executes_requested_path(
         "text": True,
         "check": True,
         "timeout": 8,
+        "creationflags": JavaManager._creation_flags(),
     }
 
 

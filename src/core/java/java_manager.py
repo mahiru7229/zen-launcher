@@ -25,6 +25,13 @@ class JavaManager:
     )
 
 
+    @staticmethod
+    def _creation_flags() -> int:
+        if os.name == "nt":
+            return subprocess.CREATE_NO_WINDOW
+
+        return 0
+
 
     @staticmethod
     def find_installation() -> list[JavaInstallation]:
@@ -170,10 +177,12 @@ class JavaManager:
                 text=True,
                 check=True,
                 timeout=8,
+                creationflags=JavaManager._creation_flags(),
             )
 
         except (
             subprocess.CalledProcessError,
+            subprocess.TimeoutExpired,
             FileNotFoundError,
             PermissionError,
             OSError,
@@ -187,19 +196,25 @@ class JavaManager:
 
         java_paths: list[Path] = []
 
-        for p in paths:
-            java = Path(p.strip())
-            javaw = java.with_name("javaw.exe")
+        for raw_path in paths:
+            java_path = Path(raw_path.strip())
 
-            if javaw.exists():
-                java_paths.append(javaw)
+            if not str(java_path):
+                continue
+
+            javaw_path = java_path.with_name("javaw.exe")
+
+            if javaw_path.exists():
+                java_paths.append(javaw_path)
             else:
-                java_paths.append(java)
+                java_paths.append(java_path)
 
-        return java_paths
+        return java_paths or None
 
     @staticmethod
-    def _get_major_version(java_path: Path) -> int | None:
+    def _get_major_version(
+        java_path: Path
+    ) -> int | None:
         try:
             result = subprocess.run(
                 [str(java_path), "-version"],
@@ -207,6 +222,7 @@ class JavaManager:
                 text=True,
                 check=True,
                 timeout=8,
+                creationflags=JavaManager._creation_flags(),
             )
 
         except (
@@ -223,12 +239,7 @@ class JavaManager:
         if not output:
             return None
 
-        lines = output.splitlines()
-
-        if not lines:
-            return None
-
-        first_line = lines[0]
+        first_line = output.splitlines()[0]
 
         match = re.search(
             r'version "(?:1\.)?(\d+)',
@@ -240,7 +251,6 @@ class JavaManager:
 
         try:
             return int(match.group(1))
-
         except ValueError:
             return None
 
