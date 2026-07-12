@@ -49,7 +49,7 @@ class Paths:
 
     @staticmethod
     def instance_settings_path(instance:Instance) -> Path:
-        instance_settings_path = Paths.INSTANCES_ROOT / instance.name / "settings.json"
+        instance_settings_path = Path(instance.instance_dir) / "settings.json"
         if not instance_settings_path.exists():
             Paths.instance_settings_create(instance)
         return instance_settings_path
@@ -61,7 +61,7 @@ class Paths:
         """
         Default settings.
         """
-        instance_settings_path = Paths.INSTANCES_ROOT / instance.name / "settings.json"
+        instance_settings_path = Path(instance.instance_dir) / "settings.json"
         return instance_settings_path
 
 
@@ -87,7 +87,11 @@ class Paths:
     @staticmethod
     def instance_data_path_create():
         instance_path = Paths.instances_root() / "instances.json"
-        instance_path.write_text(json.dumps({"instances":[]}, indent=4),encoding="utf-8")
+        if not instance_path.exists():
+            instance_path.write_text(
+                json.dumps({"instances": []}, indent=4),
+                encoding="utf-8"
+            )
         return instance_path
     @staticmethod
     def instance_data_path():
@@ -138,4 +142,3 @@ class Paths:
     @staticmethod
     def natives(version:Version):
         return Paths.CACHE_ROOT / "natives" / version.id
-

@@ -13,7 +13,8 @@ class InstanceManager:
 
     @staticmethod
     def _save_instance_metadata(instance: Instance) -> None:
-        path = Paths.instance_metadata(instance.name)
+        instance_dir = Path(instance.instance_dir)
+        path = instance_dir / "instance.json"
 
         path.parent.mkdir(
             parents=True,
@@ -27,6 +28,7 @@ class InstanceManager:
                     "name": instance.name,
                     "version_id": instance.version_id,
                     "mod_loader": instance.mod_loader,
+                    "instance_dir": str(instance_dir),
 
                     "created_at": "",
                     "updated_at": "",
@@ -35,7 +37,7 @@ class InstanceManager:
                     "icon": "grass_block",
                     "notes": "",
 
-                    "launcher_version": "v0.2.2-alpha",
+                    "launcher_version": "",
                     "metadata_version": 1
                 },
                 indent=4,
@@ -54,7 +56,8 @@ class InstanceManager:
             instance_id=data["id"],
             name=data["name"],
             version_id=data["version_id"],
-            mod_loader=data["mod_loader"],
+            mod_loader=tuple(data.get("mod_loader", ("vanilla", "-1"))),
+            instance_dir=path.parent
         )
 
     @staticmethod
@@ -115,6 +118,7 @@ class InstanceManager:
 
         instance.instance_id = str(uuid.uuid4())
         instance.name = new_name
+        instance.instance_dir = target_dir
 
         InstanceManager._save_instance_metadata(instance)
 
@@ -186,6 +190,9 @@ class InstanceManager:
                 str(target_dir)
             )
 
+            instance.instance_dir = target_dir
+            InstanceManager._save_instance_metadata(instance)
+
             instances_data = InstanceManager._add_instances_data(
                 InstanceManager._load_instances_data(),
                 instance
@@ -220,6 +227,7 @@ class InstanceManager:
 
         instance = InstanceManager.load(new_name)
         instance.name = new_name
+        instance.instance_dir = new_dir
 
         InstanceManager._save_instance_metadata(instance)
 
@@ -228,6 +236,7 @@ class InstanceManager:
         for item in instances_data.get("instances", []):
             if item.get("name") == instance_name:
                 item["name"] = new_name
+                item["instance_dir"] = str(new_dir)
                 break
 
         InstanceManager._save_instances(instances_data)
@@ -240,7 +249,21 @@ class InstanceManager:
         metadata_path = instance_dir / "instance.json"
 
         if metadata_path.exists():
-            return InstanceManager._load_instance_metadata(metadata_path)
+            instance = InstanceManager._load_instance_metadata(metadata_path)
+            repaired = False
+
+            if instance.name != name:
+                instance.name = name
+                repaired = True
+
+            if Path(instance.instance_dir) != instance_dir:
+                instance.instance_dir = instance_dir
+                repaired = True
+
+            if repaired:
+                InstanceManager._save_instance_metadata(instance)
+
+            return instance
 
         instance_data = InstanceManager._find_instance_data(name)
 
@@ -250,6 +273,8 @@ class InstanceManager:
             )
 
         instance = InstanceManager._parse_instance(instance_data)
+        instance.name = name
+        instance.instance_dir = instance_dir
 
         InstanceManager._migrate_instance(instance)
 
@@ -343,7 +368,8 @@ class InstanceManager:
             instance_id=str(uuid.uuid4()),
             name=name,
             version_id=version.id,
-            mod_loader=mod_loader
+            mod_loader=mod_loader,
+            instance_dir=Paths.load_instance_dir(name)
         )
 
     @staticmethod
@@ -354,7 +380,8 @@ class InstanceManager:
             or str(uuid.uuid4()),
             name=instance_data.get("name"),
             version_id=instance_data.get("version_id"),
-            mod_loader=instance_data.get("mod_loader")
+            mod_loader=instance_data.get("mod_loader"),
+            instance_dir=Paths.load_instance_dir(instance_data.get("name"))
         )
 
     @staticmethod
@@ -381,7 +408,8 @@ class InstanceManager:
                 "id": instance_data.instance_id,
                 "name": instance_data.name,
                 "version_id": instance_data.version_id,
-                "mod_loader": instance_data.mod_loader
+                "mod_loader": instance_data.mod_loader,
+                "instance_dir": str(instance_data.instance_dir)
             }
         )
 
