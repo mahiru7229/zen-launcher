@@ -2,7 +2,7 @@
 
 > A lightweight, modular, and open-source Minecraft Launcher built with Python.
 
-> ⚠️ This project is currently in **Pre-Beta**.
+> ⚠️ This project is currently in **Beta**.
 
 ---
 
