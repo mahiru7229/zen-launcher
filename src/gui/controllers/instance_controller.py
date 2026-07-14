@@ -68,7 +68,7 @@ class InstanceController(BaseController):
             return
         self.selected_instance_changed.emit(instance)
 
-    def create(self, name: str, version_id: str, loader_name: str = "vanilla", loader_version: str = "-1") -> None:
+    def create(self, name: str, version_id: str, loader_name: str = "vanilla", loader_version: str = ModLoaderManager.AUTO) -> None:
         name = self._validated_name(name)
         version_id = version_id.strip()
         loader_name, loader_version = ModLoaderManager.normalize((loader_name, loader_version))
@@ -76,14 +76,12 @@ class InstanceController(BaseController):
             if not version_id:
                 self._emit_error("Create instance", "Select a Minecraft version first.")
             return
-        if loader_name == ModLoaderManager.FABRIC and not loader_version:
-            self._emit_error("Create instance", "Select a Fabric Loader version first.")
-            return
 
         def task() -> Any:
             version = VersionManager.load(version_id)
-            ModLoaderManager.prepare(version, loader_name, loader_version)
-            return InstanceManager.create(name=name, version=version, mod_loader=(loader_name, loader_version))
+            resolved_loader = ModLoaderManager.resolve(version.id, loader_name, loader_version)
+            ModLoaderManager.prepare(version, *resolved_loader)
+            return InstanceManager.create(name=name, version=version, mod_loader=resolved_loader)
 
         self._task_runner.run("instance.create", task, f"Creating instance '{name}'...")
 
@@ -101,8 +99,9 @@ class InstanceController(BaseController):
             if InstanceRunLock.is_active(instance):
                 raise RuntimeError("Close Minecraft before changing this instance's mod loader.")
             version = VersionManager.load(instance.version_id)
-            ModLoaderManager.prepare(version, loader_name, loader_version)
-            return InstanceManager.set_mod_loader(name, (loader_name, loader_version))
+            resolved_loader = ModLoaderManager.resolve(version.id, loader_name, loader_version)
+            ModLoaderManager.prepare(version, *resolved_loader)
+            return InstanceManager.set_mod_loader(name, resolved_loader)
 
         self._task_runner.run("instance.loader", task, f"Applying {loader_name.title()} to '{name}'...")
 

@@ -19,3 +19,28 @@ def test_loads_fabric_version(monkeypatch):
     instance = SimpleNamespace(version_id="1.20.1", mod_loader=("fabric", "0.19.3"))
 
     assert ModLoaderManager.load(instance) is expected
+
+
+def test_resolve_fabric_auto_uses_recommended_loader(monkeypatch):
+    monkeypatch.setattr(FabricVersionManager, "recommended_loader_version", lambda game_version: "0.19.3")
+
+    assert ModLoaderManager.resolve("1.21.1", "fabric", "auto") == ("fabric", "0.19.3")
+
+
+def test_resolve_fabric_keeps_explicit_loader_version(monkeypatch):
+    def unexpected_call(game_version):
+        raise AssertionError("Explicit loader versions must not query the recommended version.")
+
+    monkeypatch.setattr(FabricVersionManager, "recommended_loader_version", unexpected_call)
+
+    assert ModLoaderManager.resolve("1.21.1", "fabric", "0.18.6") == ("fabric", "0.18.6")
+
+
+def test_resolve_vanilla_normalizes_version():
+    assert ModLoaderManager.resolve("1.21.1", "vanilla", "auto") == ("vanilla", "-1")
+
+
+def test_resolve_fabric_legacy_missing_version_uses_recommended_loader(monkeypatch):
+    monkeypatch.setattr(FabricVersionManager, "recommended_loader_version", lambda game_version: "0.19.3")
+
+    assert ModLoaderManager.resolve("1.21.1", "fabric", "-1") == ("fabric", "0.19.3")

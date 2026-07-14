@@ -8,6 +8,7 @@ from src.models.minecraft.version import Version
 class ModLoaderManager:
     VANILLA = "vanilla"
     FABRIC = "fabric"
+    AUTO = "auto"
 
     @staticmethod
     def load(instance: Instance, reporter: ProgressReporter | None = None) -> Version:
@@ -27,6 +28,18 @@ class ModLoaderManager:
             return version
         if loader_name == ModLoaderManager.FABRIC:
             return FabricVersionManager.install(version, loader_version, reporter)
+        raise RuntimeError(f"Unsupported mod loader: {loader_name}")
+
+    @staticmethod
+    def resolve(game_version: str, loader_name: str, loader_version: str = AUTO) -> tuple[str, str]:
+        loader_name, loader_version = ModLoaderManager.normalize((loader_name, loader_version))
+
+        if loader_name == ModLoaderManager.VANILLA:
+            return ModLoaderManager.VANILLA, "-1"
+        if loader_name == ModLoaderManager.FABRIC:
+            if loader_version.casefold() in {"", "-1", ModLoaderManager.AUTO, "latest", "recommended"}:
+                loader_version = FabricVersionManager.recommended_loader_version(game_version)
+            return ModLoaderManager.FABRIC, loader_version
         raise RuntimeError(f"Unsupported mod loader: {loader_name}")
 
     @staticmethod

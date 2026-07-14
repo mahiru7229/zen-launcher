@@ -82,3 +82,24 @@ def test_library_key_keeps_classifiers_separate():
     native = FabricVersionManager._library_key("example:shared:1.0.0:natives-windows")
 
     assert regular != native
+
+
+def test_recommended_loader_prefers_first_stable_version(monkeypatch):
+    versions = [
+        type("Loader", (), {"version": "0.20.0-beta", "stable": False})(),
+        type("Loader", (), {"version": "0.19.3", "stable": True})(),
+        type("Loader", (), {"version": "0.18.6", "stable": True})(),
+    ]
+    monkeypatch.setattr(FabricMetaClient, "list_loader_versions", lambda game_version: versions)
+
+    assert FabricVersionManager.recommended_loader_version("1.21.1") == "0.19.3"
+
+
+def test_recommended_loader_falls_back_to_first_available_version(monkeypatch):
+    versions = [
+        type("Loader", (), {"version": "0.20.0-beta", "stable": False})(),
+        type("Loader", (), {"version": "0.19.4-beta", "stable": False})(),
+    ]
+    monkeypatch.setattr(FabricMetaClient, "list_loader_versions", lambda game_version: versions)
+
+    assert FabricVersionManager.recommended_loader_version("1.21.1") == "0.20.0-beta"

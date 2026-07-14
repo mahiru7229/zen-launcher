@@ -27,6 +27,16 @@ class FabricVersionManager:
         return FabricVersionManager.install(base_version, loader_version, reporter)
 
     @staticmethod
+    def recommended_loader_version(game_version: str) -> str:
+        versions = FabricMetaClient.list_loader_versions(game_version)
+
+        if not versions:
+            raise RuntimeError(f"Fabric Loader is not available for Minecraft {game_version}.")
+
+        recommended = next((version for version in versions if version.stable), versions[0])
+        return recommended.version
+
+    @staticmethod
     def install(base_version: Version, loader_version: str, reporter: ProgressReporter | None = None) -> Version:
         loader_version = loader_version.strip()
         if not loader_version:
