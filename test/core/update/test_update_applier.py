@@ -35,7 +35,6 @@ def test_update_applier_replaces_files_and_restarts(tmp_path, monkeypatch) -> No
     starts: list[bool] = []
     monkeypatch.setattr(applier, "_wait_for_process_exit", lambda _pid: None)
     monkeypatch.setattr(applier, "_start_launcher", lambda: starts.append(True))
-    monkeypatch.setattr(applier, "_schedule_updater_cleanup", lambda: None)
 
     assert applier.run() == 0
     assert (request.destination_directory / "MCW Launcher.exe").read_bytes() == b"new-exe"
@@ -100,3 +99,27 @@ def test_update_request_loads_and_validates_json(tmp_path) -> None:
     loaded = UpdateApplyRequest.load(request_path)
     assert loaded.target_version == "0.5.0-beta.3"
     assert loaded.executable_name == "MCW Launcher.exe"
+
+
+def test_start_launcher_passes_hidden_cleanup_request(tmp_path, monkeypatch) -> None:
+    request = make_request(tmp_path)
+    executable = request.destination_directory / request.executable_name
+    executable.write_bytes(b"exe")
+    applier = UpdateApplier(request)
+    calls: list[tuple[list[str], dict]] = []
+
+    class FakeProcess:
+        pass
+
+    def fake_popen(command, **kwargs):
+        calls.append((command, kwargs))
+        return FakeProcess()
+
+    monkeypatch.setattr("src.core.update.update_applier.subprocess.Popen", fake_popen)
+    monkeypatch.setattr("src.core.update.update_applier.os.getpid", lambda: 9876)
+
+    applier._start_launcher()
+
+    assert calls[0][0] == [str(executable), "--cleanup-update", str(request.updater_directory), "9876"]
+    assert calls[0][1]["stdout"] is not None
+    assert calls[0][1]["stderr"] is not None

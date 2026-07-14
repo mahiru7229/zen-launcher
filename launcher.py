@@ -15,10 +15,21 @@ def _run_update_mode() -> int | None:
     return run_update_applier(Path(sys.argv[2]))
 
 
+def _start_update_cleanup() -> None:
+    from src.core.update.update_cleanup import UpdateCleanupWorker, consume_update_cleanup_arguments
+
+    cleaned_arguments, cleanup_request = consume_update_cleanup_arguments(sys.argv)
+    sys.argv = cleaned_arguments
+    if cleanup_request is not None:
+        UpdateCleanupWorker(cleanup_request).start()
+
+
 def main() -> None:
     update_result = _run_update_mode()
     if update_result is not None:
         raise SystemExit(update_result)
+
+    _start_update_cleanup()
 
     from src.core.bootstrap import initialize_application
 

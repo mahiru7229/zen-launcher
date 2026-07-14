@@ -81,7 +81,6 @@ class UpdateApplier:
             self._start_launcher()
             self._log(f"Update to {self.request.target_version} completed")
             shutil.rmtree(self.request.staging_directory, ignore_errors=True)
-            self._schedule_updater_cleanup()
             return 0
         except Exception as error:
             self._log(f"Update failed: {error}")
@@ -153,7 +152,7 @@ class UpdateApplier:
         if os.name == "nt":
             creation_flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         subprocess.Popen(
-            [str(executable)],
+            [str(executable), "--cleanup-update", str(self.request.updater_directory), str(os.getpid())],
             cwd=str(self.request.destination_directory),
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
@@ -214,23 +213,6 @@ class UpdateApplier:
                 return
             time.sleep(0.2)
         raise TimeoutError("The launcher did not close within two minutes.")
-
-    def _schedule_updater_cleanup(self) -> None:
-        if os.name != "nt":
-            return
-        command = f'ping 127.0.0.1 -n 4 > nul & rmdir /s /q "{self.request.updater_directory}"'
-        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
-        try:
-            subprocess.Popen(
-                ["cmd.exe", "/d", "/s", "/c", command],
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                close_fds=True,
-                creationflags=flags,
-            )
-        except OSError:
-            pass
 
     def _show_error(self, message: str) -> None:
         if os.name != "nt":
