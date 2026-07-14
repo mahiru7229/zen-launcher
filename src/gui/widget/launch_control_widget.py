@@ -1,95 +1,83 @@
 from __future__ import annotations
-from pathlib import Path
-from src.core.fs.paths import Paths
-from PySide6.QtCore import QSize
-from PySide6.QtGui import QIcon
+
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QProgressBar, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton, QVBoxLayout
 
 
-class LaunchControlWidget(QWidget):
+class LaunchControlWidget(QFrame):
     launch_clicked = Signal()
 
-    def __init__(self, theme_name:str) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.THEME_NAME = theme_name
+        self.setObjectName("LaunchControl")
+        self._selected_instance = ""
         self._build_ui()
-        self._connect_signals()
 
     def _build_ui(self) -> None:
-        self.setObjectName("LaunchControlWidget")
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(20, 14, 20, 14)
+        layout.setSpacing(18)
 
-        self.main_layout = QHBoxLayout(self)
-        self.main_layout.setContentsMargins(20, 14, 20, 14)
-        self.main_layout.setSpacing(16)
-
-        self.progress_widget = QWidget()
-        self.progress_layout = QVBoxLayout(self.progress_widget)
-        self.progress_layout.setContentsMargins(0, 0, 0, 0)
-        self.progress_layout.setSpacing(6)
-
+        progress_layout = QVBoxLayout()
+        progress_layout.setContentsMargins(0, 0, 0, 0)
+        progress_layout.setSpacing(6)
         self.status_label = QLabel("Ready")
-
+        self.status_label.setObjectName("ValueLabel")
+        self.detail_label = QLabel("Select an account and an instance, then launch.")
+        self.detail_label.setObjectName("TinyLabel")
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("%p%")
+        progress_layout.addWidget(self.status_label)
+        progress_layout.addWidget(self.detail_label)
+        progress_layout.addWidget(self.progress_bar)
 
-
-        #========================================
-        # Launch Button
-        #========================================
-        self.launch_button = QPushButton()
-        self.launch_button.setIcon(QIcon(str(Paths.theme_asset(self.THEME_NAME,"images", "launch_control","button","launch_button.png"))))
-        self.launch_button.setIconSize(QSize(180, 60))
-        self.launch_button.setFixedSize(200, 80)
-        self.launch_button.setStyleSheet("""
-        QPushButton {
-            background: transparent;
-            border: none;
-        }
-
-        QPushButton:hover {
-            background: transparent;
-        }
-
-        QPushButton:pressed {
-            background: transparent;
-        }
-        """)
-
-
-
-
-        self.progress_layout.addWidget(self.status_label)
-        self.progress_layout.addWidget(self.progress_bar)
-
-        self.main_layout.addWidget(self.progress_widget, 1)
-        self.main_layout.addWidget(self.launch_button)
-
-    def _connect_signals(self) -> None:
+        self.launch_button = QPushButton("LAUNCH")
+        self.launch_button.setObjectName("PrimaryButton")
+        self.launch_button.setFixedSize(230, 72)
         self.launch_button.clicked.connect(self.launch_clicked.emit)
 
-    def set_status(self, message: str) -> None:
+        layout.addLayout(progress_layout, 1)
+        layout.addWidget(self.launch_button)
+
+    def set_selected_instance(self, instance: object | None) -> None:
+        self._selected_instance = getattr(instance, "name", "") if instance is not None else ""
+        self.launch_button.setText(f"LAUNCH\n{self._selected_instance}" if self._selected_instance else "LAUNCH")
+
+    def set_status(self, message: str, detail: str | None = None) -> None:
         self.status_label.setText(message)
+        if detail is not None:
+            self.detail_label.setText(detail)
 
-    def set_progress(self, value: int) -> None:
-        value = max(0, min(value, 100))
-
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(value)
-
-    def set_indeterminate(self, enabled: bool) -> None:
-        if enabled:
+    def set_progress_event(self, event: object) -> None:
+        self.status_label.setText(getattr(event, "message", "Working..."))
+        stage = getattr(getattr(event, "stage", None), "value", "working").replace("_", " ").title()
+        if getattr(event, "is_determinate", False):
+            percentage = float(getattr(event, "percentage", 0) or 0)
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(int(percentage))
+            current = getattr(event, "current", 0)
+            total = getattr(event, "total", 0)
+            unit = getattr(event, "unit", "") or ""
+            self.detail_label.setText(f"{stage} — {current}/{total} {unit} ({percentage:.1f}%)")
+        else:
             self.progress_bar.setRange(0, 0)
-            return
+            self.detail_label.setText(stage)
 
+    def set_result(self, result: dict) -> None:
         self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(100)
+        self.status_label.setText(f"Minecraft {result.get('minecraftVersion', 'unknown')} launched")
+        self.detail_label.setText(f"Java: {result.get('javaPath', 'unknown')}")
 
     def set_busy(self, busy: bool) -> None:
         self.launch_button.setEnabled(not busy)
+        if busy:
+            self.launch_button.setText("WORKING...")
+        else:
+            self.launch_button.setText(f"LAUNCH\n{self._selected_instance}" if self._selected_instance else "LAUNCH")
 
-    def reset(self) -> None:
-        self.set_status("Ready")
-        self.set_indeterminate(False)
-        self.set_progress(0)
-        self.set_busy(False)
+    def reset_progress(self) -> None:
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
