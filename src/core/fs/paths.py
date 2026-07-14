@@ -16,6 +16,19 @@ class Paths:
     ACCOUNTS_ROOT = PROJECT_ROOT / "accounts"
     CONFIG_ROOT = PROJECT_ROOT / "config"
     THEME_ROOT = PROJECT_ROOT / "themes" 
+    
+    @staticmethod
+    def initialize() -> None:
+        directories = [
+            Paths.CACHE_ROOT,
+            Paths.INSTANCES_ROOT,
+            Paths.ACCOUNTS_ROOT,
+            Paths.CONFIG_ROOT,
+        ]
+
+        for directory in directories:
+            directory.mkdir(parents=True, exist_ok=True)
+
 
     @staticmethod
     def theme_asset(theme: str, *paths: str) -> Path:
