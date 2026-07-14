@@ -8,4 +8,3 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-# python -m PyInstaller --onefile --windowed --clean --noconfirm --collect-all PySide6 --name "MCW Launcher" launcher.py

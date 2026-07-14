@@ -19,7 +19,7 @@ def test_presenter_formats_java_byte_progress():
     assert view.stage_text == "JAVA DOWNLOAD"
     assert view.button_text == "DOWNLOADING JAVA..."
     assert view.percentage == 25
-    assert view.detail == "5.0 MiB / 20.0 MiB · 25%"
+    assert view.detail == "5.0 MB / 20.0 MB · 25%"
 
 
 def test_presenter_uses_indeterminate_progress_for_installation():
