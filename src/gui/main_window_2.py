@@ -21,6 +21,7 @@ from src.gui.controllers.settings_controller import InstanceSettingsController
 from src.gui.controllers.version_controller import VersionController
 from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
 from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
+from src.gui.input_guard import install_combo_box_wheel_guard
 from src.gui.localization import retranslate_widget_tree
 from src.gui.pages.about_page import AboutPage
 from src.gui.pages.account_page import AccountPage
@@ -450,6 +451,7 @@ class MainWindow(QMainWindow):
 def run() -> None:
     app = QApplication(sys.argv)
     app.setApplicationName("MCW Launcher")
+    app._combo_box_wheel_guard = install_combo_box_wheel_guard(app)
 
     window = MainWindow()
     window.show()

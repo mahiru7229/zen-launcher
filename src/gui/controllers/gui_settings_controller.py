@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QByteArray, QSettings, Signal
+from PySide6.QtCore import QByteArray, Signal
 
+from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.language.language_manager import tr
 from src.gui.controllers.base_controller import BaseController
 
@@ -19,7 +20,7 @@ class GuiSettingsController(BaseController):
 
     def __init__(self) -> None:
         super().__init__()
-        self._settings = QSettings("mahiru7229", "MCW Launcher")
+        self._settings = LauncherSettingsManager()
         self._current = dict(self.DEFAULTS)
 
     @property
@@ -27,40 +28,51 @@ class GuiSettingsController(BaseController):
         return dict(self._current)
 
     def load(self) -> dict:
+        data = self._settings.load()
+        gui = data.get("gui", {})
+        launch = data.get("launch", {})
         self._current = {
-            "start_page": self._settings.value("gui/start_page", self.DEFAULTS["start_page"], type=str),
-            "show_snapshots": self._settings.value("gui/show_snapshots", self.DEFAULTS["show_snapshots"], type=bool),
-            "debug_mode": self._settings.value("launch/debug_mode", self.DEFAULTS["debug_mode"], type=bool),
-            "remember_window_size": self._settings.value("gui/remember_window_size", self.DEFAULTS["remember_window_size"], type=bool),
-            "language": self._settings.value("gui/language", self.DEFAULTS["language"], type=str),
+            "start_page": str(gui.get("start_page", self.DEFAULTS["start_page"])),
+            "show_snapshots": bool(gui.get("show_snapshots", self.DEFAULTS["show_snapshots"])),
+            "debug_mode": bool(launch.get("debug_mode", self.DEFAULTS["debug_mode"])),
+            "remember_window_size": bool(gui.get("remember_window_size", self.DEFAULTS["remember_window_size"])),
+            "language": str(gui.get("language", self.DEFAULTS["language"])),
         }
         self.settings_changed.emit(dict(self._current))
         return dict(self._current)
 
     def save(self, data: dict) -> None:
         self._current = {
-            "start_page": str(data.get("start_page", "home")),
-            "show_snapshots": bool(data.get("show_snapshots", False)),
-            "debug_mode": bool(data.get("debug_mode", False)),
-            "remember_window_size": bool(data.get("remember_window_size", True)),
+            "start_page": str(data.get("start_page", self.DEFAULTS["start_page"])),
+            "show_snapshots": bool(data.get("show_snapshots", self.DEFAULTS["show_snapshots"])),
+            "debug_mode": bool(data.get("debug_mode", self.DEFAULTS["debug_mode"])),
+            "remember_window_size": bool(data.get("remember_window_size", self.DEFAULTS["remember_window_size"])),
             "language": str(data.get("language", self.DEFAULTS["language"])),
         }
-        self._settings.setValue("gui/start_page", self._current["start_page"])
-        self._settings.setValue("gui/show_snapshots", self._current["show_snapshots"])
-        self._settings.setValue("launch/debug_mode", self._current["debug_mode"])
-        self._settings.setValue("gui/remember_window_size", self._current["remember_window_size"])
-        self._settings.setValue("gui/language", self._current["language"])
-        self._settings.sync()
+        self._settings.save({
+            "gui": {
+                "start_page": self._current["start_page"],
+                "show_snapshots": self._current["show_snapshots"],
+                "remember_window_size": self._current["remember_window_size"],
+                "language": self._current["language"],
+            },
+            "launch": {
+                "debug_mode": self._current["debug_mode"],
+            },
+        })
         self.settings_changed.emit(dict(self._current))
         self.status_changed.emit(tr("Launcher settings saved"))
         self.log_created.emit(tr("GUI preferences saved"))
 
     def reset(self) -> None:
-        self.save(dict(self.DEFAULTS))
+        self._settings.reset()
+        self.load()
+        self.status_changed.emit(tr("Launcher settings saved"))
+        self.log_created.emit(tr("GUI preferences saved"))
 
     def saved_geometry(self) -> QByteArray | None:
-        value = self._settings.value("window/geometry")
-        return value if isinstance(value, QByteArray) else None
+        geometry = self._settings.load_window_geometry()
+        return QByteArray(geometry) if geometry is not None else None
 
     def save_geometry(self, geometry: QByteArray) -> None:
-        self._settings.setValue("window/geometry", geometry)
+        self._settings.save_window_geometry(bytes(geometry))

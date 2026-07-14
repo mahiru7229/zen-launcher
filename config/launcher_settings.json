@@ -1,0 +1,15 @@
+{
+    "schema_version": 1,
+    "gui": {
+        "start_page": "home",
+        "show_snapshots": false,
+        "remember_window_size": true,
+        "language": "vi-VN"
+    },
+    "launch": {
+        "debug_mode": false
+    },
+    "window": {
+        "geometry": "AdnQywADAAAAAACgAAAAIwAABt8AAAPFAAAAoAAAAEIAAAbfAAADxQAAAAAAAAAAB4AAAACgAAAAQgAABt8AAAPF"
+    }
+}

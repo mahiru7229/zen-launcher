@@ -57,6 +57,10 @@ class Paths:
         return Paths.CONFIG_ROOT / "microsoft.json"
 
     @staticmethod
+    def launcher_settings_path() -> Path:
+        return Paths.CONFIG_ROOT / "launcher_settings.json"
+
+    @staticmethod
     def account_database_path():
         return Paths.ACCOUNTS_ROOT / "accounts.db"
 
