@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 
 from src.core.fs.paths import Paths
@@ -16,6 +19,8 @@ class AutomaticUpdateUnsupportedError(RuntimeError):
 
 
 class WindowsUpdateInstaller:
+    STARTUP_GRACE_SECONDS = 1.0
+
     @staticmethod
     def is_supported() -> bool:
         return os.name == "nt" and bool(getattr(sys, "frozen", False))
@@ -33,6 +38,40 @@ class WindowsUpdateInstaller:
         persistent_log = Path(persistent_log_path) if persistent_log_path is not None else Paths.updater_log_path()
         persistent_log = persistent_log.resolve()
 
+        cls._validate_paths(source, destination, executable)
+
+        updater_directory = Path(tempfile.gettempdir()) / f"mcw-launcher-updater-{uuid.uuid4().hex}"
+        updater_directory.mkdir(parents=True, exist_ok=False)
+        updater_executable = updater_directory / "MCW Launcher Updater.exe"
+        request_path = updater_directory / "update-request.json"
+
+        try:
+            shutil.copy2(executable, updater_executable)
+            request = {
+                "schema_version": 1,
+                "parent_pid": int(parent_pid if parent_pid is not None else os.getpid()),
+                "source_directory": str(source),
+                "destination_directory": str(destination),
+                "executable_name": executable.name,
+                "updater_directory": str(updater_directory),
+                "staging_directory": str(prepared.staging_directory.resolve()),
+                "persistent_log_path": str(persistent_log),
+                "target_version": str(prepared.info.version),
+            }
+            request_path.write_text(json.dumps(request, ensure_ascii=False, indent=2), encoding="utf-8")
+            process = cls._start_updater_process(updater_executable, request_path, destination)
+            time.sleep(cls.STARTUP_GRACE_SECONDS)
+            exit_code = process.poll()
+            if exit_code is not None:
+                detail = cls._read_startup_error(updater_directory, persistent_log)
+                raise RuntimeError(f"The updater process exited before the launcher closed (code {exit_code}).{detail}")
+            return request_path
+        except Exception:
+            shutil.rmtree(updater_directory, ignore_errors=True)
+            raise
+
+    @staticmethod
+    def _validate_paths(source: Path, destination: Path, executable: Path) -> None:
         if not source.is_dir():
             raise FileNotFoundError(f"Prepared update directory does not exist: {source}")
         if not destination.is_dir():
@@ -42,147 +81,33 @@ class WindowsUpdateInstaller:
         if not (source / executable.name).is_file():
             raise RuntimeError(f"The update ZIP does not contain the expected executable: {executable.name}")
 
-        updater_directory = Path(tempfile.gettempdir()) / f"mcw-launcher-updater-{uuid.uuid4().hex}"
-        updater_directory.mkdir(parents=True, exist_ok=False)
-        script_path = updater_directory / "update.ps1"
-        script_path.write_text(cls._script_text(), encoding="utf-8-sig")
+    @classmethod
+    def _start_updater_process(cls, updater_executable: Path, request_path: Path, destination: Path) -> subprocess.Popen:
+        command = [str(updater_executable), "--apply-update", str(request_path)]
+        base_flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        breakaway_flag = getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0)
 
-        command = [
-            "powershell.exe",
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            str(script_path),
-            "-ParentPid",
-            str(parent_pid if parent_pid is not None else os.getpid()),
-            "-SourceDirectory",
-            str(source),
-            "-DestinationDirectory",
-            str(destination),
-            "-ExecutableName",
-            executable.name,
-            "-UpdaterDirectory",
-            str(updater_directory),
-            "-StagingDirectory",
-            str(prepared.staging_directory.resolve()),
-            "-PersistentLogPath",
-            str(persistent_log),
-            "-TargetVersion",
-            str(prepared.info.version),
-        ]
-        creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
-        subprocess.Popen(command, cwd=str(destination), close_fds=True, creationflags=creation_flags)
-        return script_path
+        kwargs = {
+            "cwd": str(destination),
+            "stdin": subprocess.DEVNULL,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+            "close_fds": True,
+        }
+        if breakaway_flag:
+            try:
+                return subprocess.Popen(command, creationflags=base_flags | breakaway_flag, **kwargs)
+            except OSError:
+                pass
+        return subprocess.Popen(command, creationflags=base_flags, **kwargs)
 
     @staticmethod
-    def _script_text() -> str:
-        return r"""param(
-    [Parameter(Mandatory=$true)][int]$ParentPid,
-    [Parameter(Mandatory=$true)][string]$SourceDirectory,
-    [Parameter(Mandatory=$true)][string]$DestinationDirectory,
-    [Parameter(Mandatory=$true)][string]$ExecutableName,
-    [Parameter(Mandatory=$true)][string]$UpdaterDirectory,
-    [Parameter(Mandatory=$true)][string]$StagingDirectory,
-    [Parameter(Mandatory=$true)][string]$PersistentLogPath,
-    [Parameter(Mandatory=$true)][string]$TargetVersion
-)
-
-$ErrorActionPreference = "Stop"
-$logPath = Join-Path $UpdaterDirectory "update.log"
-$backupDirectory = Join-Path $UpdaterDirectory "backup"
-$newFiles = New-Object System.Collections.Generic.List[string]
-$completed = $false
-
-function Write-UpdateLog([string]$Message) {
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $line = "[$timestamp] $Message"
-    Add-Content -LiteralPath $logPath -Value $line -Encoding UTF8
-    $persistentParent = Split-Path -Parent $PersistentLogPath
-    if ($persistentParent) {
-        New-Item -ItemType Directory -Path $persistentParent -Force | Out-Null
-    }
-    Add-Content -LiteralPath $PersistentLogPath -Value $line -Encoding UTF8
-}
-
-function Invoke-Robocopy([string]$Source, [string]$Destination) {
-    New-Item -ItemType Directory -Path $Destination -Force | Out-Null
-    & robocopy.exe $Source $Destination /E /COPY:DAT /DCOPY:DAT /R:3 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
-    $exitCode = $LASTEXITCODE
-    if ($exitCode -ge 8) {
-        throw "Robocopy failed with exit code $exitCode"
-    }
-}
-
-function Backup-ExistingFiles {
-    Write-UpdateLog "Creating rollback backup"
-    Get-ChildItem -LiteralPath $SourceDirectory -File -Recurse -Force | ForEach-Object {
-        $relativePath = $_.FullName.Substring($SourceDirectory.Length).TrimStart([char]'\')
-        $destinationPath = Join-Path $DestinationDirectory $relativePath
-        if (Test-Path -LiteralPath $destinationPath -PathType Leaf) {
-            $backupPath = Join-Path $backupDirectory $relativePath
-            $backupParent = Split-Path -Parent $backupPath
-            New-Item -ItemType Directory -Path $backupParent -Force | Out-Null
-            Copy-Item -LiteralPath $destinationPath -Destination $backupPath -Force
-        }
-        elseif (-not (Test-Path -LiteralPath $destinationPath)) {
-            $newFiles.Add($destinationPath)
-        }
-    }
-}
-
-function Restore-Backup {
-    Write-UpdateLog "Restoring files after update failure"
-    foreach ($path in $newFiles) {
-        Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
-    }
-    if (Test-Path -LiteralPath $backupDirectory -PathType Container) {
-        Invoke-Robocopy $backupDirectory $DestinationDirectory
-    }
-}
-
-try {
-    Write-UpdateLog "Starting update to $TargetVersion"
-    Write-UpdateLog "Waiting for launcher process $ParentPid"
-    Wait-Process -Id $ParentPid -ErrorAction SilentlyContinue
-    Start-Sleep -Milliseconds 700
-
-    Backup-ExistingFiles
-    Write-UpdateLog "Copying update from $SourceDirectory to $DestinationDirectory"
-    Invoke-Robocopy $SourceDirectory $DestinationDirectory
-
-    $updatedExecutable = Join-Path $DestinationDirectory $ExecutableName
-    if (-not (Test-Path -LiteralPath $updatedExecutable -PathType Leaf)) {
-        throw "Updated executable was not found: $updatedExecutable"
-    }
-
-    Write-UpdateLog "Starting updated launcher"
-    Start-Process -FilePath $updatedExecutable -WorkingDirectory $DestinationDirectory
-    $completed = $true
-    Remove-Item -LiteralPath $StagingDirectory -Recurse -Force -ErrorAction SilentlyContinue
-    Write-UpdateLog "Update to $TargetVersion completed"
-}
-catch {
-    Write-UpdateLog "Update failed: $($_.Exception.Message)"
-    try {
-        Restore-Backup
-    }
-    catch {
-        Write-UpdateLog "Rollback failed: $($_.Exception.Message)"
-    }
-    Add-Type -AssemblyName PresentationFramework -ErrorAction SilentlyContinue
-    [System.Windows.MessageBox]::Show(
-        "MCW Launcher could not finish the update.`n`n$($_.Exception.Message)`n`nLog: $logPath",
-        "MCW Launcher Update",
-        "OK",
-        "Error"
-    ) | Out-Null
-}
-finally {
-    if ($completed) {
-        Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "timeout /t 2 /nobreak >nul & rmdir /s /q `"$UpdaterDirectory`"" -WindowStyle Hidden
-    }
-}
-"""
+    def _read_startup_error(updater_directory: Path, persistent_log: Path) -> str:
+        for log_path in (updater_directory / "update.log", persistent_log):
+            try:
+                text = log_path.read_text(encoding="utf-8", errors="replace").strip()
+                if text:
+                    return f" Last updater log: {text.splitlines()[-1]}"
+            except OSError:
+                continue
+        return ""
