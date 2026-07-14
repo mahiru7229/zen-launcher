@@ -194,13 +194,6 @@ def test_choosing_version_returns_matching_manifest(
     assert selected is versions[1]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Current implementation uses index -1 when the ID "
-        "is missing, so it returns the final manifest entry."
-    ),
-)
 def test_choosing_version_raises_when_id_does_not_exist(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -390,13 +383,6 @@ def test_load_orchestrates_choose_download_load_and_parse(
     ]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "VersionManager.load currently calls _load_version(None) "
-        "before checking whether download returned None."
-    ),
-)
 def test_load_raises_clean_runtime_error_when_download_fails(
     monkeypatch: pytest.MonkeyPatch,
 ):

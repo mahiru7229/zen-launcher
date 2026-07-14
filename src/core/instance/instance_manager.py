@@ -316,6 +316,25 @@ class InstanceManager:
         return instance
 
     @staticmethod
+    def set_mod_loader(name: str, mod_loader: tuple[str, str]) -> Instance:
+        instance = InstanceManager.load(name)
+        normalized_loader = (str(mod_loader[0]).strip().lower(), str(mod_loader[1]).strip())
+
+        if normalized_loader[0] == "vanilla":
+            normalized_loader = ("vanilla", "-1")
+
+        instance.mod_loader = normalized_loader
+        InstanceManager._save_instance_metadata(instance)
+
+        instances_data = InstanceManager._load_instances_data()
+        for item in instances_data.get("instances", []):
+            if item.get("name") == name:
+                item["mod_loader"] = normalized_loader
+                break
+        InstanceManager._save_instances(instances_data)
+        return instance
+
+    @staticmethod
     def delete_instance(name: str) -> bool:
         if not InstanceManager.is_instance_exist(name):
             return False

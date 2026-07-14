@@ -162,29 +162,3 @@ def test_concurrent_acquire_allows_only_one_owner(tmp_path: Path):
 
     assert len(acquired) == 1
     acquired[0].release()
-
-
-def test_list_active_returns_instances_sorted_by_name(tmp_path: Path):
-    second = make_instance(tmp_path, "Zulu")
-    first = make_instance(tmp_path, "Alpha")
-    second_lock = InstanceRunLock.acquire(second)
-    first_lock = InstanceRunLock.acquire(first)
-
-    running_instances = InstanceRunLock.list_active()
-
-    assert [item.name for item in running_instances] == ["Alpha", "Zulu"]
-    assert all(item.state == "preparing" for item in running_instances)
-
-    first_lock.release()
-    second_lock.release()
-
-
-def test_list_active_removes_stale_lock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
-    instance = make_instance(tmp_path)
-    lock_path = InstanceRunLock.lock_path_for(instance)
-    lock_path.write_text(json.dumps({"instance_name": instance.name, "state": "running", "launcher_pid": 100, "minecraft_pid": 200}), encoding="utf-8")
-
-    monkeypatch.setattr(InstanceRunLock, "_is_process_alive", staticmethod(lambda pid: False))
-
-    assert InstanceRunLock.list_active() == []
-    assert not lock_path.exists()

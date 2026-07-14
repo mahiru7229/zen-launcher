@@ -29,20 +29,25 @@ class VersionManager:
         Default: Loading newest version of Minecraft
         """
         version_path = VersionManager._download_version(VersionManager._choosing_version(id))
-        version_data = VersionManager._load_version(version_path)
 
         if version_path is None:
             raise RuntimeError("Cannot download version metadata")
 
-        return VersionManager._parse_version(version_data, version_path)
+        version_data = VersionManager._load_version(version_path)
+        version = VersionManager._parse_version(version_data, version_path)
+        if version is None:
+            raise RuntimeError(f"Invalid metadata for Minecraft version '{id}'.")
+        return version
     
 
 
     @staticmethod
     def _choosing_version(id:str) -> VersionManifestManager:
         versions = VersionManifestManager.get()
-        ver_idx = next((i for i, version in enumerate(versions) if version.id == id),-1)
-        return versions[ver_idx]
+        version = next((version for version in versions if version.id == id), None)
+        if version is None:
+            raise RuntimeError(f"Minecraft version '{id}' was not found in the manifest.")
+        return version
 
     @staticmethod
     def _download_version(version:VersionManifestManager) -> Path | None:
@@ -83,6 +88,6 @@ class VersionManager:
                 
                 
             )
-        except:
+        except (KeyError, TypeError, ValueError):
             return None
 

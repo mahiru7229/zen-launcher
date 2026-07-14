@@ -7,13 +7,17 @@ from PySide6.QtCore import QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget
 
+from src.core.instance.instance_manager import InstanceManager
 from src.gui.config import LAUNCHER_NAME, MINIMUM_HEIGHT, MINIMUM_WIDTH, RIGHT_PANEL_WIDTH, SIDEBAR_WIDTH, WINDOW_HEIGHT, WINDOW_WIDTH
 from src.gui.controllers.account_controller import AccountController
 from src.gui.controllers.gui_settings_controller import GuiSettingsController
 from src.gui.controllers.instance_controller import InstanceController
 from src.gui.controllers.launch_controller import LaunchController
+from src.gui.controllers.mod_controller import ModController
+from src.gui.controllers.mod_loader_controller import ModLoaderController
 from src.gui.controllers.settings_controller import InstanceSettingsController
 from src.gui.controllers.version_controller import VersionController
+from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
 from src.gui.pages.about_page import AboutPage
 from src.gui.pages.account_page import AccountPage
 from src.gui.pages.home_page import HomePage
@@ -40,6 +44,8 @@ class MainWindow(QMainWindow):
         self.version_controller = VersionController(self.task_runner)
         self.account_controller = AccountController()
         self.instance_controller = InstanceController(self.task_runner)
+        self.mod_loader_controller = ModLoaderController(self.task_runner)
+        self.mod_controller = ModController(self.task_runner)
         self.instance_settings_controller = InstanceSettingsController()
         self.gui_settings_controller = GuiSettingsController()
         self.launch_controller = LaunchController(self.task_runner)
@@ -89,6 +95,7 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page = LauncherSettingsPage()
         self.logs_page = LogsPage()
         self.about_page = AboutPage()
+        self.mod_manager_dialog = ModManagerDialog(self)
 
         self.pages = {
             "home": self.home_page,
@@ -116,6 +123,7 @@ class MainWindow(QMainWindow):
 
         self.right_panel.manage_accounts_requested.connect(lambda: self.show_page("accounts"))
         self.right_panel.manage_instances_requested.connect(lambda: self.show_page("instances"))
+        self.right_panel.manage_mods_requested.connect(self._open_mod_manager)
         self.right_panel.refresh_requested.connect(self._refresh_all)
         self.running_instances_timer.timeout.connect(self.instance_controller.refresh_running)
 
@@ -127,6 +135,9 @@ class MainWindow(QMainWindow):
         self.instances_page.refresh_requested.connect(self.instance_controller.refresh)
         self.instances_page.selected_instance_changed.connect(self.instance_controller.select)
         self.instances_page.create_requested.connect(self.instance_controller.create)
+        self.instances_page.fabric_versions_requested.connect(self.mod_loader_controller.load_fabric_versions)
+        self.instances_page.loader_change_requested.connect(self.instance_controller.change_loader)
+        self.instances_page.manage_mods_requested.connect(self._open_mod_manager)
         self.instances_page.rename_requested.connect(self.instance_controller.rename)
         self.instances_page.clone_requested.connect(self.instance_controller.clone)
         self.instances_page.delete_requested.connect(self.instance_controller.delete)
@@ -143,6 +154,7 @@ class MainWindow(QMainWindow):
 
         self.version_controller.versions_changed.connect(self.instances_page.set_versions)
         self.version_controller.versions_changed.connect(lambda versions: self.home_page.set_manifest_count(len(versions)))
+        self.mod_loader_controller.fabric_versions_changed.connect(self.instances_page.set_fabric_versions)
 
         self.account_controller.accounts_changed.connect(self.account_page.set_accounts)
         self.account_controller.selected_account_changed.connect(self._account_selected)
@@ -156,6 +168,13 @@ class MainWindow(QMainWindow):
         self.instance_settings_controller.settings_loaded.connect(self.instance_settings_page.set_settings)
         self.gui_settings_controller.settings_changed.connect(self._apply_gui_settings)
 
+        self.mod_manager_dialog.refresh_requested.connect(self.mod_controller.refresh)
+        self.mod_manager_dialog.add_requested.connect(self.mod_controller.add)
+        self.mod_manager_dialog.remove_requested.connect(self.mod_controller.remove)
+        self.mod_manager_dialog.enabled_requested.connect(self.mod_controller.set_enabled)
+        self.mod_controller.instance_changed.connect(self.mod_manager_dialog.set_instance)
+        self.mod_controller.mods_changed.connect(self.mod_manager_dialog.set_mods)
+
         self.launch_controller.progress_received.connect(self._on_progress)
         self.launch_controller.launch_finished.connect(self.launch_control.set_result)
         self.launch_controller.launch_finished.connect(lambda _result: self.instance_controller.refresh_running(force=True))
@@ -163,12 +182,15 @@ class MainWindow(QMainWindow):
         self.task_runner.task_started.connect(self._on_task_started)
         self.task_runner.task_failed.connect(self._on_task_failed)
         self.task_runner.busy_changed.connect(self._set_busy)
+        self.task_runner.busy_changed.connect(self.mod_manager_dialog.set_busy)
         self.task_runner.task_rejected.connect(lambda message: QMessageBox.information(self, "MCW Launcher", message))
 
         controllers = (
             self.version_controller,
             self.account_controller,
             self.instance_controller,
+            self.mod_loader_controller,
+            self.mod_controller,
             self.instance_settings_controller,
             self.gui_settings_controller,
             self.launch_controller,
@@ -208,6 +230,21 @@ class MainWindow(QMainWindow):
 
         self.content_stack.setCurrentWidget(page)
         self.sidebar.set_current_page(page_id if page_id in self.pages else "home")
+
+    def _open_mod_manager(self, instance_name: str) -> None:
+        instance_name = instance_name.strip()
+        if not instance_name:
+            QMessageBox.information(self, "Mod Manager", "Select an instance first.")
+            return
+        try:
+            instance = InstanceManager.load(instance_name)
+        except Exception as error:
+            self._show_error("Mod Manager", str(error))
+            return
+        self.mod_controller.set_instance(instance)
+        self.mod_manager_dialog.show()
+        self.mod_manager_dialog.raise_()
+        self.mod_manager_dialog.activateWindow()
 
     def _account_selected(self, account: object | None) -> None:
         self.home_page.set_account(account)

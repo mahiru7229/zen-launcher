@@ -36,3 +36,15 @@ def test_empty_running_instances_state(app):
     widget.set_running_instances([])
 
     assert widget.running_count.text() == "No instances running"
+
+
+def test_manage_mods_is_enabled_only_for_fabric_instance(app):
+    widget = RightPanelWidget()
+    vanilla = SimpleNamespace(name="Vanilla", version_id="1.20.1", instance_dir="instances/Vanilla", mod_loader=("vanilla", "-1"))
+    fabric = SimpleNamespace(name="Fabric", version_id="1.20.1", instance_dir="instances/Fabric", mod_loader=("fabric", "0.16.14"))
+
+    widget.set_instance(vanilla)
+    assert widget.manage_mods_button.isEnabled() is False
+
+    widget.set_instance(fabric)
+    assert widget.manage_mods_button.isEnabled() is True

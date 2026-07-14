@@ -132,7 +132,25 @@ class Paths:
 
     @staticmethod
     def client(version:Version):
-        return Paths.version_dir(version) / f"{version.id}.jar"
+        raw_json = getattr(version, "raw_json", {}) or {}
+        inherited_version = str(raw_json.get("inheritsFrom") or version.id)
+        return Paths.CACHE_ROOT / "versions" / inherited_version / f"{inherited_version}.jar"
+
+    @staticmethod
+    def fabric_version_dir(game_version: str, loader_version: str) -> Path:
+        profile_id = f"fabric-loader-{loader_version}-{game_version}"
+        return Paths.CACHE_ROOT / "versions" / profile_id
+
+    @staticmethod
+    def fabric_version_json(game_version: str, loader_version: str) -> Path:
+        directory = Paths.fabric_version_dir(game_version, loader_version)
+        return directory / f"{directory.name}.json"
+
+    @staticmethod
+    def instance_mods_dir(instance: Instance) -> Path:
+        directory = Path(instance.instance_dir) / "mods"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
 
     @staticmethod
     def libraries():

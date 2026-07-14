@@ -8,7 +8,7 @@ from src.core.minecraft.context_builder import ContextBuilder
 from src.core.minecraft.download_manager import DownloadClientManager
 from src.core.minecraft.launcher_manager import LauncherManager
 from src.core.minecraft.library_manager import DownloadLibraryManager
-from src.core.minecraft.version_manager import VersionManager
+from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.account.account import Account
@@ -30,7 +30,7 @@ class MinecraftExecutor:
 
             VersionManifestManager.get()
             reporter.status(stage=ProgressStage.LOADING_VERSION, message=f"Loading Minecraft {instance.version_id}...")
-            version = VersionManager.load(instance.version_id)
+            version = ModLoaderManager.load(instance, reporter)
 
             reporter.status(stage=ProgressStage.DOWNLOADING_CLIENT, message="Checking Minecraft client...")
             DownloadClientManager.load(version=version, reporter=reporter)

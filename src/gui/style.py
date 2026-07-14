@@ -256,6 +256,27 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0;
 }
 
+QTableWidget, QPlainTextEdit {
+    background: #20221f;
+    color: #f5f1e8;
+    border: 2px solid #11120f;
+    gridline-color: #11120f;
+    selection-background-color: #4f6d3c;
+    selection-color: #ffffff;
+}
+
+QHeaderView::section {
+    background: #343730;
+    color: #d9e6c8;
+    border: 1px solid #11120f;
+    padding: 7px;
+    font-weight: 800;
+}
+
+QTableWidget::item {
+    padding: 5px;
+}
+
 QToolTip {
     background: #252823;
     color: #f5f1e8;

@@ -9,6 +9,7 @@ from PySide6.QtCore import Signal, Slot
 from src.core.instance.instance_manager import InstanceManager
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.minecraft.version_manager import VersionManager
+from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 
@@ -67,18 +68,43 @@ class InstanceController(BaseController):
             return
         self.selected_instance_changed.emit(instance)
 
-    def create(self, name: str, version_id: str) -> None:
+    def create(self, name: str, version_id: str, loader_name: str = "vanilla", loader_version: str = "-1") -> None:
         name = self._validated_name(name)
         version_id = version_id.strip()
+        loader_name, loader_version = ModLoaderManager.normalize((loader_name, loader_version))
         if name is None or not version_id:
             if not version_id:
                 self._emit_error("Create instance", "Select a Minecraft version first.")
             return
+        if loader_name == ModLoaderManager.FABRIC and not loader_version:
+            self._emit_error("Create instance", "Select a Fabric Loader version first.")
+            return
 
         def task() -> Any:
-            return InstanceManager.create(name=name, version=VersionManager.load(version_id))
+            version = VersionManager.load(version_id)
+            ModLoaderManager.prepare(version, loader_name, loader_version)
+            return InstanceManager.create(name=name, version=version, mod_loader=(loader_name, loader_version))
 
         self._task_runner.run("instance.create", task, f"Creating instance '{name}'...")
+
+    def change_loader(self, name: str, loader_name: str, loader_version: str) -> None:
+        name = name.strip()
+        loader_name, loader_version = ModLoaderManager.normalize((loader_name, loader_version))
+        if not name:
+            return
+        if loader_name == ModLoaderManager.FABRIC and not loader_version:
+            self._emit_error("Change mod loader", "Select a Fabric Loader version first.")
+            return
+
+        def task() -> Any:
+            instance = InstanceManager.load(name)
+            if InstanceRunLock.is_active(instance):
+                raise RuntimeError("Close Minecraft before changing this instance's mod loader.")
+            version = VersionManager.load(instance.version_id)
+            ModLoaderManager.prepare(version, loader_name, loader_version)
+            return InstanceManager.set_mod_loader(name, (loader_name, loader_version))
+
+        self._task_runner.run("instance.loader", task, f"Applying {loader_name.title()} to '{name}'...")
 
     def rename(self, source_name: str, target_name: str) -> None:
         source_name = source_name.strip()
@@ -139,6 +165,11 @@ class InstanceController(BaseController):
         elif task_id == "instance.import":
             selected_name = result.name
             self.status_changed.emit(f"Imported '{selected_name}'")
+        elif task_id == "instance.loader":
+            selected_name = result.name
+            loader_name, loader_version = ModLoaderManager.normalize(result.mod_loader)
+            loader_text = loader_name if loader_name == "vanilla" else f"{loader_name} {loader_version}"
+            self.status_changed.emit(f"Applied {loader_text} to '{selected_name}'")
         elif task_id == "instance.export":
             self.export_finished.emit(result)
             self.status_changed.emit("Instance export completed")

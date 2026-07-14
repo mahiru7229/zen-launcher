@@ -11,6 +11,7 @@ from src.gui.widget.card_widget import CardWidget
 class RightPanelWidget(QFrame):
     manage_accounts_requested = Signal()
     manage_instances_requested = Signal()
+    manage_mods_requested = Signal(str)
     refresh_requested = Signal()
 
     MAX_RUNNING_INSTANCES = 4
@@ -18,6 +19,7 @@ class RightPanelWidget(QFrame):
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("RightPanel")
+        self._instance_name = ""
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -57,11 +59,15 @@ class RightPanelWidget(QFrame):
         self.instance_path.setWordWrap(True)
         instance_button = QPushButton("Manage instances")
         instance_button.clicked.connect(self.manage_instances_requested.emit)
+        self.manage_mods_button = QPushButton("Manage mods")
+        self.manage_mods_button.setEnabled(False)
+        self.manage_mods_button.clicked.connect(lambda: self.manage_mods_requested.emit(self._instance_name))
         self.instance_card.layout.addWidget(self.instance_name)
         self.instance_card.layout.addWidget(self.instance_version)
         self.instance_card.layout.addWidget(self.instance_loader)
         self.instance_card.layout.addWidget(self.instance_path)
         self.instance_card.layout.addWidget(instance_button)
+        self.instance_card.layout.addWidget(self.manage_mods_button)
         layout.addWidget(self.instance_card)
 
         self.running_card = CardWidget("Running instances")
@@ -101,15 +107,22 @@ class RightPanelWidget(QFrame):
 
     def set_instance(self, instance: object | None) -> None:
         if instance is None:
+            self._instance_name = ""
+            self.manage_mods_button.setEnabled(False)
+            self.manage_mods_button.setToolTip("Select a Fabric instance first.")
             self.instance_name.setText("No instance selected")
             self.instance_version.setText("Minecraft: -")
             self.instance_loader.setText("Loader: -")
             self.instance_path.setText("Path: -")
             return
+        self._instance_name = str(instance.name)
         loader = getattr(instance, "mod_loader", ("vanilla", "-1"))
         loader_name = loader[0] if loader else "vanilla"
         loader_version = loader[1] if len(loader) > 1 else "-1"
         loader_text = loader_name if loader_version in {"", "-1"} else f"{loader_name} {loader_version}"
+        is_fabric = str(loader_name).casefold() == "fabric"
+        self.manage_mods_button.setEnabled(is_fabric)
+        self.manage_mods_button.setToolTip("" if is_fabric else "Apply Fabric Loader to manage mods.")
         self.instance_name.setText(instance.name)
         self.instance_version.setText(f"Minecraft: {instance.version_id}")
         self.instance_loader.setText(f"Loader: {loader_text}")

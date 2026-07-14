@@ -249,7 +249,7 @@ def test_build_keeps_unknown_placeholder_unchanged():
     assert game_args[-1] == "${unknown_value}"
 
 
-def test_build_ignores_non_string_jvm_entries():
+def test_build_supports_rule_based_jvm_entries():
     version = make_version(
         jvm_arguments=[
             {
@@ -268,14 +268,14 @@ def test_build_ignores_non_string_jvm_entries():
         account=make_account(),
     )
 
-    assert "-Dexample=true" not in jvm_args
+    assert "-Dexample=true" in jvm_args
     assert all(
         isinstance(argument, str)
         for argument in jvm_args
     )
 
 
-def test_build_ignores_non_string_game_entries():
+def test_build_supports_rule_based_game_entries():
     version = make_version(
         game_arguments=[
             {
@@ -294,7 +294,7 @@ def test_build_ignores_non_string_game_entries():
         account=make_account(),
     )
 
-    assert "--demo" not in game_args
+    assert "--demo" in game_args
     assert all(
         isinstance(argument, str)
         for argument in game_args
@@ -481,3 +481,54 @@ def test_build_accepts_version_with_no_arguments():
         "--height",
         "480",
     ]
+
+def test_build_rejects_rule_based_entry_when_feature_is_disabled():
+    version = make_version(
+        game_arguments=[
+            {
+                "rules": [
+                    {"action": "allow", "features": {"is_demo_user": True}}
+                ],
+                "value": "--demo",
+            }
+        ]
+    )
+
+    _, game_args = ArgumentBuilder.build(version=version, context={}, settings=make_settings(), account=make_account())
+
+    assert "--demo" not in game_args
+
+
+def test_build_accepts_rule_based_entry_when_context_enables_feature():
+    version = make_version(
+        game_arguments=[
+            {
+                "rules": [
+                    {"action": "allow", "features": {"is_demo_user": True}}
+                ],
+                "value": "--demo",
+            }
+        ]
+    )
+
+    _, game_args = ArgumentBuilder.build(version=version, context={"argument_features": {"is_demo_user": True}}, settings=make_settings(), account=make_account())
+
+    assert "--demo" in game_args
+
+
+def test_build_respects_last_matching_argument_rule():
+    version = make_version(
+        jvm_arguments=[
+            {
+                "rules": [
+                    {"action": "allow"},
+                    {"action": "disallow"},
+                ],
+                "value": "-Dblocked=true",
+            }
+        ]
+    )
+
+    jvm_args, _ = ArgumentBuilder.build(version=version, context={}, settings=make_settings(), account=make_account())
+
+    assert "-Dblocked=true" not in jvm_args
