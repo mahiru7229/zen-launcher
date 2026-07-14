@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-VERSION = "v0.4.0 Beta 4"
+VERSION = "v0.4.0 Beta 5"
 LAUNCHER_NAME = f"MCW LAUNCHER {VERSION}"
 DEVELOPER_NAME = "mahiru7229"
 
