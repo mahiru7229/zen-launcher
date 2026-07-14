@@ -12,7 +12,7 @@ from src.core.fs.paths import Paths
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
         "gui": {
@@ -26,6 +26,11 @@ class LauncherSettingsManager:
         },
         "window": {
             "geometry": None,
+        },
+        "updates": {
+            "auto_check": True,
+            "channel": "beta",
+            "last_checked_at": None,
         },
     }
 
@@ -144,6 +149,13 @@ class LauncherSettingsManager:
         window = normalized.setdefault("window", {})
         geometry = window.get("geometry")
         window["geometry"] = geometry if isinstance(geometry, str) and geometry else None
+
+        updates = normalized.setdefault("updates", {})
+        updates["auto_check"] = self._as_bool(updates.get("auto_check"), True)
+        channel = str(updates.get("channel") or "beta").strip().lower()
+        updates["channel"] = channel if channel in {"stable", "beta"} else "beta"
+        last_checked_at = updates.get("last_checked_at")
+        updates["last_checked_at"] = last_checked_at if isinstance(last_checked_at, str) and last_checked_at else None
 
         return normalized
 

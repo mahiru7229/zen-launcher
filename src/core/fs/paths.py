@@ -61,6 +61,30 @@ class Paths:
         return Paths.CONFIG_ROOT / "launcher_settings.json"
 
     @staticmethod
+    def update_root() -> Path:
+        directory = Paths.CACHE_ROOT / "updates"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def update_release_cache() -> Path:
+        return Paths.update_root() / "releases.json"
+
+    @staticmethod
+    def update_download_path(tag_name: str, asset_name: str) -> Path:
+        from urllib.parse import quote
+
+        tag = quote(str(tag_name).strip(), safe="") or "unknown-release"
+        filename = Path(str(asset_name)).name or "update.zip"
+        return Paths.update_root() / "downloads" / tag / filename
+
+    @staticmethod
+    def update_staging_root() -> Path:
+        directory = Paths.update_root() / "staging"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
     def account_database_path():
         return Paths.ACCOUNTS_ROOT / "accounts.db"
 

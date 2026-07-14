@@ -4,7 +4,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QPushButton
 
 from src.core.language.language_manager import language_manager
-from src.gui.config import NAVIGATION_ITEMS
+from src.gui.config import NAVIGATION_ITEMS, VERSION
 from src.gui.pages.base_page import BasePage
 from src.gui.widget.card_widget import CardWidget
 
@@ -13,6 +13,7 @@ class LauncherSettingsPage(BasePage):
     save_requested = Signal(dict)
     reset_requested = Signal()
     language_changed = Signal(str)
+    check_updates_requested = Signal()
 
     def __init__(self) -> None:
         super().__init__("Launcher Settings", "Preferences here belong to the GUI, not to an individual Minecraft instance.")
@@ -43,6 +44,21 @@ class LauncherSettingsPage(BasePage):
         language_card.layout.addWidget(self.language_combo)
         language_card.layout.addWidget(reload_languages_button)
         self.root_layout.addWidget(language_card)
+
+        update_card = CardWidget("Launcher updates", "MCW Launcher can check GitHub Releases and install ZIP updates after asking for confirmation.")
+        current_version_label = QLabel(f"Current version: {VERSION}")
+        current_version_label.setObjectName("ValueLabel")
+        self.auto_check_updates = QCheckBox("Automatically check for updates when the launcher starts")
+        self.update_status_label = QLabel("Update status: Not checked")
+        self.update_status_label.setObjectName("ValueLabel")
+        self.update_status_label.setWordWrap(True)
+        self.check_updates_button = QPushButton("Check for updates")
+        self.check_updates_button.clicked.connect(self.check_updates_requested.emit)
+        update_card.layout.addWidget(current_version_label)
+        update_card.layout.addWidget(self.auto_check_updates)
+        update_card.layout.addWidget(self.update_status_label)
+        update_card.layout.addWidget(self.check_updates_button)
+        self.root_layout.addWidget(update_card)
 
         appearance_card = CardWidget("Appearance", "The current stylesheet is intentionally text-only so custom icons and pixel assets can be added later.")
         theme_value = QLabel("Theme: MCW Dark Block")
@@ -82,6 +98,7 @@ class LauncherSettingsPage(BasePage):
         self.show_snapshots.setChecked(bool(settings.get("show_snapshots", False)))
         self.debug_mode.setChecked(bool(settings.get("debug_mode", False)))
         self.remember_window_size.setChecked(bool(settings.get("remember_window_size", True)))
+        self.auto_check_updates.setChecked(bool(settings.get("auto_check_updates", True)))
         self.reload_languages()
         language_index = self.language_combo.findData(settings.get("language", "en-US"))
         self.language_combo.blockSignals(True)
@@ -95,4 +112,12 @@ class LauncherSettingsPage(BasePage):
             "debug_mode": self.debug_mode.isChecked(),
             "remember_window_size": self.remember_window_size.isChecked(),
             "language": self.language_combo.currentData() or "en-US",
+            "auto_check_updates": self.auto_check_updates.isChecked(),
+            "update_channel": "beta",
         }
+
+    def set_update_status(self, message: str) -> None:
+        self.update_status_label.setText(message)
+
+    def set_update_busy(self, busy: bool) -> None:
+        self.check_updates_button.setEnabled(not busy)

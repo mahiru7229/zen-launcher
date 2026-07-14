@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QMessageBo
 
 from src.core.instance.instance_manager import InstanceManager
 from src.core.language.language_manager import language_manager, tr
+from src.core.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
 from src.gui.config import LAUNCHER_NAME, MINIMUM_HEIGHT, MINIMUM_WIDTH, RIGHT_PANEL_WIDTH, SIDEBAR_WIDTH, WINDOW_HEIGHT, WINDOW_WIDTH
 from src.gui.controllers.account_controller import AccountController
 from src.gui.controllers.gui_settings_controller import GuiSettingsController
@@ -19,8 +20,10 @@ from src.gui.controllers.mod_loader_controller import ModLoaderController
 from src.gui.controllers.modrinth_controller import ModrinthController
 from src.gui.controllers.settings_controller import InstanceSettingsController
 from src.gui.controllers.version_controller import VersionController
+from src.gui.controllers.update_controller import UpdateController
 from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
 from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
+from src.gui.dialogs.update_dialog import UpdateDialog
 from src.gui.input_guard import install_combo_box_wheel_guard
 from src.gui.localization import retranslate_widget_tree
 from src.gui.pages.about_page import AboutPage
@@ -35,6 +38,7 @@ from src.gui.task_runner import TaskRunner
 from src.gui.widget.launch_control_widget import LaunchControlWidget
 from src.gui.widget.right_panel_widget import RightPanelWidget
 from src.gui.widget.sidebar_widget import SidebarWidget
+from src.models.update.update_info import PreparedUpdate, UpdateInfo
 
 
 class MainWindow(QMainWindow):
@@ -58,8 +62,10 @@ class MainWindow(QMainWindow):
         language_manager.reload()
         language_manager.set_language(self._startup_settings.get("language", "en-US"), notify=False)
         self.launch_controller = LaunchController(self.task_runner)
+        self.update_controller = UpdateController(self.task_runner)
         self.running_instances_timer = QTimer(self)
         self._modrinth_tasks: set[str] = set()
+        self._prompted_update_versions: set[str] = set()
         self.running_instances_timer.setInterval(1000)
 
         self._build_ui()
@@ -165,6 +171,7 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.save_requested.connect(self.gui_settings_controller.save)
         self.launcher_settings_page.reset_requested.connect(self.gui_settings_controller.reset)
         self.launcher_settings_page.language_changed.connect(self._preview_language)
+        self.launcher_settings_page.check_updates_requested.connect(lambda: self.update_controller.check(manual=True))
 
         self.launch_control.launch_clicked.connect(self.launch_controller.launch)
 
@@ -207,6 +214,11 @@ class MainWindow(QMainWindow):
         self.launch_controller.launch_finished.connect(self.launch_control.set_result)
         self.launch_controller.launch_finished.connect(lambda _result: self.instance_controller.refresh_running(force=True))
 
+        self.update_controller.update_available.connect(self._on_update_available)
+        self.update_controller.no_update_available.connect(self._on_no_update_available)
+        self.update_controller.update_prepared.connect(self._on_update_prepared)
+        self.update_controller.update_check_failed.connect(self._on_update_check_failed)
+
         self.task_runner.task_started.connect(self._on_task_started)
         self.task_runner.task_failed.connect(self._on_task_failed)
         self.task_runner.task_succeeded.connect(self._on_task_completed)
@@ -225,6 +237,7 @@ class MainWindow(QMainWindow):
             self.instance_settings_controller,
             self.gui_settings_controller,
             self.launch_controller,
+            self.update_controller,
         )
 
         for controller in controllers:
@@ -249,6 +262,8 @@ class MainWindow(QMainWindow):
         self.running_instances_timer.start()
         self.version_controller.refresh()
         self.logs_page.append(tr("Started {launcher_name}", launcher_name=LAUNCHER_NAME))
+        if settings.get("auto_check_updates", True):
+            QTimer.singleShot(1500, lambda: self.update_controller.check(manual=False))
 
     def _refresh_all(self) -> None:
         self.account_controller.refresh()
@@ -333,6 +348,46 @@ class MainWindow(QMainWindow):
         self.modrinth_modpack_dialog.close()
         QMessageBox.information(self, tr("modrinth.modpack.install"), tr("modrinth.modpack.installed", name=selected_name))
 
+    def _on_update_available(self, info: UpdateInfo, manual: bool) -> None:
+        if not manual and info.version in self._prompted_update_versions:
+            return
+        self._prompted_update_versions.add(info.version)
+        self.launcher_settings_page.set_update_status(tr("update.status.available", version=info.version))
+
+        decision = UpdateDialog.ask(info, self)
+        if decision == UpdateDialog.DONT_ASK_AGAIN:
+            self.gui_settings_controller.set_auto_check_updates(False)
+            self.launcher_settings_page.set_update_status(tr("update.status.auto_disabled"))
+            return
+        if decision == UpdateDialog.UPDATE_NOW:
+            if not WindowsUpdateInstaller.is_supported():
+                QMessageBox.information(self, tr("update.error.title"), tr("update.error.packaged_only"))
+                return
+            self.update_controller.prepare(info)
+
+    def _on_no_update_available(self, manual: bool) -> None:
+        self.launcher_settings_page.set_update_status(tr("update.status.latest"))
+        if manual:
+            QMessageBox.information(self, tr("update.latest.title"), tr("update.latest.message"))
+
+    def _on_update_check_failed(self, error: Exception, manual: bool) -> None:
+        self.launcher_settings_page.set_update_status(tr("update.status.failed"))
+        if manual:
+            QMessageBox.warning(self, tr("update.error.title"), tr("update.error.check_failed", error=error))
+
+    def _on_update_prepared(self, prepared: PreparedUpdate) -> None:
+        self.launcher_settings_page.set_update_status(tr("update.status.installing"))
+        QTimer.singleShot(0, lambda: self._launch_prepared_update(prepared))
+
+    def _launch_prepared_update(self, prepared: PreparedUpdate) -> None:
+        try:
+            WindowsUpdateInstaller.launch(prepared)
+        except (AutomaticUpdateUnsupportedError, OSError, RuntimeError) as error:
+            self._show_error(tr("update.error.title"), str(error))
+            self.launcher_settings_page.set_update_status(tr("update.status.failed"))
+            return
+        self.close()
+
     def _account_selected(self, account: object | None) -> None:
         self.home_page.set_account(account)
         self.right_panel.set_account(account)
@@ -382,6 +437,9 @@ class MainWindow(QMainWindow):
                 retranslate_dynamic()
 
     def _on_task_started(self, _task_id: str, message: str, blocking: bool) -> None:
+        if _task_id.startswith("update."):
+            self.launcher_settings_page.set_update_busy(True)
+            self.launcher_settings_page.set_update_status(message)
         if _task_id.startswith("modrinth."):
             self._modrinth_tasks.add(_task_id)
             self.modrinth_mod_dialog.set_busy(True)
@@ -390,6 +448,8 @@ class MainWindow(QMainWindow):
             self._set_status(message)
 
     def _on_task_completed(self, task_id: str, _result: object) -> None:
+        if task_id.startswith("update."):
+            self.launcher_settings_page.set_update_busy(False)
         if not task_id.startswith("modrinth."):
             return
         self._modrinth_tasks.discard(task_id)

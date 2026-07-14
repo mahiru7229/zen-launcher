@@ -14,7 +14,7 @@ class PackageManager:
     PACKAGE_TYPE_INSTANCE = "instance"
 
     LAUNCHER_NAME = "mcw-launcher"
-    LAUNCHER_VERSION = "v0.2.2-alpha"
+    LAUNCHER_VERSION = "v0.5.0-beta.2"
 
     @staticmethod
     def create_instance_package_metadata(include_saves: bool) -> PackageMetadata:

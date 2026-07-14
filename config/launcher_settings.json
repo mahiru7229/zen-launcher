@@ -1,5 +1,5 @@
 {
-    "schema_version": 1,
+    "schema_version": 2,
     "gui": {
         "start_page": "home",
         "show_snapshots": false,
@@ -11,5 +11,10 @@
     },
     "window": {
         "geometry": "AdnQywADAAAAAACgAAAAIwAABt8AAAPFAAAAoAAAAEIAAAbfAAADxQAAAAAAAAAAB4AAAACgAAAAQgAABt8AAAPF"
+    },
+    "updates": {
+        "auto_check": true,
+        "channel": "beta",
+        "last_checked_at": "2026-07-14T18:22:27.030890+00:00"
     }
 }

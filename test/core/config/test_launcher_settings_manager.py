@@ -62,3 +62,16 @@ def test_reset_restores_defaults(tmp_path: Path) -> None:
 
     assert data == manager.DEFAULT_SETTINGS
     assert manager.load() == manager.DEFAULT_SETTINGS
+
+
+def test_update_settings_are_created_and_persisted(tmp_path: Path) -> None:
+    manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
+
+    data = manager.load()
+    assert data["updates"] == {"auto_check": True, "channel": "beta", "last_checked_at": None}
+
+    manager.update_section("updates", {"auto_check": False, "last_checked_at": "2026-07-15T12:00:00+00:00"})
+    updated = manager.load()["updates"]
+    assert updated["auto_check"] is False
+    assert updated["channel"] == "beta"
+    assert updated["last_checked_at"] == "2026-07-15T12:00:00+00:00"
