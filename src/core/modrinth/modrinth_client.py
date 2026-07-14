@@ -21,7 +21,7 @@ class ModrinthClient:
     SEARCH_TTL_SECONDS = 10 * 60
     VERSIONS_TTL_SECONDS = 30 * 60
     PROJECT_TTL_SECONDS = 60 * 60
-    USER_AGENT = "mahiru7229/mcw-launcher/0.5.0-beta.2 (https://github.com/mahiru7229/mcw-launcher)"
+    USER_AGENT = "mahiru7229/mcw-launcher/0.5.0-beta.3 (https://github.com/mahiru7229/mcw-launcher)"
 
     _cache_locks: dict[Path, Lock] = {}
     _cache_locks_guard = Lock()

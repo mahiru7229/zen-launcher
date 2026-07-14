@@ -100,3 +100,12 @@ def test_cleanup_removes_instance_when_finalization_fails(tmp_path, monkeypatch)
 
     assert not InstanceManager.is_instance_exist("Broken Instance")
     assert not (tmp_path / "instances" / "Broken Instance").exists()
+
+
+
+def test_blank_modpack_name_uses_next_available_project_name(tmp_path, monkeypatch):
+    configure_paths(tmp_path, monkeypatch)
+    (tmp_path / "instances" / "Test Pack").mkdir(parents=True)
+    (tmp_path / "instances" / "Test Pack (2)").mkdir(parents=True)
+
+    assert InstanceManager.next_available_name("Test Pack") == "Test Pack (3)"

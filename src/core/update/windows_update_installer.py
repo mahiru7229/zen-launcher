@@ -7,6 +7,7 @@ import sys
 import tempfile
 import uuid
 
+from src.core.fs.paths import Paths
 from src.models.update.update_info import PreparedUpdate
 
 
@@ -20,7 +21,7 @@ class WindowsUpdateInstaller:
         return os.name == "nt" and bool(getattr(sys, "frozen", False))
 
     @classmethod
-    def launch(cls, prepared: PreparedUpdate, install_directory: Path | None = None, executable_path: Path | None = None, parent_pid: int | None = None) -> Path:
+    def launch(cls, prepared: PreparedUpdate, install_directory: Path | None = None, executable_path: Path | None = None, parent_pid: int | None = None, persistent_log_path: Path | None = None) -> Path:
         if not cls.is_supported():
             raise AutomaticUpdateUnsupportedError("Automatic installation is only available in the packaged Windows launcher.")
 
@@ -29,6 +30,8 @@ class WindowsUpdateInstaller:
         source = prepared.content_directory.resolve()
         destination = destination.resolve()
         executable = executable.resolve()
+        persistent_log = Path(persistent_log_path) if persistent_log_path is not None else Paths.updater_log_path()
+        persistent_log = persistent_log.resolve()
 
         if not source.is_dir():
             raise FileNotFoundError(f"Prepared update directory does not exist: {source}")
@@ -65,6 +68,10 @@ class WindowsUpdateInstaller:
             str(updater_directory),
             "-StagingDirectory",
             str(prepared.staging_directory.resolve()),
+            "-PersistentLogPath",
+            str(persistent_log),
+            "-TargetVersion",
+            str(prepared.info.version),
         ]
         creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
         subprocess.Popen(command, cwd=str(destination), close_fds=True, creationflags=creation_flags)
@@ -78,7 +85,9 @@ class WindowsUpdateInstaller:
     [Parameter(Mandatory=$true)][string]$DestinationDirectory,
     [Parameter(Mandatory=$true)][string]$ExecutableName,
     [Parameter(Mandatory=$true)][string]$UpdaterDirectory,
-    [Parameter(Mandatory=$true)][string]$StagingDirectory
+    [Parameter(Mandatory=$true)][string]$StagingDirectory,
+    [Parameter(Mandatory=$true)][string]$PersistentLogPath,
+    [Parameter(Mandatory=$true)][string]$TargetVersion
 )
 
 $ErrorActionPreference = "Stop"
@@ -89,7 +98,13 @@ $completed = $false
 
 function Write-UpdateLog([string]$Message) {
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    Add-Content -LiteralPath $logPath -Value "[$timestamp] $Message" -Encoding UTF8
+    $line = "[$timestamp] $Message"
+    Add-Content -LiteralPath $logPath -Value $line -Encoding UTF8
+    $persistentParent = Split-Path -Parent $PersistentLogPath
+    if ($persistentParent) {
+        New-Item -ItemType Directory -Path $persistentParent -Force | Out-Null
+    }
+    Add-Content -LiteralPath $PersistentLogPath -Value $line -Encoding UTF8
 }
 
 function Invoke-Robocopy([string]$Source, [string]$Destination) {
@@ -129,6 +144,7 @@ function Restore-Backup {
 }
 
 try {
+    Write-UpdateLog "Starting update to $TargetVersion"
     Write-UpdateLog "Waiting for launcher process $ParentPid"
     Wait-Process -Id $ParentPid -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 700
@@ -146,7 +162,7 @@ try {
     Start-Process -FilePath $updatedExecutable -WorkingDirectory $DestinationDirectory
     $completed = $true
     Remove-Item -LiteralPath $StagingDirectory -Recurse -Force -ErrorAction SilentlyContinue
-    Write-UpdateLog "Update completed"
+    Write-UpdateLog "Update to $TargetVersion completed"
 }
 catch {
     Write-UpdateLog "Update failed: $($_.Exception.Message)"

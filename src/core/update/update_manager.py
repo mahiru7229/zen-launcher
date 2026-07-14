@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from pathlib import Path, PurePosixPath
 import shutil
@@ -11,6 +12,7 @@ import zipfile
 from src.core.fs.paths import Paths
 from src.core.network.httpx_downloader import HttpDownloader
 from src.core.update.github_release_client import GitHubReleaseClient
+from src.core.update.versioning import LauncherVersion
 from src.models.update.update_info import PreparedUpdate, UpdateInfo
 
 
@@ -18,6 +20,8 @@ class UpdateManager:
     MAX_ARCHIVE_BYTES = 2 * 1024 * 1024 * 1024
     MAX_EXTRACTED_BYTES = 4 * 1024 * 1024 * 1024
     MAX_ARCHIVE_ENTRIES = 20_000
+    PACKAGE_MANIFEST_NAME = "mcw-update.json"
+    PACKAGE_MANIFEST_SCHEMA_VERSION = 1
 
     def __init__(self, repository: str, current_version: str, channel: str = "beta") -> None:
         self.client = GitHubReleaseClient(repository=repository, current_version=current_version, channel=channel)
@@ -37,10 +41,41 @@ class UpdateManager:
             content_directory = self._resolve_content_directory(extraction_directory)
             if not any(content_directory.iterdir()):
                 raise RuntimeError("The update archive does not contain any files.")
+            self._validate_package_manifest(content_directory, info)
             return PreparedUpdate(info=info, archive_path=archive_path, staging_directory=staging_directory, content_directory=content_directory)
         except Exception:
             shutil.rmtree(staging_directory, ignore_errors=True)
             raise
+
+
+    @classmethod
+    def _validate_package_manifest(cls, content_directory: Path, info: UpdateInfo) -> None:
+        manifest_path = content_directory / cls.PACKAGE_MANIFEST_NAME
+        if not manifest_path.is_file():
+            return
+        try:
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise RuntimeError(f"Invalid {cls.PACKAGE_MANIFEST_NAME}: {error}") from error
+        if not isinstance(payload, dict):
+            raise RuntimeError(f"{cls.PACKAGE_MANIFEST_NAME} must contain a JSON object.")
+        if int(payload.get("schema_version", 0) or 0) != cls.PACKAGE_MANIFEST_SCHEMA_VERSION:
+            raise RuntimeError(f"Unsupported update package schema: {payload.get('schema_version')}")
+        package_version = str(payload.get("version") or "").strip()
+        if not package_version:
+            raise RuntimeError("The update package manifest does not declare a version.")
+        try:
+            expected = LauncherVersion.parse(info.version)
+            actual = LauncherVersion.parse(package_version)
+        except ValueError as error:
+            raise RuntimeError(f"The update package contains an invalid version: {package_version}") from error
+        if actual != expected:
+            raise RuntimeError(f"Update package version mismatch: expected {expected}, found {actual}.")
+        executable_name = str(payload.get("executable") or "MCW Launcher.exe").strip()
+        if Path(executable_name).name != executable_name or not executable_name.lower().endswith(".exe"):
+            raise RuntimeError("The update package manifest contains an invalid executable name.")
+        if not (content_directory / executable_name).is_file():
+            raise RuntimeError(f"The update package does not contain the declared executable: {executable_name}")
 
     def _download_archive(self, info: UpdateInfo, archive_path: Path) -> None:
         expected_sha256 = info.asset.sha256

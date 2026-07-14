@@ -53,3 +53,28 @@ def test_rejects_unsafe_archive_paths(tmp_path: Path, name: str) -> None:
 
     with pytest.raises(RuntimeError, match="Unsafe path"):
         manager()._extract_archive(archive_path, extraction)
+
+
+def test_validates_matching_update_package_manifest(tmp_path: Path) -> None:
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "MCW Launcher.exe").write_bytes(b"exe")
+    (content / "mcw-update.json").write_text('{"schema_version": 1, "version": "0.5.0-beta.3", "executable": "MCW Launcher.exe"}', encoding="utf-8")
+    from src.models.update.update_info import ReleaseAsset, UpdateInfo
+
+    info = UpdateInfo(current_version="0.5.0-beta.2", version="0.5.0-beta.3", tag_name="v0.5.0-beta.3", title="Beta 3", release_notes="", release_url="", published_at="", prerelease=True, asset=ReleaseAsset("update.zip", "https://example.com/update.zip", 1))
+
+    manager()._validate_package_manifest(content, info)
+
+
+def test_rejects_update_package_version_mismatch(tmp_path: Path) -> None:
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "MCW Launcher.exe").write_bytes(b"exe")
+    (content / "mcw-update.json").write_text('{"schema_version": 1, "version": "0.5.0-beta.4", "executable": "MCW Launcher.exe"}', encoding="utf-8")
+    from src.models.update.update_info import ReleaseAsset, UpdateInfo
+
+    info = UpdateInfo(current_version="0.5.0-beta.2", version="0.5.0-beta.3", tag_name="v0.5.0-beta.3", title="Beta 3", release_notes="", release_url="", published_at="", prerelease=True, asset=ReleaseAsset("update.zip", "https://example.com/update.zip", 1))
+
+    with pytest.raises(RuntimeError, match="version mismatch"):
+        manager()._validate_package_manifest(content, info)

@@ -29,6 +29,9 @@ class GuiSettingsController(BaseController):
     def current(self) -> dict:
         return dict(self._current)
 
+    def raw_settings(self) -> dict:
+        return self._settings.load()
+
     def load(self) -> dict:
         data = self._settings.load()
         gui = data.get("gui", {})

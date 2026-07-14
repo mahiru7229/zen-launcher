@@ -15,7 +15,7 @@ from src.models.update.update_info import ReleaseAsset, UpdateInfo
 class GitHubReleaseClient:
     API_ROOT = "https://api.github.com"
     CACHE_SCHEMA_VERSION = 1
-    CACHE_TTL_SECONDS = 0
+    CACHE_TTL_SECONDS = 15 * 60
 
     def __init__(self, repository: str, current_version: str, channel: str = "beta", cache_path: Path | None = None) -> None:
         repository_name = str(repository).strip().strip("/")

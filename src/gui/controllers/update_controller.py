@@ -23,13 +23,30 @@ class UpdateController(BaseController):
     MANUAL_CHECK_TASK_ID = "update.check.manual"
     PREPARE_TASK_ID = "update.prepare"
 
-    def __init__(self, task_runner: TaskRunner) -> None:
+    def __init__(self, task_runner: TaskRunner, channel: str = UPDATE_CHANNEL) -> None:
         super().__init__()
         self._task_runner = task_runner
-        self._manager = UpdateManager(repository=GITHUB_REPOSITORY, current_version=VERSION_ID, channel=UPDATE_CHANNEL)
+        self._channel = self._normalize_channel(channel)
+        self._manager = UpdateManager(repository=GITHUB_REPOSITORY, current_version=VERSION_ID, channel=self._channel)
         self._settings = LauncherSettingsManager()
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
+
+    @property
+    def channel(self) -> str:
+        return self._channel
+
+    def set_channel(self, channel: str) -> None:
+        normalized = self._normalize_channel(channel)
+        if normalized == self._channel:
+            return
+        self._channel = normalized
+        self._manager = UpdateManager(repository=GITHUB_REPOSITORY, current_version=VERSION_ID, channel=self._channel)
+
+    @staticmethod
+    def _normalize_channel(channel: str) -> str:
+        value = str(channel or "beta").strip().lower()
+        return value if value in {"stable", "beta"} else "beta"
 
     def check(self, manual: bool = False) -> None:
         task_id = self.MANUAL_CHECK_TASK_ID if manual else self.AUTO_CHECK_TASK_ID

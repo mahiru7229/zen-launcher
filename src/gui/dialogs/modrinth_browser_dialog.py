@@ -5,6 +5,7 @@ import re
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout
 
+from src.core.instance.instance_manager import InstanceManager
 from src.core.language.language_manager import tr
 from src.models.instance.instance import Instance
 from src.models.modrinth.project import ModrinthProject, ModrinthSearchResult
@@ -28,6 +29,8 @@ class ModrinthBrowserDialog(QDialog):
         self._versions: list[ModrinthVersion] = []
         self._selected_project: ModrinthProject | None = None
         self._offset = 0
+        self._suggested_instance_name = ""
+        self._instance_name_customized = False
         self._build_ui()
         self.retranslate_dynamic()
 
@@ -89,6 +92,7 @@ class ModrinthBrowserDialog(QDialog):
         self.version_combo = QComboBox()
         self.version_combo.currentIndexChanged.connect(self._version_selected)
         self.instance_name_input = QLineEdit()
+        self.instance_name_input.textEdited.connect(self._instance_name_edited)
         self.optional_checkbox = QCheckBox()
         self.optional_checkbox.setChecked(True)
         self.install_button = QPushButton()
@@ -119,6 +123,10 @@ class ModrinthBrowserDialog(QDialog):
         self._projects = []
         self._versions = []
         self._selected_project = None
+        self._suggested_instance_name = ""
+        self._instance_name_customized = False
+        if self.project_type == "modpack":
+            self.instance_name_input.clear()
         self.results_table.setRowCount(0)
         self.version_combo.clear()
         self.install_button.setEnabled(False)
@@ -198,8 +206,10 @@ class ModrinthBrowserDialog(QDialog):
         self._versions = []
         self.version_combo.clear()
         self.install_button.setEnabled(False)
-        if self.project_type == "modpack" and not self.instance_name_input.text().strip():
-            self.instance_name_input.setText(self._safe_instance_name(project.title))
+        if self.project_type == "modpack" and (not self._instance_name_customized or not self.instance_name_input.text().strip() or self.instance_name_input.text() == self._suggested_instance_name):
+            self._suggested_instance_name = InstanceManager.next_available_name(self._safe_instance_name(project.title))
+            self.instance_name_input.setText(self._suggested_instance_name)
+            self._instance_name_customized = False
         game_version = self._instance.version_id if self.project_type == "mod" and self._instance is not None else ""
         self.details_label.setText(tr("modrinth.project.loading_versions", title=project.title))
         self.versions_requested.emit(self.project_type, project.project_id, game_version)
@@ -211,6 +221,9 @@ class ModrinthBrowserDialog(QDialog):
             return
         self.details_label.setText(tr("modrinth.project.details", title=project.title, author=project.author or tr("common.unknown"), version=version.version_number, release_type=version.version_type, downloads=f"{project.downloads:,}", description=project.description))
 
+    def _instance_name_edited(self, text: str) -> None:
+        self._instance_name_customized = bool(text.strip()) and text != self._suggested_instance_name
+
     def _request_install(self) -> None:
         version = self._selected_version()
         project = self._selected_project
@@ -220,9 +233,6 @@ class ModrinthBrowserDialog(QDialog):
             self.install_mod_requested.emit(version.version_id)
             return
         name = self.instance_name_input.text().strip()
-        if not name:
-            QMessageBox.information(self, tr("modrinth.modpack.install"), tr("modrinth.modpack.name_required"))
-            return
         self.install_modpack_requested.emit(project.project_id, version.version_id, name, self.optional_checkbox.isChecked())
 
     def _selected_version(self) -> ModrinthVersion | None:

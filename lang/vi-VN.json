@@ -331,7 +331,7 @@
     "modrinth.modpack.installed": "Đã cài modpack thành instance '{name}'.",
     "launcher_settings.update.title": "Cập nhật launcher",
     "launcher_settings.update.subtitle": "MCW Launcher có thể kiểm tra GitHub Releases và cài bản cập nhật ZIP sau khi hỏi xác nhận.",
-    "launcher_settings.update.current_version": "Phiên bản hiện tại: v0.5.0 Beta 2",
+    "launcher_settings.update.current_version": "Phiên bản hiện tại: v0.5.0 Beta 3",
     "launcher_settings.update.auto_check": "Tự động kiểm tra cập nhật khi mở launcher",
     "launcher_settings.update.status.not_checked": "Trạng thái cập nhật: Chưa kiểm tra",
     "launcher_settings.update.check": "Kiểm tra cập nhật",
@@ -358,6 +358,18 @@
     "update.latest.message": "Đang sử dụng phiên bản MCW Launcher mới nhất.",
     "update.error.title": "Cập nhật launcher",
     "update.error.packaged_only": "Cài đặt tự động chỉ hoạt động với bản EXE Windows đã đóng gói. Hãy build hoặc chạy gói release để kiểm tra tính năng cập nhật tự động.",
-    "update.error.check_failed": "MCW Launcher không thể kiểm tra cập nhật.\n\n{error}"
+    "update.error.check_failed": "MCW Launcher không thể kiểm tra cập nhật.\n\n{error}",
+    "launcher_settings.update.channel": "Kênh cập nhật",
+    "update.channel.beta": "Beta",
+    "update.channel.stable": "Ổn định",
+    "update.status.waiting": "Bản cập nhật đã sẵn sàng, nhưng launcher phải rảnh trước khi cài đặt",
+    "update.error.tasks_running": "Không thể cài cập nhật khi còn {count} tác vụ launcher đang chạy. Hãy hoàn tất hoặc hủy chúng rồi kiểm tra lại.",
+    "update.error.instances_running": "Hãy đóng các instance Minecraft đang chạy trước khi cập nhật: {names}",
+    "update.dialog.package_details": "Gói cập nhật: {asset} • {size}",
+    "update.dialog.open_release": "Mở trang phát hành",
+    "diagnostics.export.title": "Xuất chẩn đoán",
+    "diagnostics.file_filter": "Tệp văn bản (*.txt)",
+    "diagnostics.export.success": "Đã lưu báo cáo chẩn đoán tại:\n{path}",
+    "diagnostics.open_logs": "Mở thư mục log"
   }
 }

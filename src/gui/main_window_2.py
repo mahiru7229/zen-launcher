@@ -3,14 +3,17 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QTimer
-from PySide6.QtGui import QCloseEvent
-from PySide6.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget
+from PySide6.QtCore import QTimer, QUrl
+from PySide6.QtGui import QCloseEvent, QDesktopServices
+from PySide6.QtWidgets import QApplication, QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget
 
+from src.core.diagnostics.diagnostics_manager import DiagnosticsManager
+from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
+from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.language.language_manager import language_manager, tr
 from src.core.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
-from src.gui.config import LAUNCHER_NAME, MINIMUM_HEIGHT, MINIMUM_WIDTH, RIGHT_PANEL_WIDTH, SIDEBAR_WIDTH, WINDOW_HEIGHT, WINDOW_WIDTH
+from src.gui.config import LAUNCHER_NAME, MINIMUM_HEIGHT, MINIMUM_WIDTH, RIGHT_PANEL_WIDTH, SIDEBAR_WIDTH, VERSION_ID, WINDOW_HEIGHT, WINDOW_WIDTH
 from src.gui.controllers.account_controller import AccountController
 from src.gui.controllers.gui_settings_controller import GuiSettingsController
 from src.gui.controllers.instance_controller import InstanceController
@@ -62,7 +65,7 @@ class MainWindow(QMainWindow):
         language_manager.reload()
         language_manager.set_language(self._startup_settings.get("language", "en-US"), notify=False)
         self.launch_controller = LaunchController(self.task_runner)
-        self.update_controller = UpdateController(self.task_runner)
+        self.update_controller = UpdateController(self.task_runner, channel=self._startup_settings.get("update_channel", "beta"))
         self.running_instances_timer = QTimer(self)
         self._modrinth_tasks: set[str] = set()
         self._prompted_update_versions: set[str] = set()
@@ -172,6 +175,8 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.reset_requested.connect(self.gui_settings_controller.reset)
         self.launcher_settings_page.language_changed.connect(self._preview_language)
         self.launcher_settings_page.check_updates_requested.connect(lambda: self.update_controller.check(manual=True))
+        self.logs_page.export_diagnostics_requested.connect(self._export_diagnostics)
+        self.logs_page.open_logs_folder_requested.connect(self._open_logs_folder)
 
         self.launch_control.launch_clicked.connect(self.launch_controller.launch)
 
@@ -363,6 +368,11 @@ class MainWindow(QMainWindow):
             if not WindowsUpdateInstaller.is_supported():
                 QMessageBox.information(self, tr("update.error.title"), tr("update.error.packaged_only"))
                 return
+            blocked_reason = self._update_install_block_reason()
+            if blocked_reason:
+                QMessageBox.warning(self, tr("update.error.title"), blocked_reason)
+                self.launcher_settings_page.set_update_status(tr("update.status.waiting"))
+                return
             self.update_controller.prepare(info)
 
     def _on_no_update_available(self, manual: bool) -> None:
@@ -376,8 +386,25 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("update.error.title"), tr("update.error.check_failed", error=error))
 
     def _on_update_prepared(self, prepared: PreparedUpdate) -> None:
+        blocked_reason = self._update_install_block_reason()
+        if blocked_reason:
+            self.launcher_settings_page.set_update_status(tr("update.status.waiting"))
+            QMessageBox.warning(self, tr("update.error.title"), blocked_reason)
+            return
         self.launcher_settings_page.set_update_status(tr("update.status.installing"))
         QTimer.singleShot(0, lambda: self._launch_prepared_update(prepared))
+
+    def _update_install_block_reason(self) -> str | None:
+        active_tasks = [task_id for task_id in self.task_runner.active_task_ids if not task_id.startswith("update.")]
+        if active_tasks:
+            return tr("update.error.tasks_running", count=len(active_tasks))
+        running_instances = InstanceRunLock.list_active()
+        if running_instances:
+            names = ", ".join(item.name for item in running_instances[:4])
+            if len(running_instances) > 4:
+                names += f" (+{len(running_instances) - 4})"
+            return tr("update.error.instances_running", names=names)
+        return None
 
     def _launch_prepared_update(self, prepared: PreparedUpdate) -> None:
         try:
@@ -413,6 +440,7 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.set_settings(settings)
         self.instances_page.set_show_snapshots(bool(settings.get("show_snapshots", False)))
         self.launch_controller.set_debug_mode(bool(settings.get("debug_mode", False)))
+        self.update_controller.set_channel(str(settings.get("update_channel", "beta")))
 
     def _preview_language(self, locale: str) -> None:
         if language_manager.set_language(locale, notify=False):
@@ -484,6 +512,22 @@ class MainWindow(QMainWindow):
         self.instance_settings_page.set_busy(busy)
         self.launch_control.set_busy(busy)
         self.right_panel.set_busy(busy)
+
+    def _export_diagnostics(self) -> None:
+        suggested = Paths.diagnostics_default_path()
+        selected, _ = QFileDialog.getSaveFileName(self, tr("diagnostics.export.title"), str(suggested), tr("diagnostics.file_filter"))
+        if not selected:
+            return
+        try:
+            path = DiagnosticsManager.write_report(Path(selected), launcher_version=VERSION_ID, settings=self.gui_settings_controller.raw_settings(), activity_log=self.logs_page.activity_text())
+        except Exception as error:
+            self._show_error(tr("diagnostics.export.title"), str(error))
+            return
+        self.logs_page.append(tr("diagnostics.export.success", path=path))
+        QMessageBox.information(self, tr("diagnostics.export.title"), tr("diagnostics.export.success", path=path))
+
+    def _open_logs_folder(self) -> None:
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(Paths.logs_root().resolve())))
 
     def _show_error(self, title: str, message: str) -> None:
         QMessageBox.critical(self, title, message)

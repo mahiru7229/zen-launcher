@@ -9,3 +9,5 @@ def test_updater_script_waits_copies_restarts_and_cleans_up() -> None:
     assert "-Recurse -Force" in script
     assert "Start-Process -FilePath $updatedExecutable" in script
     assert "$StagingDirectory" in script
+    assert "$PersistentLogPath" in script
+    assert "Starting update to $TargetVersion" in script

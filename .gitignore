@@ -16,3 +16,7 @@ MCW-Launcher.spec
 test.py
 GUI_STRUCTURE.txt
 runtimes/
+build/
+dist/
+release/
+*.spec.bak

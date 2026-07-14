@@ -49,6 +49,9 @@ class LauncherSettingsPage(BasePage):
         current_version_label = QLabel(f"Current version: {VERSION}")
         current_version_label.setObjectName("ValueLabel")
         self.auto_check_updates = QCheckBox("Automatically check for updates when the launcher starts")
+        self.update_channel_combo = QComboBox()
+        self.update_channel_combo.addItem("Beta", "beta")
+        self.update_channel_combo.addItem("Stable", "stable")
         self.update_status_label = QLabel("Update status: Not checked")
         self.update_status_label.setObjectName("ValueLabel")
         self.update_status_label.setWordWrap(True)
@@ -56,6 +59,8 @@ class LauncherSettingsPage(BasePage):
         self.check_updates_button.clicked.connect(self.check_updates_requested.emit)
         update_card.layout.addWidget(current_version_label)
         update_card.layout.addWidget(self.auto_check_updates)
+        update_card.layout.addWidget(QLabel("Update channel"))
+        update_card.layout.addWidget(self.update_channel_combo)
         update_card.layout.addWidget(self.update_status_label)
         update_card.layout.addWidget(self.check_updates_button)
         self.root_layout.addWidget(update_card)
@@ -99,6 +104,8 @@ class LauncherSettingsPage(BasePage):
         self.debug_mode.setChecked(bool(settings.get("debug_mode", False)))
         self.remember_window_size.setChecked(bool(settings.get("remember_window_size", True)))
         self.auto_check_updates.setChecked(bool(settings.get("auto_check_updates", True)))
+        channel_index = self.update_channel_combo.findData(settings.get("update_channel", "beta"))
+        self.update_channel_combo.setCurrentIndex(max(0, channel_index))
         self.reload_languages()
         language_index = self.language_combo.findData(settings.get("language", "en-US"))
         self.language_combo.blockSignals(True)
@@ -113,7 +120,7 @@ class LauncherSettingsPage(BasePage):
             "remember_window_size": self.remember_window_size.isChecked(),
             "language": self.language_combo.currentData() or "en-US",
             "auto_check_updates": self.auto_check_updates.isChecked(),
-            "update_channel": "beta",
+            "update_channel": self.update_channel_combo.currentData() or "beta",
         }
 
     def set_update_status(self, message: str) -> None:

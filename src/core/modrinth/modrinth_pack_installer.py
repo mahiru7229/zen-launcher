@@ -32,11 +32,13 @@ class ModrinthPackInstaller:
 
     @staticmethod
     def install(project_id: str, version_id: str, instance_name: str, install_optional_files: bool = True) -> ModrinthModpackInstallResult:
-        normalized_name = ModrinthPackInstaller._validated_instance_name(instance_name)
-        if InstanceManager.is_instance_exist(normalized_name):
+        project = ModrinthClient.get_project(project_id)
+        requested_name = str(instance_name or "").strip()
+        base_name = ModrinthPackInstaller._validated_instance_name(requested_name or project.title)
+        normalized_name = base_name if requested_name else InstanceManager.next_available_name(base_name)
+        if requested_name and InstanceManager.is_instance_exist(normalized_name):
             raise RuntimeError(f"Instance '{normalized_name}' already exists.")
 
-        project = ModrinthClient.get_project(project_id)
         if project.project_type != "modpack":
             raise RuntimeError(f"'{project.title}' is not a Modrinth modpack.")
         version = ModrinthClient.get_version(version_id)

@@ -3,8 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-VERSION = "v0.5.0 Beta 2"
-VERSION_ID = "0.5.0-beta.2"
+VERSION = "v0.5.0 Beta 3"
+VERSION_ID = "0.5.0-beta.3"
 UPDATE_CHANNEL = "beta"
 GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
 LAUNCHER_NAME = f"MCW LAUNCHER {VERSION}"

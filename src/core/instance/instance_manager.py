@@ -359,6 +359,26 @@ class InstanceManager:
         return True
 
     @staticmethod
+    def next_available_name(preferred_name: str) -> str:
+        base_name = str(preferred_name).strip() or "New Instance"
+        try:
+            existing_names = {instance.name.casefold() for instance in InstanceManager.list_instances()}
+        except Exception:
+            existing_names = set()
+
+        def is_taken(candidate: str) -> bool:
+            return candidate.casefold() in existing_names or Paths.load_instance_dir(candidate).exists() or InstanceManager.is_instance_exist(candidate)
+
+        if not is_taken(base_name):
+            return base_name
+        suffix = 2
+        while True:
+            candidate = f"{base_name} ({suffix})"
+            if not is_taken(candidate):
+                return candidate
+            suffix += 1
+
+    @staticmethod
     def is_instance_exist(name: str) -> bool:
         metadata_path = Paths.instance_metadata(name)
 

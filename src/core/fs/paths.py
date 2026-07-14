@@ -15,6 +15,7 @@ class Paths:
     INSTANCES_ROOT = PROJECT_ROOT / "instances"
     ACCOUNTS_ROOT = PROJECT_ROOT / "accounts"
     CONFIG_ROOT = PROJECT_ROOT / "config"
+    LOGS_ROOT = PROJECT_ROOT / "logs"
     THEME_ROOT = PROJECT_ROOT / "themes" 
     INSTANCE_LOCKS_ROOT = INSTANCES_ROOT / ".runtime" / "locks"
     
@@ -25,6 +26,7 @@ class Paths:
             Paths.INSTANCES_ROOT,
             Paths.ACCOUNTS_ROOT,
             Paths.CONFIG_ROOT,
+            Paths.LOGS_ROOT,
             Paths.INSTANCE_LOCKS_ROOT,
         ]
 
@@ -59,6 +61,22 @@ class Paths:
     @staticmethod
     def launcher_settings_path() -> Path:
         return Paths.CONFIG_ROOT / "launcher_settings.json"
+
+    @staticmethod
+    def logs_root() -> Path:
+        Paths.LOGS_ROOT.mkdir(parents=True, exist_ok=True)
+        return Paths.LOGS_ROOT
+
+    @staticmethod
+    def updater_log_path() -> Path:
+        return Paths.logs_root() / "updater.log"
+
+    @staticmethod
+    def diagnostics_default_path() -> Path:
+        from datetime import datetime
+
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        return Paths.logs_root() / f"MCW-Diagnostics-{timestamp}.txt"
 
     @staticmethod
     def update_root() -> Path:

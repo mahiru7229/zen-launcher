@@ -331,7 +331,7 @@
     "modrinth.modpack.installed": "Modpack installed successfully as instance '{name}'.",
     "launcher_settings.update.title": "Launcher updates",
     "launcher_settings.update.subtitle": "MCW Launcher can check GitHub Releases and install ZIP updates after asking for confirmation.",
-    "launcher_settings.update.current_version": "Current version: v0.5.0 Beta 2",
+    "launcher_settings.update.current_version": "Current version: v0.5.0 Beta 3",
     "launcher_settings.update.auto_check": "Automatically check for updates when the launcher starts",
     "launcher_settings.update.status.not_checked": "Update status: Not checked",
     "launcher_settings.update.check": "Check for updates",
@@ -358,7 +358,19 @@
     "update.latest.message": "You are using the latest available MCW Launcher version.",
     "update.error.title": "Launcher update",
     "update.error.packaged_only": "Automatic installation is only available in the packaged Windows EXE. Build or run the release package to test automatic updates.",
-    "update.error.check_failed": "MCW Launcher could not check for updates.\n\n{error}"
+    "update.error.check_failed": "MCW Launcher could not check for updates.\n\n{error}",
+    "launcher_settings.update.channel": "Update channel",
+    "update.channel.beta": "Beta",
+    "update.channel.stable": "Stable",
+    "update.status.waiting": "Update is ready, but the launcher must be idle before installation",
+    "update.error.tasks_running": "The update cannot be installed while {count} launcher task(s) are still running. Finish or cancel them, then check again.",
+    "update.error.instances_running": "Close the running Minecraft instance(s) before updating: {names}",
+    "update.dialog.package_details": "Package: {asset} • {size}",
+    "update.dialog.open_release": "Open release page",
+    "diagnostics.export.title": "Export diagnostics",
+    "diagnostics.file_filter": "Text files (*.txt)",
+    "diagnostics.export.success": "Diagnostic report saved to:\n{path}",
+    "diagnostics.open_logs": "Open logs folder"
   },
   "aliases": {
     "MCW Launcher": "app.name",
@@ -653,9 +665,14 @@
     "Rebuild Fabric metadata and verify Loader libraries without changing mods or saves.": "fabric.repair.tooltip",
     "Launcher updates": "launcher_settings.update.title",
     "MCW Launcher can check GitHub Releases and install ZIP updates after asking for confirmation.": "launcher_settings.update.subtitle",
-    "Current version: v0.5.0 Beta 2": "launcher_settings.update.current_version",
     "Automatically check for updates when the launcher starts": "launcher_settings.update.auto_check",
     "Update status: Not checked": "launcher_settings.update.status.not_checked",
-    "Check for updates": "launcher_settings.update.check"
+    "Check for updates": "launcher_settings.update.check",
+    "Update channel": "launcher_settings.update.channel",
+    "Beta": "update.channel.beta",
+    "Stable": "update.channel.stable",
+    "Export diagnostics": "diagnostics.export.title",
+    "Open logs folder": "diagnostics.open_logs",
+    "Current version: v0.5.0 Beta 3": "launcher_settings.update.current_version"
   }
 }

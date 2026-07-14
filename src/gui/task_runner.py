@@ -52,6 +52,10 @@ class TaskRunner(QObject):
     def has_active_tasks(self) -> bool:
         return bool(self._contexts)
 
+    @property
+    def active_task_ids(self) -> tuple[str, ...]:
+        return tuple(self._contexts)
+
     def is_task_active(self, task_id: str) -> bool:
         return task_id in self._contexts
 
