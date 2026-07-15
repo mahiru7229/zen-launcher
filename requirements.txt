@@ -1,0 +1,14 @@
+# MCW Launcher runtime dependencies
+PySide6>=6.8,<7
+httpx>=0.28,<1
+requests>=2.32,<3
+
+# Windows DPAPI support (`import win32crypt`)
+pywin32>=311; sys_platform == "win32"
+
+# Build dependencies
+PyInstaller>=6.16,<7
+
+# Test dependencies
+pytest>=9,<10
+pytest-cov>=7,<8
