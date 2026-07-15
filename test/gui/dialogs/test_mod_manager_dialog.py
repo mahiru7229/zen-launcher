@@ -44,6 +44,27 @@ def test_dialog_renders_modrinth_update_and_lock_state(gui_app, tmp_path):
         assert dialog.table.item(0, 4).text() == "1.0 → 2.0"
         assert dialog.table.item(0, 5).text() == "Locked"
         assert not dialog.update_all_button.isEnabled()
+        assert dialog.update_notice_label.isVisibleTo(dialog)
+        assert "Example" in dialog.update_notice_label.text()
+        assert "2.0" in dialog.update_notice_label.text()
+        assert "locked" in dialog.update_notice_label.text().casefold()
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+        gui_app.processEvents()
+
+
+def test_dialog_keeps_update_check_status_inside_manage_mods(gui_app, tmp_path):
+    instance = Instance(instance_id="id", name="Fabric", version_id="1.20.1", instance_dir=tmp_path, mod_loader=("fabric", "0.19.3"))
+    dialog = ModManagerDialog()
+
+    try:
+        dialog.set_instance(instance)
+        dialog.set_update_checking(True)
+
+        assert dialog.update_notice_label.isVisibleTo(dialog)
+        assert "checking" in dialog.update_notice_label.text().casefold()
+        assert not dialog.check_updates_button.isEnabled()
     finally:
         dialog.close()
         dialog.deleteLater()

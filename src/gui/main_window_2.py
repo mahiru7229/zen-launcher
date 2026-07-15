@@ -12,6 +12,7 @@ from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.language.language_manager import language_manager, tr
+from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
 from src.core.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
 from src.gui.config import LAUNCHER_NAME, MINIMUM_HEIGHT, MINIMUM_WIDTH, RIGHT_PANEL_WIDTH, SIDEBAR_WIDTH, VERSION_ID, WINDOW_HEIGHT, WINDOW_WIDTH
@@ -318,6 +319,9 @@ class MainWindow(QMainWindow):
         self.mod_manager_dialog.show()
         self.mod_manager_dialog.raise_()
         self.mod_manager_dialog.activateWindow()
+        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
+        if loader_name == ModLoaderManager.FABRIC and not self.task_runner.is_task_active("mods.update.check"):
+            QTimer.singleShot(0, lambda: self.mod_controller.check_updates(self.mod_manager_dialog.allowed_version_types, force_refresh=False))
 
     def _open_modrinth_mod_browser(self) -> None:
         instance = self.mod_controller.current_instance
@@ -360,7 +364,8 @@ class MainWindow(QMainWindow):
 
     def _modrinth_mod_installed(self, result: object) -> None:
         self.mod_controller.refresh()
-        self.mod_controller.check_updates(self.mod_manager_dialog.allowed_version_types)
+        if self.mod_manager_dialog.isVisible():
+            self.mod_controller.check_updates(self.mod_manager_dialog.allowed_version_types, force_refresh=False)
         count = len(getattr(result, "installed_files", ()) or ())
         warnings = tuple(getattr(result, "warnings", ()) or ())
         message = tr("modrinth.mod.installed", count=count)
@@ -537,6 +542,9 @@ class MainWindow(QMainWindow):
         self.theme_runtime.reapply_assets(self)
 
     def _on_task_started(self, _task_id: str, message: str, blocking: bool) -> None:
+        if _task_id == "mods.update.check":
+            self.mod_manager_dialog.set_update_checking(True)
+            return
         if _task_id.startswith("update."):
             self.launcher_settings_page.set_update_busy(True)
             self.launcher_settings_page.set_update_status(message)
@@ -548,6 +556,8 @@ class MainWindow(QMainWindow):
             self._set_status(message)
 
     def _on_task_completed(self, task_id: str, _result: object) -> None:
+        if task_id == "mods.update.check":
+            self.mod_manager_dialog.set_update_checking(False)
         if task_id.startswith("update."):
             self.launcher_settings_page.set_update_busy(False)
         if not task_id.startswith("modrinth."):
@@ -558,6 +568,8 @@ class MainWindow(QMainWindow):
         self.modrinth_modpack_dialog.set_busy(busy)
 
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
+        if task_id == "mods.update.check":
+            self.mod_manager_dialog.set_update_error(str(error))
         if task_id == self.launch_controller.TASK_ID:
             self.launch_control.set_failed(str(error))
             self.home_page.set_status("Launch failed")

@@ -435,7 +435,15 @@
     "mod_manager.update.none": "All unlocked Modrinth mods are up to date.",
     "mod_manager.column.source": "Source",
     "mod_manager.column.update": "Update",
-    "mod_manager.column.lock": "Lock"
+    "mod_manager.column.lock": "Lock",
+    "mod_manager.update_notice.checking": "Checking Modrinth for newer mod versions…",
+    "mod_manager.update_notice.failed": "Mod update check failed: {error}",
+    "mod_manager.update_notice.available": "{count} newer mod version(s) found: {details}",
+    "mod_manager.update_notice.available_more": "{details}, and {remaining} more",
+    "mod_manager.update_notice.locked_detail": "{detail} (locked)",
+    "mod_manager.update_notice.partial_failed": "No installable updates were found, but {count} tracked mod(s) could not be checked. Select a mod to view details.",
+    "mod_manager.update_notice.not_tracked": "No Modrinth mods are tracked in this instance. Mods added manually are not checked automatically.",
+    "mod_manager.update_notice.up_to_date": "All tracked Modrinth mods are up to date."
   },
   "aliases": {
     "MCW Launcher": "app.name",

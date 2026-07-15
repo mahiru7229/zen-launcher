@@ -39,7 +39,6 @@ class ModController(BaseController):
         self._instance = instance
         self._scan_pending = False
         self.instance_changed.emit(instance)
-        self.updates_changed.emit(ModrinthModUpdateReport(entries=()))
         self.health_changed.emit(ModHealthReport(issues=(), enabled_mods=0, disabled_mods=0))
         if instance is None:
             self.mods_changed.emit([])
@@ -99,13 +98,13 @@ class ModController(BaseController):
         action = "Enabling" if enabled else "Disabling"
         self._task_runner.run("mods.toggle", lambda: ModManager.set_enabled(instance, paths, enabled), f"{action} {len(paths)} mod file(s)...")
 
-    def check_updates(self, allowed_version_types: tuple[str, ...]) -> None:
+    def check_updates(self, allowed_version_types: tuple[str, ...], force_refresh: bool = True) -> None:
         instance = self._require_instance()
         if instance is None:
             return
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
-        self._task_runner.run("mods.update.check", lambda: (instance_id, ModrinthModUpdateManager.check(instance, allowed_version_types, force_refresh=True)), "Checking Modrinth mod updates...", blocking=False)
+        self._task_runner.run("mods.update.check", lambda: (instance_id, ModrinthModUpdateManager.check(instance, allowed_version_types, force_refresh=force_refresh)), "Checking Modrinth mod updates...", blocking=False)
 
     def update_projects(self, project_ids: list[str], allowed_version_types: tuple[str, ...]) -> None:
         instance = self._require_instance()
@@ -150,7 +149,6 @@ class ModController(BaseController):
             instance_id, report = result
             if self._matches_instance(instance_id):
                 self.updates_changed.emit(report)
-                self.status_changed.emit(f"{report.update_count} mod update(s) available")
             return
         if task_id == "mods.update.apply":
             instance_id, allowed_types, update_result = result

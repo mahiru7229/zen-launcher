@@ -435,7 +435,15 @@
     "mod_manager.update.none": "Tất cả mod Modrinth chưa bị khóa đều đã mới nhất.",
     "mod_manager.column.source": "Nguồn",
     "mod_manager.column.update": "Cập nhật",
-    "mod_manager.column.lock": "Khóa"
+    "mod_manager.column.lock": "Khóa",
+    "mod_manager.update_notice.checking": "Đang kiểm tra phiên bản mod mới trên Modrinth…",
+    "mod_manager.update_notice.failed": "Không thể kiểm tra cập nhật mod: {error}",
+    "mod_manager.update_notice.available": "Tìm thấy {count} phiên bản mod mới: {details}",
+    "mod_manager.update_notice.available_more": "{details}, và {remaining} mod khác",
+    "mod_manager.update_notice.locked_detail": "{detail} (đang khóa)",
+    "mod_manager.update_notice.partial_failed": "Không tìm thấy bản cập nhật có thể cài, nhưng có {count} mod không thể kiểm tra. Hãy chọn mod để xem chi tiết.",
+    "mod_manager.update_notice.not_tracked": "Instance này chưa có mod Modrinth nào được theo dõi. Mod thêm thủ công sẽ không được tự động kiểm tra.",
+    "mod_manager.update_notice.up_to_date": "Tất cả mod Modrinth đang theo dõi đều đã là phiên bản mới nhất."
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",

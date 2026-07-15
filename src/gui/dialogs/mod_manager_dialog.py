@@ -36,6 +36,9 @@ class ModManagerDialog(QDialog):
         self._include_beta = False
         self._include_alpha = False
         self._busy = False
+        self._updates_checked = False
+        self._update_checking = False
+        self._update_error = ""
         self.setWindowTitle("Mod Manager")
         self.setObjectName("ModManagerDialog")
         self.resize(1260, 760)
@@ -67,6 +70,12 @@ class ModManagerDialog(QDialog):
         root.addWidget(self.title_label)
         root.addWidget(self.summary_label)
         root.addWidget(self.health_label)
+
+        self.update_notice_label = QLabel("")
+        self.update_notice_label.setObjectName("StatusBadge")
+        self.update_notice_label.setWordWrap(True)
+        self.update_notice_label.hide()
+        root.addWidget(self.update_notice_label)
 
         search_row = QHBoxLayout()
         self.search_input = QLineEdit()
@@ -150,9 +159,13 @@ class ModManagerDialog(QDialog):
         self._mods = []
         self._updates = ModrinthModUpdateReport(entries=())
         self._health = ModHealthReport(issues=(), enabled_mods=0, disabled_mods=0)
+        self._updates_checked = False
+        self._update_checking = False
+        self._update_error = ""
         self.table.setRowCount(0)
         self.details.clear()
         self.health_label.clear()
+        self._render_update_notice()
 
         if instance is None:
             self.title_label.setText(tr("No instance selected"))
@@ -176,8 +189,25 @@ class ModManagerDialog(QDialog):
 
     def set_update_report(self, report: ModrinthModUpdateReport) -> None:
         self._updates = report if isinstance(report, ModrinthModUpdateReport) else ModrinthModUpdateReport(entries=())
+        self._updates_checked = True
+        self._update_checking = False
+        self._update_error = ""
         self._render_table()
         self._render_summary()
+        self._render_update_notice()
+
+    def set_update_checking(self, checking: bool) -> None:
+        self._update_checking = bool(checking)
+        if checking:
+            self._update_error = ""
+        self._set_actions_enabled(not self._busy and self._is_fabric_instance())
+        self._render_update_notice()
+
+    def set_update_error(self, message: str) -> None:
+        self._update_checking = False
+        self._updates_checked = True
+        self._update_error = str(message).strip()
+        self._render_update_notice()
 
     def set_health_report(self, report: ModHealthReport) -> None:
         self._health = report if isinstance(report, ModHealthReport) else ModHealthReport(issues=(), enabled_mods=0, disabled_mods=0)
@@ -260,6 +290,59 @@ class ModManagerDialog(QDialog):
         tracked = len(self._updates.entries)
         channels = "/".join(item.title() for item in self.allowed_version_types)
         self.health_label.setText(tr("mod_manager.health_summary", errors=self._health.error_count, warnings=self._health.warning_count, tracked=tracked, updates=self._updates.update_count, channels=channels))
+
+    def _render_update_notice(self) -> None:
+        if self._instance is None or not self._is_fabric_instance():
+            self.update_notice_label.clear()
+            self.update_notice_label.hide()
+            return
+
+        if self._update_checking:
+            self._set_update_notice(tr("mod_manager.update_notice.checking"), warning=True)
+            return
+
+        if self._update_error:
+            self._set_update_notice(tr("mod_manager.update_notice.failed", error=self._update_error), warning=True)
+            return
+
+        if not self._updates_checked:
+            self.update_notice_label.clear()
+            self.update_notice_label.hide()
+            return
+
+        available = [entry for entry in self._updates.entries if entry.update_available and not entry.file_missing and not entry.warning]
+        if available:
+            shown = available[:3]
+            descriptions: list[str] = []
+            for entry in shown:
+                detail = f"{entry.title}: {entry.current_version_number} → {entry.latest_version_number}"
+                descriptions.append(tr("mod_manager.update_notice.locked_detail", detail=detail) if entry.locked else detail)
+            details = ", ".join(descriptions)
+            remaining = len(available) - len(shown)
+            if remaining > 0:
+                details = tr("mod_manager.update_notice.available_more", details=details, remaining=remaining)
+            self._set_update_notice(tr("mod_manager.update_notice.available", count=len(available), details=details), warning=True)
+            return
+
+        failed = [entry for entry in self._updates.entries if entry.file_missing or entry.warning]
+        if failed:
+            self._set_update_notice(tr("mod_manager.update_notice.partial_failed", count=len(failed)), warning=True)
+            return
+
+        if not self._updates.entries:
+            self._set_update_notice(tr("mod_manager.update_notice.not_tracked"), warning=False)
+            return
+
+        self._set_update_notice(tr("mod_manager.update_notice.up_to_date"), warning=False)
+
+    def _set_update_notice(self, text: str, warning: bool) -> None:
+        object_name = "WarningBadge" if warning else "StatusBadge"
+        if self.update_notice_label.objectName() != object_name:
+            self.update_notice_label.setObjectName(object_name)
+            self.update_notice_label.style().unpolish(self.update_notice_label)
+            self.update_notice_label.style().polish(self.update_notice_label)
+        self.update_notice_label.setText(text)
+        self.update_notice_label.show()
 
     def _selection_changed(self) -> None:
         self._render_details()
@@ -371,8 +454,9 @@ class ModManagerDialog(QDialog):
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder.resolve())))
 
     def _set_actions_enabled(self, enabled: bool) -> None:
-        for button in (self.refresh_button, self.analyze_button, self.open_folder_button, self.add_button, self.modrinth_button, self.enable_button, self.disable_button, self.remove_button, self.check_updates_button):
+        for button in (self.refresh_button, self.analyze_button, self.open_folder_button, self.add_button, self.modrinth_button, self.enable_button, self.disable_button, self.remove_button):
             button.setEnabled(enabled)
+        self.check_updates_button.setEnabled(enabled and not self._update_checking)
         self._update_action_state()
 
     def _update_action_state(self) -> None:
@@ -411,6 +495,7 @@ class ModManagerDialog(QDialog):
             self._health = health
             self._render_table()
             self._render_summary()
+            self._render_update_notice()
         self.refresh_button.setText(tr("mod_manager.refresh"))
         self.open_folder_button.setText(tr("mod_manager.open_folder"))
         self.analyze_button.setText(tr("mod_manager.analyze"))
