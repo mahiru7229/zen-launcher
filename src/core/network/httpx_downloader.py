@@ -13,6 +13,7 @@ import httpx
 
 from src.config import MODRINTH_USER_AGENT
 from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter
+from src.core.network.download_pause import DownloadPausedError, download_pause_controller
 from src.core.progress.download_rate_meter import DownloadRateMeter
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.progress.progress_stage import ProgressStage
@@ -72,6 +73,7 @@ class HttpDownloader:
 
     @staticmethod
     def download(download_info: DownloadInfo, path: Path, max_retry: int = 2, timeout: float = 20.0, reporter: ProgressReporter | None = None, progress_stage: ProgressStage | None = None, progress_message: str | None = None) -> Path:
+        download_pause_controller.raise_if_requested()
         path_lock = HttpDownloader._get_path_lock(path)
         with path_lock:
             return HttpDownloader._download_and_verify(download_info=download_info, path=path, max_retry=max_retry, timeout=timeout, reporter=reporter, progress_stage=progress_stage, progress_message=progress_message)
@@ -83,11 +85,13 @@ class HttpDownloader:
         force_full_request = False
 
         while True:
+            download_pause_controller.raise_if_requested()
             existing_size = 0 if force_full_request else HttpDownloader._partial_size(path, expected_size)
             headers = {"Accept": "application/octet-stream", "Accept-Encoding": "identity"}
             if existing_size > 0:
                 headers["Range"] = f"bytes={existing_size}-"
 
+            download_pause_controller.raise_if_requested()
             client = HttpDownloader.get_client()
             with client.stream("GET", download_info.url, headers=headers, timeout=timeout) as response:
                 status_code = int(getattr(response, "status_code", 200) or 200)
@@ -122,9 +126,11 @@ class HttpDownloader:
 
                 with path.open("ab" if append else "wb") as file:
                     for chunk in response.iter_bytes(chunk_size=CHUNK_SIZE):
+                        download_pause_controller.raise_if_requested()
                         if not chunk:
                             continue
                         download_bandwidth_limiter.throttle(len(chunk))
+                        download_pause_controller.raise_if_requested()
                         file.write(chunk)
                         downloaded_bytes += len(chunk)
                         response_bytes += len(chunk)
@@ -162,6 +168,7 @@ class HttpDownloader:
         try:
             with path.open("rb") as file:
                 while chunk := file.read(1024 * 1024):
+                    download_pause_controller.raise_if_requested()
                     sha1.update(chunk)
         except OSError:
             return None
@@ -201,11 +208,13 @@ class HttpDownloader:
                     size = temp_path.stat().st_size
                     temp_path.replace(path)
                     return path, sha1, size
+                except DownloadPausedError:
+                    raise
                 except (httpx.HTTPError, OSError, RuntimeError) as error:
                     last_error = error
                     if not HttpDownloader._should_retry(error, attempt, max_retry):
                         break
-                    time.sleep(HttpDownloader._retry_delay(attempt, HttpDownloader._error_response(error)))
+                    HttpDownloader._sleep_retry(HttpDownloader._retry_delay(attempt, HttpDownloader._error_response(error)))
 
             HttpDownloader.delete_file(temp_path)
             raise RuntimeError(f"Failed to download '{path.name}' after {max_retry} attempts: {HttpDownloader._describe_error(last_error)}") from last_error
@@ -299,6 +308,13 @@ class HttpDownloader:
         return float(min(2 ** (attempt - 1), 8))
 
     @staticmethod
+    def _sleep_retry(seconds: float) -> None:
+        if download_pause_controller.is_active:
+            download_pause_controller.wait(seconds)
+            return
+        time.sleep(seconds)
+
+    @staticmethod
     def _describe_error(error: Exception | None) -> str:
         if error is None:
             return "unknown error"
@@ -328,6 +344,7 @@ class HttpDownloader:
 
         last_error: Exception | None = None
         for attempt in range(1, max_retry + 1):
+            download_pause_controller.raise_if_requested()
             try:
                 HttpDownloader._download_stream(download_info=download_info, path=temp_path, timeout=timeout, reporter=reporter, progress_stage=progress_stage, progress_message=progress_message)
                 if not HttpDownloader.verify_sha1(temp_path, download_info.sha1):
@@ -335,11 +352,13 @@ class HttpDownloader:
                     raise RuntimeError(f"SHA1 mismatch for: {path.name}")
                 temp_path.replace(path)
                 return path
+            except DownloadPausedError:
+                raise
             except (httpx.HTTPError, OSError, RuntimeError) as error:
                 last_error = error
                 if not HttpDownloader._should_retry(error, attempt, max_retry):
                     break
-                time.sleep(HttpDownloader._retry_delay(attempt, HttpDownloader._error_response(error)))
+                HttpDownloader._sleep_retry(HttpDownloader._retry_delay(attempt, HttpDownloader._error_response(error)))
 
         HttpDownloader.delete_file(temp_path)
         raise RuntimeError(f"Failed to download '{path.name}' after {max_retry} attempts: {HttpDownloader._describe_error(last_error)}") from last_error

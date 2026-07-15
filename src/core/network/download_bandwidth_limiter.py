@@ -5,6 +5,8 @@ from threading import Lock
 import math
 import time
 
+from src.core.network.download_pause import download_pause_controller
+
 
 class DownloadBandwidthLimiter:
     BYTES_PER_MEGABYTE = 1024 * 1024
@@ -12,6 +14,7 @@ class DownloadBandwidthLimiter:
     def __init__(self, clock: Callable[[], float] | None = None, sleeper: Callable[[float], None] | None = None) -> None:
         self._clock = clock or time.monotonic
         self._sleeper = sleeper or time.sleep
+        self._interruptible_sleep = sleeper is None
         self._lock = Lock()
         self._limit_bytes_per_second = 0.0
         self._next_available_at = 0.0
@@ -54,7 +57,10 @@ class DownloadBandwidthLimiter:
             delay = scheduled_at - now
 
         if delay > 0:
-            self._sleeper(delay)
+            if self._interruptible_sleep:
+                download_pause_controller.wait(delay)
+            else:
+                self._sleeper(delay)
 
     @staticmethod
     def _normalize_mbps(value: object) -> float:

@@ -27,3 +27,57 @@ def test_java_download_uses_shared_bandwidth_limiter(tmp_path: Path, monkeypatch
 
     assert destination.read_bytes() == content
     assert sum(throttled) == len(content)
+
+
+def test_java_download_pause_keeps_partial_and_resumes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.core.network.download_pause import DownloadPausedError, download_pause_controller
+
+    content = b"java-archive"
+    release = JavaRelease(major=21, url="https://example.com/java.zip", sha256=hashlib.sha256(content).hexdigest(), size=len(content), filename="java.zip", release_name="test")
+    destination = tmp_path / "java.zip"
+    phase = {"value": 1}
+    ranges: list[str | None] = []
+
+    class Response:
+        def __init__(self, resumed: bool) -> None:
+            self.status_code = 206 if resumed else 200
+            self.headers = {"Content-Length": "7", "Content-Range": "bytes 5-11/12"} if resumed else {"Content-Length": str(len(content))}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def iter_bytes(self, chunk_size: int):
+            if phase["value"] == 1:
+                yield b"java-"
+                download_pause_controller.request_pause()
+                yield b"archive"
+                return
+            yield b"archive"
+
+    class Client:
+        def stream(self, method: str, url: str, *, headers: dict[str, str], timeout: float):
+            ranges.append(headers.get("Range"))
+            return Response(resumed=phase["value"] == 2)
+
+    monkeypatch.setattr(HttpDownloader, "get_client", lambda: Client())
+    download_pause_controller.begin()
+    with pytest.raises(DownloadPausedError):
+        JavaArchiveDownloader.download(release, destination, max_retry=1)
+
+    partial = destination.with_name(destination.name + ".part")
+    assert partial.read_bytes() == b"java-"
+
+    download_pause_controller.finish()
+    phase["value"] = 2
+    download_pause_controller.begin()
+    JavaArchiveDownloader.download(release, destination, max_retry=1)
+    download_pause_controller.finish()
+
+    assert destination.read_bytes() == content
+    assert ranges == [None, "bytes=5-"]

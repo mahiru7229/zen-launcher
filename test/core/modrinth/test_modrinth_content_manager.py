@@ -10,6 +10,7 @@ from src.core.mod.mod_manager import ModManager
 from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.modrinth.modrinth_downloader import ModrinthDownloader
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
+from src.core.network.download_pause import DownloadPausedError
 from src.core.modrinth.modrinth_registry import ModrinthRegistry
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.instance.instance import Instance
@@ -243,3 +244,13 @@ def test_failed_tracked_mod_manual_warning_contains_destination_path(tmp_path, m
     assert entry["pendingDownload"] is True
     assert entry["lastDownloadError"] == "CDN unavailable"
 
+
+
+def test_pause_is_not_swallowed_as_a_modrinth_download_failure(tmp_path, monkeypatch):
+    instance = make_instance(tmp_path)
+    save_pack_entry(instance, b"pause-me")
+
+    monkeypatch.setattr(ModrinthDownloader, "download_urls", lambda *args, **kwargs: (_ for _ in ()).throw(DownloadPausedError("paused")))
+
+    with pytest.raises(DownloadPausedError):
+        ModrinthContentManager.ensure(instance)

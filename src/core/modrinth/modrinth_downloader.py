@@ -9,6 +9,7 @@ import httpx
 
 from src.config import MODRINTH_USER_AGENT
 from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter
+from src.core.network.download_pause import DownloadPausedError, download_pause_controller
 from src.core.network.httpx_downloader import CHUNK_SIZE, HttpDownloader
 from src.core.progress.download_rate_meter import DownloadRateMeter
 from src.core.progress.progress_reporter import ProgressReporter
@@ -41,6 +42,7 @@ class ModrinthDownloader:
 
     @staticmethod
     def download_urls(urls: tuple[str, ...] | list[str], destination: Path, sha1: str = "", sha512: str = "", expected_size: int = 0, force: bool = False, restrict_hosts: bool = True, max_retry: int = 5, reporter: ProgressReporter | None = None, progress_stage: ProgressStage = ProgressStage.DOWNLOADING_MODS, progress_message: str | None = None) -> Path:
+        download_pause_controller.raise_if_requested()
         normalized_urls = tuple(dict.fromkeys(str(url).strip() for url in urls if str(url).strip()))
         if not normalized_urls:
             raise RuntimeError(f"No download URL is available for '{destination.name}'.")
@@ -78,6 +80,7 @@ class ModrinthDownloader:
         last_url = ""
 
         for url in urls:
+            download_pause_controller.raise_if_requested()
             last_url = url
             if restrict_hosts:
                 try:
@@ -87,6 +90,7 @@ class ModrinthDownloader:
                     continue
 
             for attempt in range(1, max_retry + 1):
+                download_pause_controller.raise_if_requested()
                 response: httpx.Response | None = None
                 try:
                     size, actual_sha1, actual_sha512, response = ModrinthDownloader._download_attempt(url, temp, expected_size, reporter, progress_stage, message)
@@ -95,25 +99,27 @@ class ModrinthDownloader:
                     final_size = expected_size if expected_size > 0 else size
                     ModrinthDownloader._report(reporter, progress_stage, message, final_size, final_size)
                     return destination
+                except DownloadPausedError:
+                    raise
                 except httpx.HTTPStatusError as error:
                     last_error = error
                     if error.response.status_code not in ModrinthDownloader.RETRYABLE_STATUS_CODES:
                         break
                     if attempt < max_retry:
-                        time.sleep(HttpDownloader._retry_delay(attempt, error.response))
+                        HttpDownloader._sleep_retry(HttpDownloader._retry_delay(attempt, error.response))
                 except _ResumableDownloadError as error:
                     last_error = error
                     if attempt < max_retry:
-                        time.sleep(HttpDownloader._retry_delay(attempt, response))
+                        HttpDownloader._sleep_retry(HttpDownloader._retry_delay(attempt, response))
                 except (httpx.HTTPError, OSError) as error:
                     last_error = error
                     if attempt < max_retry:
-                        time.sleep(HttpDownloader._retry_delay(attempt, response))
+                        HttpDownloader._sleep_retry(HttpDownloader._retry_delay(attempt, response))
                 except RuntimeError as error:
                     last_error = error
                     temp.unlink(missing_ok=True)
                     if attempt < max_retry:
-                        time.sleep(HttpDownloader._retry_delay(attempt, response))
+                        HttpDownloader._sleep_retry(HttpDownloader._retry_delay(attempt, response))
 
         host = urlparse(last_url).hostname or "unknown host"
         reason = HttpDownloader._describe_error(last_error)
@@ -124,6 +130,7 @@ class ModrinthDownloader:
         force_full_request = False
 
         while True:
+            download_pause_controller.raise_if_requested()
             if force_full_request:
                 temp.unlink(missing_ok=True)
             existing_size, sha1_hash, sha512_hash = ModrinthDownloader._hash_partial(temp, expected_size)
@@ -164,9 +171,11 @@ class ModrinthDownloader:
 
                 with temp.open("ab" if append else "wb") as output:
                     for chunk in response.iter_bytes(chunk_size=CHUNK_SIZE):
+                        download_pause_controller.raise_if_requested()
                         if not chunk:
                             continue
                         download_bandwidth_limiter.throttle(len(chunk))
+                        download_pause_controller.raise_if_requested()
                         output.write(chunk)
                         sha1_hash.update(chunk)
                         sha512_hash.update(chunk)
@@ -203,6 +212,7 @@ class ModrinthDownloader:
                 return 0, sha1_hash, sha512_hash
             with path.open("rb") as source:
                 while chunk := source.read(1024 * 1024):
+                    download_pause_controller.raise_if_requested()
                     sha1_hash.update(chunk)
                     sha512_hash.update(chunk)
             return size, sha1_hash, sha512_hash
@@ -228,6 +238,7 @@ class ModrinthDownloader:
         try:
             with path.open("rb") as source:
                 while chunk := source.read(1024 * 1024):
+                    download_pause_controller.raise_if_requested()
                     if sha1_hash is not None:
                         sha1_hash.update(chunk)
                     if sha512_hash is not None:

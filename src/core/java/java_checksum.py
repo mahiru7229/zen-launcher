@@ -1,6 +1,8 @@
 import hashlib
 from pathlib import Path
 
+from src.core.network.download_pause import download_pause_controller
+
 
 class JavaChecksum:
     @staticmethod
@@ -8,6 +10,7 @@ class JavaChecksum:
         digest = hashlib.sha256()
         with path.open("rb") as file:
             while chunk := file.read(1024 * 1024):
+                download_pause_controller.raise_if_requested()
                 digest.update(chunk)
         return digest.hexdigest().lower()
 

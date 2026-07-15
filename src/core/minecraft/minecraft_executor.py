@@ -16,6 +16,7 @@ from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
+from src.core.network.download_pause import download_pause_controller
 from src.core.progress.progress_reporter import ProgressReporter
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
 from src.models.account.account import Account
@@ -34,37 +35,48 @@ class MinecraftExecutor:
 
         try:
             reporter = ProgressReporter(on_progress)
+            download_pause_controller.raise_if_requested()
             reporter.status(stage=ProgressStage.PREPARING, message="Preparing Minecraft...")
 
             settings = SettingsManager.load(instance)
+            download_pause_controller.raise_if_requested()
             modrinth_warnings = ModrinthContentManager.ensure(
                 instance,
                 reporter,
                 block_launch_on_failure=bool(getattr(settings, "block_launch_on_modrinth_failure", True)),
             )
 
+            download_pause_controller.raise_if_requested()
             VersionManifestManager.get()
+            download_pause_controller.raise_if_requested()
             reporter.status(stage=ProgressStage.LOADING_VERSION, message=f"Loading Minecraft {instance.version_id}...")
             version = ModLoaderManager.load(instance, reporter)
+            download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.DOWNLOADING_CLIENT, message="Checking Minecraft client...")
             DownloadClientManager.load(version=version, reporter=reporter)
+            download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.DOWNLOADING_LIBRARIES, message="Checking Minecraft libraries...")
             DownloadLibraryManager.load(version=version, reporter=reporter)
+            download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.DOWNLOADING_ASSETS, message="Checking Minecraft assets...")
             AssetManager.load(version=version, reporter=reporter)
+            download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.BUILDING_CONTEXT, message="Building launch context...")
             context = ContextBuilder.build(instance, version, authentication)
+            download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.BUILDING_COMMAND, message="Building launch command...")
             command = LauncherManager.build(version, context, settings, account)
+            download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.SELECTING_JAVA, message="Selecting Java runtime...")
             java_major = version.java_version.get("majorVersion") or 8
             java = JavaResolver.resolve(java_major, reporter)
+            download_pause_controller.raise_if_requested()
 
             reporter.status(stage=ProgressStage.LAUNCHING, message=f"Launching Minecraft {version.id}...")
             started_at = datetime.now(timezone.utc)

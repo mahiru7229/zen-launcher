@@ -11,7 +11,8 @@ from src.gui.theme.runtime import set_theme_icon, set_theme_pixmap, set_theme_st
 class LaunchControlWidget(QFrame):
     launch_clicked = Signal()
 
-    BUTTON_TEXT = "Launch"
+    LAUNCH_TEXT = "launch.button"
+    CANCEL_TEXT = "launch.cancel_button"
 
     def __init__(self) -> None:
         super().__init__()
@@ -21,6 +22,9 @@ class LaunchControlWidget(QFrame):
         self._last_result: dict | None = None
         self._last_error = ""
         self._last_exit_result: object | None = None
+        self._busy = False
+        self._launch_active = False
+        self._pause_pending = False
         self._status_message = "Ready"
         self._detail_message = "Select an account and an instance, then launch."
         self._build_ui()
@@ -64,8 +68,8 @@ class LaunchControlWidget(QFrame):
         progress_layout.addWidget(self.detail_label)
         progress_layout.addWidget(self.progress_bar)
 
-        self.launch_button = set_theme_icon(QPushButton(tr(self.BUTTON_TEXT)), "icon.action.launch", 40)
-        set_theme_static_text(self.launch_button, "control.launch", tr(self.BUTTON_TEXT))
+        self.launch_button = set_theme_icon(QPushButton(tr(self.LAUNCH_TEXT)), "icon.action.launch", 40)
+        set_theme_static_text(self.launch_button, "control.launch", tr(self.LAUNCH_TEXT))
         self.launch_button.setObjectName("PrimaryButton")
         self.launch_button.setProperty("themeRole", "launch")
         self.launch_button.setFixedSize(230, 72)
@@ -75,7 +79,7 @@ class LaunchControlWidget(QFrame):
         layout.addWidget(self.launch_button)
 
     def set_selected_instance(self, _instance: object | None) -> None:
-        self._keep_launch_button_text()
+        self._refresh_launch_button()
 
     def set_status(self, message: str, detail: str | None = None) -> None:
         self._status_message = message
@@ -94,7 +98,7 @@ class LaunchControlWidget(QFrame):
         self.detail_label.setText(view.detail)
         self.stage_label.setText(view.stage_text)
         self._set_stage_state("busy")
-        self._keep_launch_button_text()
+        self._refresh_launch_button()
 
         if view.percentage is None:
             self.progress_bar.setRange(0, 0)
@@ -125,7 +129,7 @@ class LaunchControlWidget(QFrame):
             self.detail_label.setText(tr("Java: {path}", path=java_path))
             self.stage_label.setText(tr("RUNNING"))
             self._set_stage_state("success")
-        self._keep_launch_button_text()
+        self._refresh_launch_button()
 
 
     def set_exit_result(self, result: object) -> None:
@@ -150,7 +154,7 @@ class LaunchControlWidget(QFrame):
             self.detail_label.setText(tr("Play time: {duration}", duration=duration))
             self.stage_label.setText(tr("FINISHED"))
             self._set_stage_state("success")
-        self._keep_launch_button_text()
+        self._refresh_launch_button()
 
     def set_failed(self, message: str) -> None:
         self._mode = "failed"
@@ -162,14 +166,44 @@ class LaunchControlWidget(QFrame):
         self.detail_label.setText(message or tr("Minecraft could not be started."))
         self.stage_label.setText(tr("FAILED"))
         self._set_stage_state("error")
-        self._keep_launch_button_text()
+        self._refresh_launch_button()
 
     def set_busy(self, busy: bool) -> None:
-        self.launch_button.setEnabled(not busy)
-        self._keep_launch_button_text()
+        self._busy = bool(busy)
+        self._refresh_launch_button()
+
+    def set_launch_active(self, active: bool) -> None:
+        self._launch_active = bool(active)
+        if not self._launch_active:
+            self._pause_pending = False
+        self._refresh_launch_button()
+
+    def set_pause_pending(self) -> None:
+        if not self._launch_active:
+            return
+        self._pause_pending = True
+        self.status_label.setText(tr("launch.pause_requested"))
+        self.detail_label.setText(tr("launch.pause_requested_detail"))
+        self.stage_label.setText(tr("launch.pausing_badge"))
+        self._set_stage_state("warning")
+        self._refresh_launch_button()
+
+    def set_paused(self) -> None:
+        self._mode = "paused"
+        self._launch_active = False
+        self._pause_pending = False
+        self.status_label.setText(tr("launch.paused"))
+        self.detail_label.setText(tr("launch.paused_detail"))
+        self.stage_label.setText(tr("launch.paused_badge"))
+        self.progress_bar.setFormat(tr("launch.paused_badge"))
+        self._set_stage_state("warning")
+        self._refresh_launch_button()
 
     def reset_progress(self) -> None:
         self._mode = "idle"
+        self._busy = False
+        self._launch_active = False
+        self._pause_pending = False
         self._status_message = "Ready"
         self._detail_message = "Select an account and an instance, then launch."
         self.progress_bar.setRange(0, 100)
@@ -179,17 +213,27 @@ class LaunchControlWidget(QFrame):
         self.detail_label.setText(tr("Select an account and an instance, then launch."))
         self.stage_label.setText(tr("READY"))
         self._set_stage_state("success")
-        self._keep_launch_button_text()
+        self._refresh_launch_button()
 
-    def _keep_launch_button_text(self) -> None:
-        button_text = tr(self.BUTTON_TEXT)
+    def _refresh_launch_button(self) -> None:
+        is_cancel = self._launch_active
+        text_key = self.CANCEL_TEXT if is_cancel else self.LAUNCH_TEXT
+        static_role = "control.cancel" if is_cancel else "control.launch"
+        theme_role = "cancel" if is_cancel else "launch"
+        button_text = tr(text_key)
+
+        self.launch_button.setProperty("themeRole", theme_role)
+        self.launch_button.setProperty("themeStaticTextRole", static_role)
         self.launch_button.setProperty("themeStaticTextFallback", button_text)
+        self.launch_button.setEnabled((is_cancel and not self._pause_pending) or (not is_cancel and not self._busy))
+
         if bool(self.launch_button.property("themeStaticTextHidden")):
-            if self.launch_button.text():
-                self.launch_button.setText("")
-            return
-        if self.launch_button.text() != button_text:
+            self.launch_button.setText("")
+        elif self.launch_button.text() != button_text:
             self.launch_button.setText(button_text)
+
+        self.launch_button.style().unpolish(self.launch_button)
+        self.launch_button.style().polish(self.launch_button)
 
     def retranslate_dynamic(self) -> None:
         if self._mode == "progress" and self._last_event is not None:
@@ -198,13 +242,15 @@ class LaunchControlWidget(QFrame):
             self.set_result(self._last_result)
         elif self._mode == "failed":
             self.set_failed(self._last_error)
+        elif self._mode == "paused":
+            self.set_paused()
         elif self._mode == "exit" and self._last_exit_result is not None:
             self.set_exit_result(self._last_exit_result)
         else:
             self.status_label.setText(tr(self._status_message))
             self.detail_label.setText(tr(self._detail_message))
             self.stage_label.setText(tr("READY"))
-            self._keep_launch_button_text()
+            self._refresh_launch_button()
 
     def _set_stage_state(self, state: str) -> None:
         icon_state = "ready" if state == "success" and self._mode == "idle" else state

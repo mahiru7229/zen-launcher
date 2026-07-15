@@ -43,6 +43,14 @@ class LaunchErrorPresenter:
                 technical_message=technical_message,
             )
 
+        if "winerror 206" in normalized or "filename or extension is too long" in normalized or "launch command or one of its paths is still too long" in normalized:
+            return cls._build(
+                title="Windows path is too long",
+                summary="Windows rejected the Minecraft launch command or one of its paths. The launcher attempted to shorten the classpath automatically. Move MCW Launcher to a short folder such as C:\\MCW and shorten the instance name if the problem continues.",
+                status="Windows path is too long",
+                technical_message=technical_message,
+            )
+
         if "no space" in normalized or "disk full" in normalized:
             return cls._build(
                 title="Not enough storage",

@@ -87,3 +87,42 @@ def test_missing_text_asset_keeps_fallback_text_visible(tmp_path: Path, app: QAp
 
     assert button.text() == "Launch"
     assert button.property("themeStaticTextHidden") is False
+
+
+def test_cancel_role_uses_default_theme_png_fallback(tmp_path: Path, app: QApplication) -> None:
+    default_root = tmp_path / "themes" / ThemeManager.DEFAULT_THEME_ID
+    default_root.mkdir(parents=True)
+    (default_root / "theme.json").write_text(json.dumps({
+        "schema_version": 1,
+        "id": ThemeManager.DEFAULT_THEME_ID,
+        "name": "Default",
+        "author": "Test",
+        "assets": {"button.cancel": "cancel.png"},
+        "text_assets": {"control.cancel": "button.cancel"},
+    }), encoding="utf-8")
+    write_png(default_root / "cancel.png", 461, 133)
+
+    custom_root = tmp_path / "themes" / "custom"
+    custom_root.mkdir(parents=True)
+    (custom_root / "theme.json").write_text(json.dumps({
+        "schema_version": 1,
+        "id": "custom",
+        "name": "Custom",
+        "author": "Test",
+        "assets": {},
+    }), encoding="utf-8")
+
+    root, button = build_root()
+    button.setObjectName("PrimaryButton")
+    button.setProperty("themeRole", "cancel")
+    button.setProperty("themeStaticTextRole", "control.cancel")
+    button.setProperty("themeStaticTextFallback", "Cancel")
+
+    runtime = ThemeRuntime(ThemeManager(tmp_path / "themes"))
+    selected_theme = runtime.apply(root, "", "custom", show_static_text=False)
+    stylesheet = app.styleSheet()
+
+    assert selected_theme == "custom"
+    assert "cancel.png" in stylesheet
+    assert button.text() == ""
+    assert button.property("themeStaticTextHidden") is True

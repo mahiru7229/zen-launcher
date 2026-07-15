@@ -535,3 +535,51 @@ def test_run_passes_all_expected_popen_options(
         is java_runtime.subprocess.STDOUT
     )
     assert received["kwargs"]["creationflags"] == 0
+
+def test_run_retries_winerror_206_with_compacted_classpath(monkeypatch: pytest.MonkeyPatch, instance, instance_dir: Path):
+    received_commands = []
+    expected_process = object()
+
+    monkeypatch.setattr("src.core.java.java_runtime.datetime", FixedDateTime)
+    monkeypatch.setattr("src.core.java.java_runtime.os.name", "nt")
+    monkeypatch.setattr("src.core.java.java_runtime.subprocess.CREATE_NO_WINDOW", 0x08000000, raising=False)
+
+    def fake_popen(command, **kwargs):
+        received_commands.append(command)
+        if len(received_commands) == 1:
+            error = OSError("The filename or extension is too long")
+            error.winerror = 206
+            raise error
+        return expected_process
+
+    monkeypatch.setattr("src.core.java.java_runtime.subprocess.Popen", fake_popen)
+
+    result = JavaRuntime.run(
+        java=Path("C:/Java/bin/javaw.exe"),
+        command=["-Xmx4G", "-cp", "first.jar;client.jar", "example.Main"],
+        instance=instance,
+    )
+
+    assert result is expected_process
+    assert len(received_commands) == 2
+    assert received_commands[0][3] == "first.jar;client.jar"
+    compacted_classpath = type(instance_dir)(received_commands[1][3])
+    assert compacted_classpath.is_file()
+    assert compacted_classpath.name.startswith("classpath-")
+    assert compacted_classpath.suffix == ".jar"
+
+
+def test_run_reports_actionable_error_when_winerror_206_cannot_be_compacted(monkeypatch: pytest.MonkeyPatch, instance, instance_dir: Path):
+    monkeypatch.setattr("src.core.java.java_runtime.datetime", FixedDateTime)
+    monkeypatch.setattr("src.core.java.java_runtime.os.name", "nt")
+    monkeypatch.setattr("src.core.java.java_runtime.subprocess.CREATE_NO_WINDOW", 0x08000000, raising=False)
+
+    def failing_popen(command, **kwargs):
+        error = OSError("The filename or extension is too long")
+        error.winerror = 206
+        raise error
+
+    monkeypatch.setattr("src.core.java.java_runtime.subprocess.Popen", failing_popen)
+
+    with pytest.raises(RuntimeError, match="Move MCW Launcher to a shorter folder"):
+        JavaRuntime.run(java=Path("javaw.exe"), command=["example.Main", "x" * 40_000], instance=instance)

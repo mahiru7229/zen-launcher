@@ -36,6 +36,9 @@ The project is currently developed primarily for Windows and uses PySide6 for it
 - Select a compatible Java runtime automatically.
 - Download and manage compatible Java runtimes when required.
 - Display structured progress while preparing and launching the game.
+- Show active network speed, remaining bytes/files, and aggregate multi-file throughput while downloads are running.
+- Apply an optional global download bandwidth limit shared by all concurrent downloads.
+- Press the Launch button again while it shows Cancel to pause the active launch download; partial files are kept and resumed on the next Launch.
 - Track the Minecraft process until exit, including PID, exit code, session duration, latest game log, and crash report detection.
 
 ### Instance management
@@ -75,6 +78,9 @@ Each instance has its own game directory, metadata, settings, saves, mods, and r
 - Filter versions by Release, Beta, and Alpha channels. Release remains enabled by default; Beta and Alpha require explicit opt-in.
 - Persist channel preferences in `config/launcher_settings.json`.
 - Verify downloaded files and protect modpack extraction paths.
+- Check all managed Modrinth files before downloading, retry missing files in up to three complete rounds, and fail clearly when required files still cannot be obtained.
+- Resume interrupted partial downloads, recover from invalid HTTP ranges, use fallback URLs, and preserve failed entries for the next launch.
+- Allow each instance to continue with manual Modrinth file installation when the user explicitly disables launch blocking.
 - Track Modrinth mod provenance, installed versions, update locks, and managed modpack files.
 - Detect missing or locally modified files that originally came from an installed `.mrpack`.
 - Check and install newer modpack versions.
@@ -89,6 +95,7 @@ Each instance has its own game directory, metadata, settings, saves, mods, and r
 - Reload and preview themes from Launcher Settings.
 - Fall back per component to the built-in CSS interface when a PNG is missing, invalid, or unreadable.
 - Ship external themes beside the EXE so visual assets can be updated without rebuilding the launcher.
+- Support dedicated Cancel-state artwork, with bundled PNG fallbacks when a custom theme does not provide it.
 
 See [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) for every filename, path, and recommended canvas size.
 
@@ -327,7 +334,7 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 
 Near-term priorities:
 
-- Harden Microsoft token storage, revocation, session lifecycle, and account security for Beta 10.
+- Complete packaged Windows testing for v0.5.1 Beta 2, the final beta before the v0.5.1 stable release.
 - Add interactive per-file conflict resolution for modpack updates.
 - Add backup retention rules, backup size previews, and a dedicated backup browser.
 - Improve crash diagnostics and runtime history presentation.

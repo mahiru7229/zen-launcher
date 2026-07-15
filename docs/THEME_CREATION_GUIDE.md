@@ -121,7 +121,8 @@ Chỉ dùng cho chữ cố định. Ví dụ nút Launch đã vẽ chữ `LAUNCH
     "button.launch": "controls/buttons/launch/default.png"
   },
   "text_assets": {
-    "control.launch": "button.launch"
+    "control.launch": "button.launch",
+    "control.cancel": "button.cancel"
   }
 }
 ```
@@ -139,10 +140,14 @@ controls/buttons/launch/
 ├── default.png
 ├── hover.png
 ├── pressed.png
-└── disabled.png
+├── disabled.png
+├── cancel.png
+├── cancel_hover.png
+├── cancel_pressed.png
+└── cancel_disabled.png
 ```
 
-Các state thiếu sẽ fallback về style mặc định hoặc state gần nhất do stylesheet xử lý.
+Các state Launch thiếu sẽ fallback về CSS. Riêng state Cancel có bộ PNG fallback đi kèm launcher, nên nút vẫn hiện rõ khi theme cũ chưa khai báo asset mới.
 
 ## 8. Background và vùng an toàn
 
@@ -193,7 +198,7 @@ Asset lỗi bị bỏ qua riêng lẻ. Tuy vậy, nên test console/log để ph
 Công cụ release tự copy toàn bộ `themes/`:
 
 ```powershell
-python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.5.1-beta.1"
+python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.5.1-beta.2"
 ```
 
 Người dùng cũng có thể thêm theme mới vào folder `themes/` mà không cần rebuild EXE.

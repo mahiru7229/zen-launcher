@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TextIO
 
 from src.core.fs.paths import Paths
+from src.core.java.java_command_compactor import JavaCommandCompactor
 from src.models.instance.instance import Instance
 
 
@@ -23,15 +24,34 @@ class JavaRuntime:
         log_path = log_dir / f"minecraft-{timestamp}.log"
         log_file = log_path.open("w", encoding="utf-8", errors="replace")
 
+        instance_dir = Paths.load_instance_dir(instance.name)
         try:
-            process = subprocess.Popen(
-                [str(java), *command],
-                cwd=Paths.load_instance_dir(instance.name),
-                stdin=subprocess.DEVNULL,
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                creationflags=creation_flags,
-            )
+            launch_command = JavaCommandCompactor.prepare(java, command, instance_dir)
+        except Exception:
+            log_file.close()
+            raise
+
+        try:
+            process = cls._popen(java, launch_command, instance_dir, log_file, creation_flags)
+        except OSError as error:
+            if not cls._is_windows_length_error(error):
+                log_file.close()
+                raise
+
+            compacted = JavaCommandCompactor.prepare(java, command, instance_dir, force=True)
+            if compacted == launch_command:
+                log_file.close()
+                raise cls._windows_length_error(instance_dir) from error
+            try:
+                process = cls._popen(java, compacted, instance_dir, log_file, creation_flags)
+            except OSError as retry_error:
+                log_file.close()
+                if cls._is_windows_length_error(retry_error):
+                    raise cls._windows_length_error(instance_dir) from retry_error
+                raise
+            except Exception:
+                log_file.close()
+                raise
         except Exception:
             log_file.close()
             raise
@@ -41,6 +61,28 @@ class JavaRuntime:
             with cls._process_logs_lock:
                 cls._process_logs[pid] = (log_path, log_file)
         return process
+
+    @staticmethod
+    def _popen(java: Path, command: list[str], instance_dir: Path, log_file: TextIO, creation_flags: int) -> subprocess.Popen:
+        return subprocess.Popen(
+            [str(java), *command],
+            cwd=instance_dir,
+            stdin=subprocess.DEVNULL,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            creationflags=creation_flags,
+        )
+
+    @staticmethod
+    def _is_windows_length_error(error: OSError) -> bool:
+        return os.name == "nt" and getattr(error, "winerror", None) == 206
+
+    @staticmethod
+    def _windows_length_error(instance_dir: Path) -> RuntimeError:
+        return RuntimeError(
+            "Windows could not start Minecraft because the launch command or one of its paths is still too long. "
+            f"Move MCW Launcher to a shorter folder such as C:\\MCW and shorten the instance name if needed. Instance: {instance_dir}"
+        )
 
     @classmethod
     def log_path(cls, process: object) -> Path | None:

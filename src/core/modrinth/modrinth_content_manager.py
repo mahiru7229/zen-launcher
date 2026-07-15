@@ -10,6 +10,7 @@ from src.core.modrinth.modrinth_downloader import ModrinthDownloader
 from src.core.modrinth.modrinth_pack_installer import ModrinthPackInstaller
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
 from src.core.modrinth.modrinth_registry import ModrinthRegistry
+from src.core.network.download_pause import is_download_paused
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.instance.instance import Instance
 from src.models.progress.progress_stage import ProgressStage
@@ -36,6 +37,8 @@ class ModrinthContentManager:
                 ModrinthContentManager._hydrate_pack_downloads(instance, pack_registry, reporter)
                 pack_entries = ModrinthContentManager._pack_download_entries(pack_registry)
             except Exception as error:
+                if is_download_paused(error):
+                    raise
                 ModrinthContentManager._append_warning(warnings, f"Could not refresh Modrinth pack download sources: {error}")
 
         last_pack_errors: dict[str, str] = {}
@@ -206,6 +209,8 @@ class ModrinthContentManager:
                     raise RuntimeError("No saved download source is available")
                 ModrinthDownloader.download_urls(urls=urls, destination=target, sha1=str(entry.get("sha1") or ""), sha512=str(entry.get("sha512") or ""), expected_size=int(entry.get("size", 0) or 0), restrict_hosts=True, max_retry=1, reporter=reporter, progress_stage=ProgressStage.DOWNLOADING_MODPACK, progress_message=f"Downloading modpack file {target.name} (round {round_number}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS})...")
             except Exception as error:
+                if is_download_paused(error):
+                    raise
                 errors[path] = str(error)
             ModrinthContentManager._report_files(reporter, ProgressStage.DOWNLOADING_MODPACK, message, completed, total)
 
@@ -244,6 +249,8 @@ class ModrinthContentManager:
                 entry["fileName"] = added[0].file_name
                 ModrinthContentManager._set_mod_download_state(entry, False, "")
             except Exception as error:
+                if is_download_paused(error):
+                    raise
                 error_message = str(error)
                 errors[key] = error_message
                 ModrinthContentManager._set_mod_download_state(entry, True, error_message)

@@ -46,6 +46,10 @@
     "button.launch_hover": "controls/buttons/launch/hover.png",
     "button.launch_pressed": "controls/buttons/launch/pressed.png",
     "button.launch_disabled": "controls/buttons/launch/disabled.png",
+    "button.cancel": "controls/buttons/launch/cancel.png",
+    "button.cancel_hover": "controls/buttons/launch/cancel_hover.png",
+    "button.cancel_pressed": "controls/buttons/launch/cancel_pressed.png",
+    "button.cancel_disabled": "controls/buttons/launch/cancel_disabled.png",
     "button.danger": "controls/buttons/danger.png",
     "button.danger_hover": "controls/buttons/danger_hover.png",
     "button.nav": "controls/navigation/default.png",
@@ -126,6 +130,7 @@
     "icon.action.reprotect": "icons/actions/reprotect.png"
   },
   "text_assets": {
-    "control.launch": "button.launch"
+    "control.launch": "button.launch",
+    "control.cancel": "button.cancel"
   }
 }

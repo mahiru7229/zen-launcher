@@ -94,6 +94,10 @@ class ThemeRuntime:
         "button.launch_hover": ('QPushButton#PrimaryButton[themeRole="launch"]:hover', 18),
         "button.launch_pressed": ('QPushButton#PrimaryButton[themeRole="launch"]:pressed', 18),
         "button.launch_disabled": ('QPushButton#PrimaryButton[themeRole="launch"]:disabled', 18),
+        "button.cancel": ('QPushButton#PrimaryButton[themeRole="cancel"]', 18),
+        "button.cancel_hover": ('QPushButton#PrimaryButton[themeRole="cancel"]:hover', 18),
+        "button.cancel_pressed": ('QPushButton#PrimaryButton[themeRole="cancel"]:pressed', 18),
+        "button.cancel_disabled": ('QPushButton#PrimaryButton[themeRole="cancel"]:disabled', 18),
         "button.danger": ("QPushButton#DangerButton", 10),
         "button.danger_hover": ("QPushButton#DangerButton:hover", 10),
         "button.nav": ("QPushButton#NavButton", 10),
@@ -148,7 +152,7 @@ class ThemeRuntime:
     def build_stylesheet(self, base_stylesheet: str = "") -> str:
         rules: list[str] = [str(base_stylesheet).rstrip()]
         for key, (selector, slice_size) in self.STYLE_ASSETS.items():
-            path = self.manager.resolve_asset(key)
+            path = self.manager.resolve_asset(key, fallback_to_default=key.startswith("button.cancel"))
             if path is None:
                 continue
             url = self._qss_url(path)
@@ -193,7 +197,7 @@ class ThemeRuntime:
         if not role:
             return
         fallback_text = str(widget.property("themeStaticTextFallback") or "")
-        should_hide = not self._show_static_text and self.manager.resolve_text_asset(role) is not None
+        should_hide = not self._show_static_text and self.manager.resolve_text_asset(role, fallback_to_default=role == "control.cancel") is not None
         widget.setProperty("themeStaticTextHidden", should_hide)
         widget.setText("" if should_hide else fallback_text)
 

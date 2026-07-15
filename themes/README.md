@@ -53,3 +53,16 @@ icons/actions/reprotect.png
 ```
 
 Các asset này dùng cho card Account Security, nút kiểm tra integrity và nút mã hóa lại credential. Tất cả vẫn là optional và fallback về CSS/icon trống khi chưa có PNG.
+
+## Asset Cancel của Beta 2
+
+Khi một tác vụ Launch đang chuẩn bị hoặc tải file, nút Launch chuyển sang trạng thái Cancel. Theme có thể tùy chỉnh:
+
+```text
+controls/buttons/launch/cancel.png
+controls/buttons/launch/cancel_hover.png
+controls/buttons/launch/cancel_pressed.png
+controls/buttons/launch/cancel_disabled.png
+```
+
+Các key tương ứng là `button.cancel`, `button.cancel_hover`, `button.cancel_pressed`, `button.cancel_disabled`. Có thể khai báo `control.cancel` trong `text_assets` nếu PNG đã chứa chữ. Theme cũ không có các file này sẽ tự dùng PNG Cancel mặc định của launcher.

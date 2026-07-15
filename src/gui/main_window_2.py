@@ -13,6 +13,7 @@ from src.core.instance.instance_manager import InstanceManager
 from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.language.language_manager import language_manager, tr
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.network.download_pause import is_download_paused
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
 from src.core.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
 from src.gui.config import LAUNCHER_NAME, MINIMUM_HEIGHT, MINIMUM_WIDTH, RIGHT_PANEL_WIDTH, SIDEBAR_WIDTH, VERSION_ID, WINDOW_HEIGHT, WINDOW_WIDTH
@@ -268,6 +269,8 @@ class MainWindow(QMainWindow):
         self.launch_controller.launch_finished.connect(self.launch_control.set_result)
         self.launch_controller.launch_finished.connect(lambda _result: self.instance_controller.refresh_running(force=True))
         self.launch_controller.game_exited.connect(self._on_game_exited)
+        self.launch_controller.pause_requested.connect(self.launch_control.set_pause_pending)
+        self.launch_controller.launch_paused.connect(self._on_launch_paused)
         self.instance_controller.repair_progress.connect(self._on_progress)
         self.instance_controller.repair_finished.connect(self._on_repair_finished)
 
@@ -630,6 +633,8 @@ class MainWindow(QMainWindow):
         self.theme_runtime.reapply_assets(self)
 
     def _on_task_started(self, _task_id: str, message: str, blocking: bool) -> None:
+        if _task_id == self.launch_controller.TASK_ID:
+            self._set_launch_active(True)
         if _task_id == "mods.update.check":
             self.mod_manager_dialog.set_update_checking(True)
             return
@@ -646,6 +651,8 @@ class MainWindow(QMainWindow):
             self._set_status(message)
 
     def _on_task_completed(self, task_id: str, _result: object) -> None:
+        if task_id == self.launch_controller.TASK_ID:
+            self._set_launch_active(False)
         if task_id == "mods.update.check":
             self.mod_manager_dialog.set_update_checking(False)
         if task_id.startswith("modpack."):
@@ -663,6 +670,10 @@ class MainWindow(QMainWindow):
         if task_id == "mods.update.check":
             self.mod_manager_dialog.set_update_error(str(error))
         if task_id == self.launch_controller.TASK_ID:
+            if is_download_paused(error):
+                self._on_launch_paused()
+                self.instance_controller.refresh_running(force=True)
+                return
             self.launch_control.set_failed(str(error))
             self.home_page.set_status("Launch failed")
             self.right_panel.set_status("Launch failed")
@@ -672,6 +683,16 @@ class MainWindow(QMainWindow):
             self.launch_control.set_failed(str(error))
             self.home_page.set_status(tr("Repair failed"))
             self.right_panel.set_status(tr("Repair failed"))
+
+    def _on_launch_paused(self) -> None:
+        self.launch_control.set_paused()
+        message = tr("launch.paused")
+        self.home_page.set_status(message)
+        self.right_panel.set_status(message)
+
+    def _set_launch_active(self, active: bool) -> None:
+        self.launch_control.set_launch_active(active)
+        self.theme_runtime.reapply_assets(self.launch_control)
 
     def _on_progress(self, event: object) -> None:
         self.launch_control.set_progress_event(event)

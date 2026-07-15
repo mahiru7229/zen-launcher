@@ -33,6 +33,10 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def default_output_path(project_root: Path, version: str) -> Path:
+    return project_root / "release" / f"MCW-Launcher-v{version}-windows-x64.zip"
+
+
 def build_release_zip(project_root: Path, executable: Path, version: str, output: Path) -> Path:
     if not executable.is_file():
         raise FileNotFoundError(f"Launcher executable not found: {executable}")
@@ -64,12 +68,12 @@ def build_release_zip(project_root: Path, executable: Path, version: str, output
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build an MCW Launcher ZIP that can be installed by the automatic updater.")
     parser.add_argument("--exe", type=Path, required=True, help="Path to the packaged MCW Launcher.exe")
-    parser.add_argument("--version", required=True, help="Version without a leading v, for example 0.5.1-beta.1")
+    parser.add_argument("--version", required=True, help="Version without a leading v, for example 0.5.1-beta.2")
     parser.add_argument("--output", type=Path, help="Output ZIP path")
     args = parser.parse_args()
 
     project_root = Path(__file__).resolve().parents[1]
-    output = args.output or project_root / f"MCW-Launcher-v{args.version}-windows-x64.zip"
+    output = args.output or default_output_path(project_root, args.version.strip())
     result = build_release_zip(project_root, args.exe.resolve(), args.version.strip(), output.resolve())
     print(result)
     print(result.with_name(f"{result.name}.sha256"))

@@ -110,3 +110,20 @@ def test_unknown_static_text_asset_key_is_ignored(tmp_path: Path) -> None:
 
     assert selected.text_assets == {}
     assert any("Unknown text asset key" in issue for issue in selected.issues)
+
+
+def test_cancel_artwork_falls_back_to_default_theme(tmp_path: Path) -> None:
+    default_root = tmp_path / "themes" / ThemeManager.DEFAULT_THEME_ID
+    write_manifest(default_root, {"button.cancel": "controls/cancel.png"}, {"control.cancel": "button.cancel"})
+    write_png(default_root / "controls" / "cancel.png", 461, 133)
+
+    custom_root = tmp_path / "themes" / "custom"
+    write_manifest(custom_root, {"button.launch": "controls/launch.png"}, {"control.launch": "button.launch"})
+    write_png(custom_root / "controls" / "launch.png", 461, 133)
+
+    manager = ThemeManager(tmp_path / "themes")
+    manager.select("custom")
+
+    assert manager.resolve_asset("button.cancel") is None
+    assert manager.resolve_asset("button.cancel", fallback_to_default=True) == (default_root / "controls" / "cancel.png").resolve()
+    assert manager.resolve_text_asset("control.cancel", fallback_to_default=True) == (default_root / "controls" / "cancel.png").resolve()

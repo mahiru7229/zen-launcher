@@ -1,6 +1,6 @@
 # MCW Launcher PNG Theme Asset Guide
 
-Tài liệu này liệt kê toàn bộ PNG mà một theme có thể thay thế trong **MCW Launcher v0.5.1 Beta 1**. Mọi file đều là **tùy chọn**: thiếu, hỏng, sai định dạng hoặc nằm ngoài thư mục theme thì launcher chỉ bỏ qua asset đó và quay về CSS/text mặc định.
+Tài liệu này liệt kê toàn bộ PNG mà một theme có thể thay thế trong **MCW Launcher v0.5.1 Beta 2**. Mọi file đều là **tùy chọn**: thiếu, hỏng, sai định dạng hoặc nằm ngoài thư mục theme thì launcher chỉ bỏ qua asset đó và quay về CSS/text mặc định.
 
 Tổng số asset key hiện tại: **119**.
 
@@ -91,6 +91,10 @@ Beta 9 bổ sung các vùng dành riêng cho Accounts, Java, Backup và Modpack 
 | `button.launch_hover` | `themes/<theme-id>/controls/buttons/launch/hover.png` | **461 × 133 px** | Launch button | Hovered Launch button artwork. |
 | `button.launch_pressed` | `themes/<theme-id>/controls/buttons/launch/pressed.png` | **461 × 133 px** | Launch button | Pressed Launch button artwork. |
 | `button.launch_disabled` | `themes/<theme-id>/controls/buttons/launch/disabled.png` | **461 × 133 px** | Launch button | Disabled Launch button artwork. |
+| `button.cancel` | `themes/<theme-id>/controls/buttons/launch/cancel.png` | **461 × 133 px** | Launch button | Cancel artwork while a launch download is active. |
+| `button.cancel_hover` | `themes/<theme-id>/controls/buttons/launch/cancel_hover.png` | **461 × 133 px** | Launch button | Hovered Cancel artwork. |
+| `button.cancel_pressed` | `themes/<theme-id>/controls/buttons/launch/cancel_pressed.png` | **461 × 133 px** | Launch button | Pressed Cancel artwork. |
+| `button.cancel_disabled` | `themes/<theme-id>/controls/buttons/launch/cancel_disabled.png` | **461 × 133 px** | Launch button | Disabled Cancel artwork while pause is being applied. |
 | `button.danger` | `themes/<theme-id>/controls/buttons/danger.png` | **240 × 48 px** | Button | Destructive action. |
 | `button.danger_hover` | `themes/<theme-id>/controls/buttons/danger_hover.png` | **240 × 48 px** | Button | Hovered destructive action. |
 | `button.nav` | `themes/<theme-id>/controls/navigation/default.png` | **192 × 46 px** | Navigation | Normal sidebar navigation button. |
@@ -185,7 +189,8 @@ Một số PNG có thể vẽ sẵn chữ cố định, ví dụ nút Launch có
 ```json
 {
   "text_assets": {
-    "control.launch": "button.launch"
+    "control.launch": "button.launch",
+    "control.cancel": "button.cancel"
   }
 }
 ```
@@ -200,6 +205,7 @@ Trong **Launcher Settings → Appearance**, tùy chọn **Show static text over 
 | Static role | Asset xác nhận | Thành phần |
 |---|---|---|
 | `control.launch` | `button.launch` | Nút Launch cố định ở thanh dưới. |
+| `control.cancel` | `button.cancel` | Nút Cancel xuất hiện trong lúc Launch đang tải hoặc chuẩn bị file. |
 
 ## Theme manifest mẫu
 
@@ -217,10 +223,15 @@ Trong **Launcher Settings → Appearance**, tùy chọn **Show static text over 
     "surface.lifecycle_card": "surfaces/cards/lifecycle.png",
     "badge.locked": "surfaces/badges/locked.png",
     "button.launch": "controls/buttons/launch/default.png",
+    "button.cancel": "controls/buttons/launch/cancel.png",
+    "button.cancel_hover": "controls/buttons/launch/cancel_hover.png",
+    "button.cancel_pressed": "controls/buttons/launch/cancel_pressed.png",
+    "button.cancel_disabled": "controls/buttons/launch/cancel_disabled.png",
     "icon.action.backup": "icons/actions/backup.png"
   },
   "text_assets": {
-    "control.launch": "button.launch"
+    "control.launch": "button.launch",
+    "control.cancel": "button.cancel"
   }
 }
 ```

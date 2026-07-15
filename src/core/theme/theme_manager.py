@@ -84,8 +84,36 @@ class ThemeManager:
             self._current = self._themes.get(normalized) or self._themes.get(self.DEFAULT_THEME_ID) or self._themes[self.FALLBACK_THEME_ID]
             return self._current
 
-    def resolve_asset(self, key: str, theme: ThemeDefinition | None = None) -> Path | None:
+    def resolve_asset(self, key: str, theme: ThemeDefinition | None = None, fallback_to_default: bool = False) -> Path | None:
         selected = theme or self.current
+        resolved = self._resolve_asset_for_theme(str(key), selected)
+        if resolved is not None or not fallback_to_default or selected.theme_id == self.DEFAULT_THEME_ID:
+            return resolved
+        with self._lock:
+            fallback = self._themes.get(self.DEFAULT_THEME_ID)
+        if fallback is None:
+            return None
+        return self._resolve_asset_for_theme(str(key), fallback)
+
+    def resolve_text_asset(self, role: str, theme: ThemeDefinition | None = None, fallback_to_default: bool = False) -> Path | None:
+        selected = theme or self.current
+        asset_key = selected.text_assets.get(str(role))
+        if asset_key:
+            resolved = self.resolve_asset(asset_key, selected)
+            if resolved is not None:
+                return resolved
+        if not fallback_to_default or selected.theme_id == self.DEFAULT_THEME_ID:
+            return None
+        with self._lock:
+            fallback = self._themes.get(self.DEFAULT_THEME_ID)
+        if fallback is None:
+            return None
+        fallback_key = fallback.text_assets.get(str(role))
+        if not fallback_key:
+            return None
+        return self.resolve_asset(fallback_key, fallback)
+
+    def _resolve_asset_for_theme(self, key: str, selected: ThemeDefinition) -> Path | None:
         if selected.root is None:
             return None
         relative = selected.assets.get(str(key))
@@ -97,13 +125,6 @@ class ThemeManager:
             return candidate
         except ThemeAssetError:
             return None
-
-    def resolve_text_asset(self, role: str, theme: ThemeDefinition | None = None) -> Path | None:
-        selected = theme or self.current
-        asset_key = selected.text_assets.get(str(role))
-        if not asset_key:
-            return None
-        return self.resolve_asset(asset_key, selected)
 
     def asset_status(self, theme: ThemeDefinition | None = None) -> dict[str, bool]:
         selected = theme or self.current

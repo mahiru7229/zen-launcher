@@ -8,6 +8,7 @@ from src.core.auth.account_authentication import AccountAuthentication
 from src.core.instance.instance_manager import InstanceManager
 from src.core.language.language_manager import tr
 from src.core.minecraft.minecraft_executor import MinecraftExecutor
+from src.core.network.download_pause import download_pause_controller, is_download_paused
 from src.gui.controllers.base_controller import BaseController
 from src.gui.presenters.launch_error_presenter import LaunchErrorPresenter
 from src.gui.task_runner import TaskRunner
@@ -18,6 +19,8 @@ class LaunchController(BaseController):
     progress_received = Signal(object)
     launch_finished = Signal(object)
     game_exited = Signal(object)
+    pause_requested = Signal()
+    launch_paused = Signal()
 
     TASK_ID = "minecraft.launch"
 
@@ -42,6 +45,10 @@ class LaunchController(BaseController):
         self._debug_mode = enabled
 
     def launch(self) -> None:
+        if self._task_runner.is_task_active(self.TASK_ID):
+            self.pause()
+            return
+
         if self._selected_instance is None:
             self._emit_error(tr("Launch Minecraft"), tr("Select an instance first."))
             return
@@ -55,19 +62,33 @@ class LaunchController(BaseController):
         debug_mode = self._debug_mode
 
         def task() -> dict[str, Any]:
-            instance = InstanceManager.load(instance_name)
-            authentication = AccountAuthentication.authenticate(account)
+            try:
+                instance = InstanceManager.load(instance_name)
+                authentication = AccountAuthentication.authenticate(account)
+                download_pause_controller.raise_if_requested()
 
-            return MinecraftExecutor.run(
-                instance=instance,
-                authentication=authentication,
-                account=account,
-                debug_mode=debug_mode,
-                on_progress=self._on_progress,
-                on_exit=self._on_game_exit,
-            )
+                return MinecraftExecutor.run(
+                    instance=instance,
+                    authentication=authentication,
+                    account=account,
+                    debug_mode=debug_mode,
+                    on_progress=self._on_progress,
+                    on_exit=self._on_game_exit,
+                )
+            finally:
+                download_pause_controller.finish()
 
-        self._task_runner.run(self.TASK_ID, task, tr("Launching '{name}'...", name=instance_name))
+        download_pause_controller.begin()
+        started = self._task_runner.run(self.TASK_ID, task, tr("Launching '{name}'...", name=instance_name))
+        if not started:
+            download_pause_controller.finish()
+
+    def pause(self) -> None:
+        if not download_pause_controller.request_pause():
+            return
+        self.pause_requested.emit()
+        self.status_changed.emit(tr("launch.pause_requested"))
+        self.log_created.emit(tr("launch.pause_requested"))
 
     def _on_progress(self, event: ProgressEvent) -> None:
         self.progress_received.emit(event)
@@ -108,6 +129,12 @@ class LaunchController(BaseController):
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         if task_id != self.TASK_ID:
+            return
+
+        if is_download_paused(error):
+            self.launch_paused.emit()
+            self.status_changed.emit(tr("launch.paused"))
+            self.log_created.emit(tr("launch.paused_log"))
             return
 
         view = LaunchErrorPresenter.present(error)
