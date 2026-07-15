@@ -8,6 +8,7 @@ from src.core.auth.microsoft.oauth_callback_server import OAuthCallbackServer
 from src.core.auth.microsoft.microsoft_auth_config import MicrosoftAuthConfig
 from src.core.auth.microsoft.pkce import PKCE
 from src.models.auth.microsoft.oauth_session import OAuthSession
+from src.core.security.sensitive_data_redactor import SensitiveDataRedactor
 
 
 class MicrosoftOAuth:
@@ -42,18 +43,13 @@ class MicrosoftOAuth:
 
             response.raise_for_status()
 
-        except httpx.HTTPStatusError as e:
-            error_data = e.response.json()
-
-            error = error_data.get("error", "unknown_error")
-            description = error_data.get(
-                "error_description",
-                "Microsoft token request failed."
-            )
-
-            raise RuntimeError(
-                f"Microsoft OAuth token error: {error}: {description}"
-            ) from e
+        except httpx.HTTPStatusError as error:
+            try:
+                error_data = error.response.json()
+            except ValueError:
+                error_data = {}
+            error_code = SensitiveDataRedactor.redact_text(error_data.get("error", "unknown_error"))
+            raise RuntimeError(f"Microsoft OAuth token request failed: {error_code}") from error
 
         except httpx.HTTPError as e:
             raise RuntimeError(
@@ -80,8 +76,9 @@ class MicrosoftOAuth:
             try:
                 payload = error.response.json()
             except ValueError:
-                payload = {"error_description": error.response.text}
-            raise RuntimeError(f"Microsoft OAuth refresh failed: {payload.get('error_description') or payload.get('error') or 'unknown error'}") from error
+                payload = {}
+            error_code = SensitiveDataRedactor.redact_text(payload.get("error", "unknown_error"))
+            raise RuntimeError(f"Microsoft OAuth refresh failed: {error_code}. Sign in again if the session was revoked.") from error
         except httpx.HTTPError as error:
             raise RuntimeError("Could not connect to Microsoft OAuth.") from error
         return MicrosoftOAuthToken.from_dict(response.json())

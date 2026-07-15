@@ -68,6 +68,7 @@ class ThemeRuntime:
         "surface.microsoft_card": ('QFrame#Card[themeRole="microsoft"]', 14),
         "surface.java_card": ('QFrame#Card[themeRole="java"]', 14),
         "surface.lifecycle_card": ('QFrame#Card[themeRole="lifecycle"]', 14),
+        "surface.security_card": ('QFrame#Card[themeRole="security"]', 14),
         "surface.card": ("QFrame#Card", 14),
         "surface.hero_card": ("QFrame#HeroCard", 18),
         "surface.inset": ("QFrame#InsetPanel", 12),

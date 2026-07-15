@@ -7,7 +7,10 @@
   "assets": {
     "logo.main": "images/logo/main_launcher_logo.png",
     "logo.sidebar": "images/logo/main_launcher_logo_ALT.png",
-    "button.launch": "images/launch_control/button/launch_button.png"
+    "button.launch": "images/launch_control/button/launch_button.png",
+    "surface.security_card": "surfaces/cards/security.png",
+    "icon.action.shield": "icons/actions/shield.png",
+    "icon.action.reprotect": "icons/actions/reprotect.png"
   },
   "text_assets": {
     "control.launch": "button.launch"

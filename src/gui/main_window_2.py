@@ -167,6 +167,8 @@ class MainWindow(QMainWindow):
         self.account_page.select_requested.connect(self.account_controller.select)
         self.account_page.remove_requested.connect(self.account_controller.remove)
         self.account_page.refresh_requested.connect(self.account_controller.refresh)
+        self.account_page.security_audit_requested.connect(self.account_controller.audit_security)
+        self.account_page.security_reprotect_requested.connect(self.account_controller.reprotect_security)
 
         self.instances_page.refresh_requested.connect(self.instance_controller.refresh)
         self.instances_page.selected_instance_changed.connect(self.instance_controller.select)
@@ -213,6 +215,7 @@ class MainWindow(QMainWindow):
         self.account_controller.accounts_changed.connect(self.account_page.set_accounts)
         self.account_controller.selected_account_changed.connect(self._account_selected)
         self.account_controller.microsoft_auth_state_changed.connect(self.account_page.set_microsoft_auth_state)
+        self.account_controller.security_report_changed.connect(self.account_page.set_security_report)
         self.java_controller.installations_changed.connect(self.launcher_settings_page.set_java_installations)
         self.backup_controller.backup_created.connect(self._on_backup_created)
         self.backup_controller.restore_finished.connect(self._on_backup_restored)
@@ -310,6 +313,7 @@ class MainWindow(QMainWindow):
 
         self.show_page(settings.get("start_page", "home"))
         self.account_controller.refresh()
+        self.account_controller.audit_security()
         self.instance_controller.refresh()
         self.instance_controller.refresh_running(force=True)
         self.running_instances_timer.start()

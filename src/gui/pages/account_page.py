@@ -16,6 +16,8 @@ class AccountPage(BasePage):
     select_requested = Signal(str)
     remove_requested = Signal(str)
     refresh_requested = Signal()
+    security_audit_requested = Signal()
+    security_reprotect_requested = Signal()
 
     def __init__(self) -> None:
         super().__init__(tr("Accounts"), tr("account.page.subtitle"), "accounts")
@@ -84,6 +86,22 @@ class AccountPage(BasePage):
         create_card.layout.addWidget(self.microsoft_cancel_button)
         create_card.layout.addWidget(self.microsoft_status)
         self.root_layout.addWidget(create_card)
+
+        security_card = CardWidget(tr("account.security.title"), tr("account.security.description"))
+        security_card.setProperty("themeRole", "security")
+        self.security_status = QLabel(tr("account.security.checking"))
+        self.security_status.setObjectName("StatusBadge")
+        self.security_status.setWordWrap(True)
+        security_buttons = QGridLayout()
+        verify_button = set_theme_icon(QPushButton(tr("account.security.verify")), "icon.action.shield")
+        reprotect_button = set_theme_icon(QPushButton(tr("account.security.reprotect")), "icon.action.reprotect")
+        verify_button.clicked.connect(self.security_audit_requested.emit)
+        reprotect_button.clicked.connect(self.security_reprotect_requested.emit)
+        security_buttons.addWidget(verify_button, 0, 0)
+        security_buttons.addWidget(reprotect_button, 0, 1)
+        security_card.layout.addWidget(self.security_status)
+        security_card.layout.addLayout(security_buttons)
+        self.root_layout.addWidget(security_card)
         self.root_layout.addStretch()
 
     def set_accounts(self, accounts: list, selected_id: str) -> None:
@@ -116,6 +134,22 @@ class AccountPage(BasePage):
         self.microsoft_status.setText(self._microsoft_status_override or tr("account.microsoft.status_available"))
         self.microsoft_status.style().unpolish(self.microsoft_status)
         self.microsoft_status.style().polish(self.microsoft_status)
+
+
+    def set_security_report(self, report: object) -> None:
+        healthy = bool(getattr(report, "is_healthy", False))
+        self.security_status.setObjectName("StatusBadge" if healthy else "WarningBadge")
+        self.security_status.setText(
+            tr(
+                "account.security.summary",
+                protected=getattr(report, "protected_account_count", 0),
+                microsoft=getattr(report, "microsoft_account_count", 0),
+                legacy=getattr(report, "legacy_account_count", 0),
+                invalid=getattr(report, "invalid_account_count", 0),
+            )
+        )
+        self.security_status.style().unpolish(self.security_status)
+        self.security_status.style().polish(self.security_status)
 
     def _update_details(self) -> None:
         account = self._accounts.get(self.current_account_id())

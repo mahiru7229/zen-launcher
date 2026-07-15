@@ -1,8 +1,8 @@
 # MCW Launcher PNG Theme Asset Guide
 
-Tài liệu này liệt kê toàn bộ PNG mà một theme có thể thay thế trong **MCW Launcher v0.5.0 Beta 9**. Mọi file đều là **tùy chọn**: thiếu, hỏng, sai định dạng hoặc nằm ngoài thư mục theme thì launcher chỉ bỏ qua asset đó và quay về CSS/text mặc định.
+Tài liệu này liệt kê toàn bộ PNG mà một theme có thể thay thế trong **MCW Launcher v0.5.0 Beta 10**. Mọi file đều là **tùy chọn**: thiếu, hỏng, sai định dạng hoặc nằm ngoài thư mục theme thì launcher chỉ bỏ qua asset đó và quay về CSS/text mặc định.
 
-Tổng số asset key hiện tại: **116**.
+Tổng số asset key hiện tại: **119**.
 
 ## Cấu trúc theme
 
@@ -33,6 +33,15 @@ Beta 9 bổ sung các vùng dành riêng cho Accounts, Java, Backup và Modpack 
 | `icon.action.java` | 24 × 24 | Nút quét Java. |
 | `icon.action.backup` | 24 × 24 | Nút tạo backup. |
 | `icon.action.restore` | 24 × 24 | Nút restore backup. |
+
+
+## Asset mới trong Beta 10
+
+| Key | Canvas | Dùng cho |
+|---|---:|---|
+| `surface.security_card` | 480 × 260 | Card kiểm tra DPAPI, record integrity và database security. |
+| `icon.action.shield` | 24 × 24 | Nút Verify security. |
+| `icon.action.reprotect` | 24 × 24 | Nút Re-protect credentials. |
 
 ## Danh sách PNG
 
@@ -154,6 +163,10 @@ Beta 9 bổ sung các vùng dành riêng cho Accounts, Java, Backup và Modpack 
 | `icon.state.success` | `themes/<theme-id>/icons/states/success.png` | **32 × 32 px** | State icon | Success/running state. |
 | `icon.state.warning` | `themes/<theme-id>/icons/states/warning.png` | **32 × 32 px** | State icon | Warning state. |
 | `icon.state.error` | `themes/<theme-id>/icons/states/error.png` | **32 × 32 px** | State icon | Failure state. |
+
+| `surface.security_card` | `themes/<theme-id>/surfaces/cards/security.png` | **480 × 260 px** | Surface | Account security and credential protection card. |
+| `icon.action.shield` | `themes/<theme-id>/icons/actions/shield.png` | **24 × 24 px** | Action icon | Verify account database and credential protection. |
+| `icon.action.reprotect` | `themes/<theme-id>/icons/actions/reprotect.png` | **24 × 24 px** | Action icon | Re-protect Microsoft credentials. |
 
 ## Quy tắc xuất PNG
 

@@ -11,6 +11,7 @@ from typing import Any
 from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
 from src.core.instance.instance_run_lock import InstanceRunLock
+from src.core.security.sensitive_data_redactor import SensitiveDataRedactor
 
 
 class DiagnosticsManager:
@@ -23,7 +24,7 @@ class DiagnosticsManager:
             instances = InstanceManager.list_instances()
         except Exception as error:
             instances = []
-            instance_error = str(error)
+            instance_error = SensitiveDataRedactor.redact_text(error)
         else:
             instance_error = ""
 
@@ -73,7 +74,8 @@ class DiagnosticsManager:
         ])
 
         if activity_log.strip():
-            lines.extend(["", "Recent frontend activity", "------------------------", activity_log.strip()])
+            safe_activity = SensitiveDataRedactor.redact_text(activity_log.strip())
+            lines.extend(["", "Recent frontend activity", "------------------------", safe_activity])
 
         return "\n".join(lines).rstrip() + "\n"
 
@@ -97,7 +99,7 @@ class DiagnosticsManager:
         for section, value in settings.items():
             if section not in allowed_sections or not isinstance(value, dict):
                 continue
-            safe[section] = dict(value)
+            safe[section] = SensitiveDataRedactor.redact_value(dict(value))
         geometry = safe.get("window", {}).get("geometry")
         if geometry:
             safe["window"]["geometry"] = "<saved>"

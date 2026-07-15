@@ -120,7 +120,10 @@
     "icon.action.microsoft": "icons/actions/microsoft.png",
     "icon.action.java": "icons/actions/java.png",
     "icon.action.backup": "icons/actions/backup.png",
-    "icon.action.restore": "icons/actions/restore.png"
+    "icon.action.restore": "icons/actions/restore.png",
+    "surface.security_card": "surfaces/cards/security.png",
+    "icon.action.shield": "icons/actions/shield.png",
+    "icon.action.reprotect": "icons/actions/reprotect.png"
   },
   "text_assets": {
     "control.launch": "button.launch"

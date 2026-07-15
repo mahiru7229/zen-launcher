@@ -513,7 +513,15 @@
     "account.microsoft.waiting": "Waiting for Microsoft sign-in… Close the browser window and press Cancel here to stop.",
     "account.microsoft.cancelling": "Cancelling Microsoft sign-in…",
     "account.microsoft.cancel": "Cancel Microsoft sign-in",
-    "account.microsoft.cancelled": "Microsoft sign-in cancelled."
+    "account.microsoft.cancelled": "Microsoft sign-in cancelled.",
+    "account.security.title": "Account security",
+    "account.security.description": "Verify database integrity and re-protect Microsoft refresh tokens for this Windows user.",
+    "account.security.checking": "Checking account protection…",
+    "account.security.verify": "Verify security",
+    "account.security.reprotect": "Re-protect credentials",
+    "account.security.reprotecting": "Re-protecting stored Microsoft credentials…",
+    "account.security.reprotected": "Stored account credentials were re-protected successfully.",
+    "account.security.summary": "Protected Microsoft accounts: {protected}/{microsoft} • Legacy: {legacy} • Invalid: {invalid}"
   },
   "aliases": {
     "MCW Launcher": "app.name",

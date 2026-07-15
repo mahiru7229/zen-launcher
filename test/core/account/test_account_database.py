@@ -68,3 +68,16 @@ def test_initialize_migrates_legacy_token_columns(monkeypatch, tmp_path) -> None
         }
 
     assert {"access_token", "refresh_token", "token_expires_at"}.issubset(columns)
+
+
+def test_connect_enables_security_pragmas(monkeypatch, tmp_path) -> None:
+    _use_temporary_database(monkeypatch, tmp_path)
+
+    with AccountDatabase.connect() as connection:
+        secure_delete = connection.execute("PRAGMA secure_delete").fetchone()[0]
+        trusted_schema = connection.execute("PRAGMA trusted_schema").fetchone()[0]
+        temp_store = connection.execute("PRAGMA temp_store").fetchone()[0]
+
+    assert secure_delete == 1
+    assert trusted_schema == 0
+    assert temp_store == 2

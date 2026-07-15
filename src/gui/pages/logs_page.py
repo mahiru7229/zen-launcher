@@ -7,6 +7,7 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QHBoxLayout, QPushButton, QTextEdit
 
 from src.gui.pages.base_page import BasePage
+from src.core.security.sensitive_data_redactor import SensitiveDataRedactor
 from src.gui.widget.card_widget import CardWidget
 from src.gui.theme.runtime import set_theme_icon
 
@@ -52,7 +53,7 @@ class LogsPage(BasePage):
 
     def append(self, message: str) -> None:
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self.output.append(f"[{timestamp}] {message}")
+        self.output.append(f"[{timestamp}] {SensitiveDataRedactor.redact_text(message)}")
 
     def activity_text(self) -> str:
         return self.output.toPlainText()

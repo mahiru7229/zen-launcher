@@ -96,10 +96,12 @@ See [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) for every filename,
 
 - Offline account support.
 - SQLite account storage.
-- Windows DPAPI protection for stored authentication tokens.
+- Windows DPAPI v2 protection for Microsoft refresh tokens, scoped per account and credential type.
 - Microsoft OAuth PKCE, Xbox Live, XSTS, Minecraft Services, entitlement verification, profile retrieval, and token refresh.
 - Add and store multiple Microsoft accounts, identified by Minecraft UUID.
 - Microsoft sign-in runs in a background task and can be cancelled from the Accounts page without freezing the launcher.
+- Minecraft access tokens remain in memory only; account records include integrity validation and security audit/re-protection controls.
+- Logs, error dialogs, and diagnostic exports automatically redact OAuth credentials and bearer tokens.
 
 ### Java diagnostics
 
@@ -291,6 +293,7 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 | [`docs/BETA7_RUNTIME_REPAIR.md`](docs/BETA7_RUNTIME_REPAIR.md) | Runtime monitoring, crash detection, and full instance repair |
 | [`docs/BETA8_MOD_MANAGEMENT.md`](docs/BETA8_MOD_MANAGEMENT.md) | Mod updates, version locks, compatibility analysis, and managed modpack files |
 | [`docs/BETA9_ACCOUNTS_JAVA_MODPACK_BACKUP.md`](docs/BETA9_ACCOUNTS_JAVA_MODPACK_BACKUP.md) | Microsoft authentication, Java diagnostics, backups, and safe modpack updates |
+| [`docs/BETA10_ACCOUNT_SECURITY.md`](docs/BETA10_ACCOUNT_SECURITY.md) | DPAPI v2, account integrity, SQLite hardening, and privacy protections |
 | [`docs/gui-api.en.md`](docs/gui-api.en.md) | GUI integration API in English |
 | [`docs/gui-api.vi.md`](docs/gui-api.vi.md) | GUI integration API in Vietnamese |
 
@@ -311,7 +314,7 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 | Modrinth mods and Fabric modpacks | Beta — safe pack update and conflict preservation available |
 | Release/Beta/Alpha Modrinth channels | Available |
 | English and Vietnamese language packs | Available |
-| Microsoft authentication | Beta — available with multi-account support and cancellable sign-in |
+| Microsoft authentication | Beta — multi-account, cancellable sign-in, DPAPI v2 and integrity protection |
 | Forge / NeoForge / Quilt | Not currently supported |
 | Optional PNG theme system | Beta |
 | Game lifecycle and crash detection | Beta |

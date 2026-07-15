@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-VERSION = "v0.5.0 Beta 9"
-VERSION_ID = "0.5.0-beta.9"
+VERSION = "v0.5.0 Beta 10"
+VERSION_ID = "0.5.0-beta.10"
 VERSION_TAG = f"v{VERSION_ID}"
 UPDATE_CHANNEL = "beta"
 GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
@@ -14,3 +14,6 @@ MODRINTH_USER_AGENT = f"{DEVELOPER_NAME}/{LAUNCHER_SLUG}/{VERSION_ID} (https://g
 MICROSOFT_AUTH_ENABLED = True
 MICROSOFT_AUTH_STATUS = "available"
 MICROSOFT_CLIENT_ID = "cd379605-ee06-466a-a588-7a1f7c23b48a"
+
+# Security: Minecraft access tokens are short-lived and are kept in memory only.
+PERSIST_MICROSOFT_ACCESS_TOKEN = False

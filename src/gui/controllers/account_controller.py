@@ -9,16 +9,20 @@ from src.core.account.account_manager import AccountManager
 from src.core.auth.microsoft.microsoft_auth_gate import MicrosoftAuthenticationLockedError
 from src.core.auth.microsoft.oauth_callback_server import MicrosoftAuthorizationCancelledError
 from src.core.language.language_manager import tr
+from src.core.security.account_security_manager import AccountSecurityManager
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 
 
 class AccountController(BaseController):
     MICROSOFT_TASK_ID = "account.microsoft.create"
+    SECURITY_AUDIT_TASK_ID = "account.security.audit"
+    SECURITY_REPROTECT_TASK_ID = "account.security.reprotect"
 
     accounts_changed = Signal(list, str)
     selected_account_changed = Signal(object)
     microsoft_auth_state_changed = Signal(bool, str)
+    security_report_changed = Signal(object)
 
     USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_]{3,16}$")
 
@@ -78,6 +82,22 @@ class AccountController(BaseController):
         self._microsoft_cancel_event.set()
         self.microsoft_auth_state_changed.emit(True, tr("account.microsoft.cancelling"))
 
+    def audit_security(self) -> None:
+        self._task_runner.run(
+            self.SECURITY_AUDIT_TASK_ID,
+            AccountSecurityManager.audit,
+            tr("account.security.checking"),
+            blocking=False,
+        )
+
+    def reprotect_security(self) -> None:
+        self._task_runner.run(
+            self.SECURITY_REPROTECT_TASK_ID,
+            AccountSecurityManager.migrate_and_reprotect,
+            tr("account.security.reprotecting"),
+            blocking=True,
+        )
+
     def select(self, account_id: str) -> None:
         if not account_id:
             return
@@ -107,6 +127,15 @@ class AccountController(BaseController):
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:
+        if task_id == self.SECURITY_AUDIT_TASK_ID:
+            self.security_report_changed.emit(result)
+            return
+        if task_id == self.SECURITY_REPROTECT_TASK_ID:
+            self.security_report_changed.emit(result)
+            self.status_changed.emit(tr("account.security.reprotected"))
+            self.log_created.emit(tr("account.security.reprotected"))
+            self.refresh()
+            return
         if task_id != self.MICROSOFT_TASK_ID:
             return
 
@@ -120,6 +149,9 @@ class AccountController(BaseController):
 
     @Slot(str, object)
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
+        if task_id in {self.SECURITY_AUDIT_TASK_ID, self.SECURITY_REPROTECT_TASK_ID}:
+            self._emit_error(tr("account.security.title"), error)
+            return
         if task_id != self.MICROSOFT_TASK_ID:
             return
 

@@ -58,6 +58,11 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Content-Security-Policy", "default-src 'none'")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
         self.wfile.write(body)
 
@@ -98,16 +103,24 @@ class OAuthCallbackServer:
         finally:
             server.server_close()
 
-        if OAuthCallbackHandler.error:
-            description = OAuthCallbackHandler.error_description or OAuthCallbackHandler.error
-            if OAuthCallbackHandler.error == "access_denied":
-                raise MicrosoftAuthorizationCancelledError(description or "Microsoft sign-in was cancelled.")
-            raise RuntimeError(f"Microsoft authorization failed: {description}")
+        authorization_code = OAuthCallbackHandler.authorization_code
+        returned_state = OAuthCallbackHandler.returned_state
+        callback_error = OAuthCallbackHandler.error
+        error_description = OAuthCallbackHandler.error_description
+        OAuthCallbackHandler.authorization_code = None
+        OAuthCallbackHandler.returned_state = None
+        OAuthCallbackHandler.error = None
+        OAuthCallbackHandler.error_description = None
 
-        if not OAuthCallbackHandler.authorization_code:
+        if callback_error:
+            if callback_error == "access_denied":
+                raise MicrosoftAuthorizationCancelledError("Microsoft sign-in was cancelled.")
+            raise RuntimeError(f"Microsoft authorization failed: {callback_error}")
+
+        if not authorization_code:
             raise TimeoutError("Microsoft authorization callback was not received.")
 
-        if not OAuthCallbackHandler.returned_state:
+        if not returned_state:
             raise RuntimeError("Microsoft authorization callback did not contain state.")
 
-        return OAuthCallbackHandler.authorization_code, OAuthCallbackHandler.returned_state
+        return authorization_code, returned_state

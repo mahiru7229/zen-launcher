@@ -513,7 +513,15 @@
     "account.microsoft.waiting": "Đang chờ đăng nhập Microsoft… Nếu đã đóng cửa sổ trình duyệt, hãy nhấn Hủy tại đây.",
     "account.microsoft.cancelling": "Đang hủy đăng nhập Microsoft…",
     "account.microsoft.cancel": "Hủy đăng nhập Microsoft",
-    "account.microsoft.cancelled": "Đã hủy đăng nhập Microsoft."
+    "account.microsoft.cancelled": "Đã hủy đăng nhập Microsoft.",
+    "account.security.title": "Bảo mật tài khoản",
+    "account.security.description": "Kiểm tra tính toàn vẹn cơ sở dữ liệu và mã hóa lại refresh token Microsoft cho tài khoản Windows hiện tại.",
+    "account.security.checking": "Đang kiểm tra bảo vệ tài khoản…",
+    "account.security.verify": "Kiểm tra bảo mật",
+    "account.security.reprotect": "Mã hóa lại thông tin",
+    "account.security.reprotecting": "Đang mã hóa lại thông tin đăng nhập Microsoft…",
+    "account.security.reprotected": "Thông tin tài khoản đã được mã hóa lại thành công.",
+    "account.security.summary": "Tài khoản Microsoft được bảo vệ: {protected}/{microsoft} • Cũ: {legacy} • Không hợp lệ: {invalid}"
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",
