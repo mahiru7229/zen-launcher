@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "id": "mcw-legacy-assets",
+  "name": "MCW Legacy Assets",
+  "author": "mahiru7229",
+  "description": "Compatibility theme for the original MCW PNG assets.",
+  "assets": {
+    "logo.main": "images/logo/main_launcher_logo.png",
+    "logo.sidebar": "images/logo/main_launcher_logo_ALT.png",
+    "button.launch": "images/launch_control/button/launch_button.png"
+  }
+}

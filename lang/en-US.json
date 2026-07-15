@@ -331,7 +331,7 @@
     "modrinth.modpack.installed": "Modpack installed successfully as instance '{name}'.",
     "launcher_settings.update.title": "Launcher updates",
     "launcher_settings.update.subtitle": "MCW Launcher can check GitHub Releases and install ZIP updates after asking for confirmation.",
-    "launcher_settings.update.current_version": "Current version: v0.5.0 Beta 3",
+    "launcher_settings.update.current_version": "Current version: {version}",
     "launcher_settings.update.auto_check": "Automatically check for updates when the launcher starts",
     "launcher_settings.update.status.not_checked": "Update status: Not checked",
     "launcher_settings.update.check": "Check for updates",
@@ -682,6 +682,6 @@
     "Stable": "update.channel.stable",
     "Export diagnostics": "diagnostics.export.title",
     "Open logs folder": "diagnostics.open_logs",
-    "Current version: v0.5.0 Beta 3": "launcher_settings.update.current_version"
+    "Current version: {version}": "launcher_settings.update.current_version"
   }
 }

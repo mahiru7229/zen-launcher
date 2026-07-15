@@ -65,6 +65,7 @@ class LaunchControlWidget(QFrame):
 
         self.launch_button = set_theme_icon(QPushButton(self.BUTTON_TEXT), "icon.action.launch", 40)
         self.launch_button.setObjectName("PrimaryButton")
+        self.launch_button.setProperty("themeRole", "launch")
         self.launch_button.setFixedSize(230, 72)
         self.launch_button.clicked.connect(self.launch_clicked.emit)
 

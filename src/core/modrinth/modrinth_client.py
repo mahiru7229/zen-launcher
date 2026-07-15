@@ -10,6 +10,7 @@ import json
 import httpx
 
 from src.core.fs.paths import Paths
+from src.config import MODRINTH_USER_AGENT
 from src.core.network.httpx_downloader import HttpDownloader
 from src.models.modrinth.project import ModrinthProject, ModrinthSearchResult
 from src.models.modrinth.version import ModrinthDependency, ModrinthFile, ModrinthVersion
@@ -21,7 +22,7 @@ class ModrinthClient:
     SEARCH_TTL_SECONDS = 10 * 60
     VERSIONS_TTL_SECONDS = 30 * 60
     PROJECT_TTL_SECONDS = 60 * 60
-    USER_AGENT = "mahiru7229/mcw-launcher/0.5.0-beta.3 (https://github.com/mahiru7229/mcw-launcher)"
+    USER_AGENT = MODRINTH_USER_AGENT
 
     _cache_locks: dict[Path, Lock] = {}
     _cache_locks_guard = Lock()

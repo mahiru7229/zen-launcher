@@ -76,6 +76,10 @@ class ThemeRuntime:
         "button.primary": ("QPushButton#PrimaryButton", 14),
         "button.primary_hover": ("QPushButton#PrimaryButton:hover", 14),
         "button.primary_pressed": ("QPushButton#PrimaryButton:pressed", 14),
+        "button.launch": ('QPushButton#PrimaryButton[themeRole="launch"]', 18),
+        "button.launch_hover": ('QPushButton#PrimaryButton[themeRole="launch"]:hover', 18),
+        "button.launch_pressed": ('QPushButton#PrimaryButton[themeRole="launch"]:pressed', 18),
+        "button.launch_disabled": ('QPushButton#PrimaryButton[themeRole="launch"]:disabled', 18),
         "button.danger": ("QPushButton#DangerButton", 10),
         "button.danger_hover": ("QPushButton#DangerButton:hover", 10),
         "button.nav": ("QPushButton#NavButton", 10),
@@ -150,8 +154,7 @@ class ThemeRuntime:
                 self._apply_label_pixmap(widget)
         icon_path = self.manager.resolve_asset("icon.app")
         window = root.window()
-        if icon_path is not None:
-            window.setWindowIcon(QIcon(str(icon_path)))
+        window.setWindowIcon(QIcon(str(icon_path)) if icon_path is not None else QIcon())
 
     def _apply_button_icon(self, button: QPushButton) -> None:
         key = str(button.property("themeIcon") or "").strip()

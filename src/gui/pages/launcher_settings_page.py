@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QPushButton
 
-from src.core.language.language_manager import language_manager
+from src.core.language.language_manager import language_manager, tr
 from src.core.theme.theme_manager import theme_manager
 from src.gui.config import NAVIGATION_ITEMS, VERSION
 from src.gui.pages.base_page import BasePage
@@ -56,7 +56,7 @@ class LauncherSettingsPage(BasePage):
         self.root_layout.addWidget(modrinth_card)
 
         update_card = CardWidget("Launcher updates", "MCW Launcher can check GitHub Releases and install ZIP updates after asking for confirmation.")
-        current_version_label = QLabel(f"Current version: {VERSION}")
+        current_version_label = QLabel(tr("launcher_settings.update.current_version", version=VERSION))
         current_version_label.setObjectName("ValueLabel")
         self.auto_check_updates = QCheckBox("Automatically check for updates when the launcher starts")
         self.update_channel_combo = QComboBox()

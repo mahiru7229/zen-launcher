@@ -331,7 +331,7 @@
     "modrinth.modpack.installed": "Đã cài modpack thành instance '{name}'.",
     "launcher_settings.update.title": "Cập nhật launcher",
     "launcher_settings.update.subtitle": "MCW Launcher có thể kiểm tra GitHub Releases và cài bản cập nhật ZIP sau khi hỏi xác nhận.",
-    "launcher_settings.update.current_version": "Phiên bản hiện tại: v0.5.0 Beta 3",
+    "launcher_settings.update.current_version": "Phiên bản hiện tại: {version}",
     "launcher_settings.update.auto_check": "Tự động kiểm tra cập nhật khi mở launcher",
     "launcher_settings.update.status.not_checked": "Trạng thái cập nhật: Chưa kiểm tra",
     "launcher_settings.update.check": "Kiểm tra cập nhật",
@@ -380,5 +380,8 @@
     "launcher_settings.theme.title": "Giao diện và theme PNG",
     "launcher_settings.theme.subtitle": "PNG bị thiếu hoặc lỗi sẽ tự quay về giao diện CSS mặc định.",
     "launcher_settings.theme.reload": "Tải lại và xem trước theme"
+  },
+  "aliases": {
+    "Current version: {version}": "launcher_settings.update.current_version"
   }
 }

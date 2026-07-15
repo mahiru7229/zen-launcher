@@ -74,3 +74,25 @@ def test_invalid_theme_manifest_does_not_break_catalog(tmp_path: Path) -> None:
 
     assert [theme.theme_id for theme in manager.available_themes()] == [ThemeManager.FALLBACK_THEME_ID]
     assert manager.select("missing").theme_id == ThemeManager.FALLBACK_THEME_ID
+
+
+def test_repository_default_manifest_matches_theme_catalog() -> None:
+    from src.core.theme.theme_catalog import THEME_ASSET_BY_KEY
+
+    project_root = Path(__file__).resolve().parents[3]
+    payload = json.loads((project_root / "themes" / "mcw-default" / "theme.json").read_text(encoding="utf-8"))
+
+    assert set(payload["assets"]) == set(THEME_ASSET_BY_KEY)
+    assert "button.launch" in payload["assets"]
+    assert "button.launch_disabled" in payload["assets"]
+
+
+def test_legacy_theme_manifest_exposes_existing_png_assets() -> None:
+    project_root = Path(__file__).resolve().parents[3]
+    manager = ThemeManager(project_root / "themes")
+    selected = manager.select("mcw-legacy-assets")
+
+    assert selected.theme_id == "mcw-legacy-assets"
+    assert manager.resolve_asset("logo.main", selected) is not None
+    assert manager.resolve_asset("logo.sidebar", selected) is not None
+    assert manager.resolve_asset("button.launch", selected) is not None

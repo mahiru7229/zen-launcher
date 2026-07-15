@@ -6,6 +6,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 from src.models.instance.instance import Instance
 from src.models.package.package_metadata import PackageMetadata
 from src.core.fs.paths import Paths
+from src.config import LAUNCHER_SLUG, VERSION_TAG
 
 
 class PackageManager:
@@ -13,8 +14,8 @@ class PackageManager:
     FORMAT_VERSION = 1
     PACKAGE_TYPE_INSTANCE = "instance"
 
-    LAUNCHER_NAME = "mcw-launcher"
-    LAUNCHER_VERSION = "v0.5.0-beta.3"
+    LAUNCHER_NAME = LAUNCHER_SLUG
+    LAUNCHER_VERSION = VERSION_TAG
 
     @staticmethod
     def create_instance_package_metadata(include_saves: bool) -> PackageMetadata:

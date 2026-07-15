@@ -3,12 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-VERSION = "v0.5.0 Beta 6"
-VERSION_ID = "0.5.0-beta.6"
-UPDATE_CHANNEL = "beta"
-GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"
-LAUNCHER_NAME = f"MCW LAUNCHER {VERSION}"
-DEVELOPER_NAME = "mahiru7229"
+from src.config import DEVELOPER_NAME, GITHUB_REPOSITORY, LAUNCHER_NAME, UPDATE_CHANNEL, VERSION, VERSION_ID
 
 WINDOW_WIDTH = 1600
 WINDOW_HEIGHT = 900
