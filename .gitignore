@@ -7,7 +7,7 @@ downloads/
 instances/
 logs/
 profiles/
-runtime/
+/runtime/
 accounts/
 launcher.py
 build/
