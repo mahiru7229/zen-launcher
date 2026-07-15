@@ -28,7 +28,7 @@ class ModrinthController(BaseController):
 
     def load_versions(self, project_type: str, project_id: str, game_version: str = "") -> None:
         task_id = f"modrinth.versions.{project_type}.{project_id}"
-        self._task_runner.run(task_id, lambda: (project_type, project_id, ModrinthClient.list_project_versions(project_id, loader="fabric", game_version=game_version)), "Loading compatible Modrinth versions...", blocking=False)
+        self._task_runner.run(task_id, lambda: (project_type, project_id, ModrinthClient.list_project_versions(project_id, loader="fabric", game_version=game_version, version_types=("release", "beta", "alpha"))), "Loading compatible Modrinth versions...", blocking=False)
 
     def install_mod(self, instance_name: str, version_id: str, allowed_version_types: tuple[str, ...] = ("release",)) -> None:
         def task() -> object:

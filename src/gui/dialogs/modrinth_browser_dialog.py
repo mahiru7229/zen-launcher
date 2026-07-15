@@ -214,6 +214,7 @@ class ModrinthBrowserDialog(QDialog):
         QMessageBox.critical(self, title, message)
 
     def _apply_version_filter(self) -> None:
+        self._update_channel_summary()
         allowed = set(self.allowed_version_types)
         self._versions = [version for version in self._all_versions if version.version_type in allowed]
         self.version_combo.blockSignals(True)
@@ -231,6 +232,16 @@ class ModrinthBrowserDialog(QDialog):
         elif self._selected_project is not None:
             channels = ", ".join(item.title() for item in self.allowed_version_types)
             self.details_label.setText(tr("modrinth.channel.no_versions", channels=channels))
+
+    def _update_channel_summary(self) -> None:
+        if not self._all_versions:
+            self.release_channel_label.setText(tr("modrinth.channel.release_always"))
+            return
+        counts = {"release": 0, "beta": 0, "alpha": 0}
+        for version in self._all_versions:
+            if version.version_type in counts:
+                counts[version.version_type] += 1
+        self.release_channel_label.setText(tr("modrinth.channel.summary", release=counts["release"], beta=counts["beta"], alpha=counts["alpha"]))
 
     def _channels_changed(self, _checked: bool) -> None:
         self._apply_version_filter()
@@ -316,7 +327,7 @@ class ModrinthBrowserDialog(QDialog):
                 self.context_label.setText(tr("modrinth.mod.context", instance=self._instance.name, minecraft=self._instance.version_id))
         else:
             self.context_label.setText(tr("modrinth.modpack.context"))
-        self.release_channel_label.setText(tr("modrinth.channel.release_always"))
+        self._update_channel_summary()
         self.include_beta_checkbox.setText(tr("modrinth.channel.beta"))
         self.include_alpha_checkbox.setText(tr("modrinth.channel.alpha"))
         self.search_input.setPlaceholderText(tr("modrinth.search.placeholder"))

@@ -372,6 +372,7 @@
     "diagnostics.export.success": "Diagnostic report saved to:\n{path}",
     "diagnostics.open_logs": "Open logs folder",
     "modrinth.channel.release_always": "Release is always enabled. Enable prerelease channels only when needed.",
+    "modrinth.channel.summary": "Available versions — Release: {release}, Beta: {beta}, Alpha: {alpha}.",
     "modrinth.channel.beta": "Include Beta",
     "modrinth.channel.alpha": "Include Alpha",
     "modrinth.channel.no_versions": "No compatible versions are available in the enabled channels: {channels}.",

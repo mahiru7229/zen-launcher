@@ -372,6 +372,7 @@
     "diagnostics.export.success": "Đã lưu báo cáo chẩn đoán tại:\n{path}",
     "diagnostics.open_logs": "Mở thư mục log",
     "modrinth.channel.release_always": "Release luôn được bật. Chỉ bật kênh thử nghiệm khi cần.",
+    "modrinth.channel.summary": "Phiên bản có sẵn — Release: {release}, Beta: {beta}, Alpha: {alpha}.",
     "modrinth.channel.beta": "Bao gồm Beta",
     "modrinth.channel.alpha": "Bao gồm Alpha",
     "modrinth.channel.no_versions": "Không có phiên bản tương thích trong các kênh đang bật: {channels}.",

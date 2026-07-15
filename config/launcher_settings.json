@@ -17,12 +17,12 @@
         "show_static_text": false
     },
     "modrinth": {
-        "include_beta": false,
+        "include_beta": true,
         "include_alpha": true
     },
     "updates": {
         "auto_check": true,
         "channel": "beta",
-        "last_checked_at": "2026-07-15T06:55:35.580943+00:00"
+        "last_checked_at": "2026-07-15T07:08:19.447104+00:00"
     }
 }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 from time import time
@@ -18,7 +19,7 @@ from src.models.modrinth.version import ModrinthDependency, ModrinthFile, Modrin
 
 class ModrinthClient:
     BASE_URL = "https://api.modrinth.com/v2"
-    CACHE_SCHEMA = 1
+    CACHE_SCHEMA = 2
     SEARCH_TTL_SECONDS = 10 * 60
     VERSIONS_TTL_SECONDS = 30 * 60
     PROJECT_TTL_SECONDS = 60 * 60
@@ -109,9 +110,22 @@ class ModrinthClient:
         return allowed or ("release",)
 
     @staticmethod
-    def _version_sort_key(version: ModrinthVersion) -> tuple[int, int, str]:
+    def _version_sort_key(version: ModrinthVersion) -> tuple[float, int, int]:
         type_weight = {"release": 3, "beta": 2, "alpha": 1}.get(version.version_type, 0)
-        return int(version.featured), type_weight, version.date_published
+        return ModrinthClient._published_timestamp(version.date_published), int(version.featured), type_weight
+
+    @staticmethod
+    def _published_timestamp(value: str) -> float:
+        normalized = str(value).strip()
+        if not normalized:
+            return 0.0
+        try:
+            parsed = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+        except ValueError:
+            return 0.0
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.timestamp()
 
     @staticmethod
     def _parse_project(data: dict) -> ModrinthProject:

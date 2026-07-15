@@ -37,7 +37,7 @@ def test_search_builds_fabric_facets_and_parses_projects(monkeypatch):
     assert result.projects[0].client_side == "required"
 
 
-def test_versions_are_sorted_featured_release_first(monkeypatch):
+def test_versions_are_sorted_by_publish_date_across_channels(monkeypatch):
     monkeypatch.setattr(ModrinthClient, "_get_json", lambda *args, **kwargs: [
         {
             "id": "beta",
@@ -67,8 +67,8 @@ def test_versions_are_sorted_featured_release_first(monkeypatch):
 
     versions = ModrinthClient.list_project_versions("project", loader="fabric", game_version="1.20.1")
 
-    assert [version.version_id for version in versions] == ["release", "beta"]
-    assert versions[0].primary_file(".jar").filename == "release.jar"
+    assert [version.version_id for version in versions] == ["beta", "release"]
+    assert versions[0].primary_file(".jar").filename == "beta.jar"
 
 
 def test_user_agent_identifies_launcher():

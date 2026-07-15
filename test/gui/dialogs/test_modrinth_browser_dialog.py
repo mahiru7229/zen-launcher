@@ -51,3 +51,5 @@ def test_dialog_filters_versions_by_enabled_channels(app):
     dialog.set_channel_preferences(include_beta=True, include_alpha=True)
     assert dialog.allowed_version_types == ("release", "beta", "alpha")
     assert dialog.version_combo.count() == 3
+    assert "Beta: 1" in dialog.release_channel_label.text()
+    assert "Alpha: 1" in dialog.release_channel_label.text()
