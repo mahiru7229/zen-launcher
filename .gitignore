@@ -21,4 +21,4 @@ dist/
 release/
 *.spec.bak
 config/launcher_settings.json
-config/launcher_settings.json
+
