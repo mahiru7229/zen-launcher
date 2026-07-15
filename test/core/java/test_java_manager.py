@@ -44,6 +44,11 @@ def test_find_installation_combines_all_sources(
         "registry/javaw.exe",
         JavaSource.REGISTRY,
     )
+    managed_runtime = make_java(
+        21,
+        "runtimes/java-21/bin/javaw.exe",
+        JavaSource.MINECRAFT_RUNTIME,
+    )
 
     monkeypatch.setattr(
         JavaManager,
@@ -67,6 +72,11 @@ def test_find_installation_combines_all_sources(
     )
     monkeypatch.setattr(
         JavaManager,
+        "_scan_managed_runtimes",
+        lambda: [managed_runtime],
+    )
+    monkeypatch.setattr(
+        JavaManager,
         "_remove_duplicates",
         lambda javas: javas,
     )
@@ -78,6 +88,7 @@ def test_find_installation_combines_all_sources(
         path_java,
         program_files,
         registry,
+        managed_runtime,
     ]
 
 
@@ -112,6 +123,11 @@ def test_find_installation_passes_all_results_to_deduplication(
     monkeypatch.setattr(
         JavaManager,
         "_scan_registry",
+        lambda: [],
+    )
+    monkeypatch.setattr(
+        JavaManager,
+        "_scan_managed_runtimes",
         lambda: [],
     )
 
@@ -157,6 +173,11 @@ def test_find_installation_passes_all_results_to_deduplication(
             "_scan_registry",
             "_get_java_in_registry",
             JavaSource.REGISTRY,
+        ),
+        (
+            "_scan_managed_runtimes",
+            "_get_java_in_managed_runtimes",
+            JavaSource.MINECRAFT_RUNTIME,
         ),
     ],
 )
