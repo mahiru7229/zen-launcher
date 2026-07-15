@@ -9,7 +9,7 @@ from src.gui.config import NAVIGATION_ITEMS, VERSION
 from src.gui.pages.base_page import BasePage
 from src.gui.theme.runtime import set_theme_icon
 from src.gui.widget.card_widget import CardWidget
-
+from src.core.language.language_manager import language_manager, tr
 
 class LauncherSettingsPage(BasePage):
     save_requested = Signal(dict)
