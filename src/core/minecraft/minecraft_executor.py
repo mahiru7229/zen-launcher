@@ -14,6 +14,7 @@ from src.core.minecraft.download_manager import DownloadClientManager
 from src.core.minecraft.launcher_manager import LauncherManager
 from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
 from src.core.progress.progress_reporter import ProgressReporter
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
@@ -35,6 +36,13 @@ class MinecraftExecutor:
             reporter = ProgressReporter(on_progress)
             reporter.status(stage=ProgressStage.PREPARING, message="Preparing Minecraft...")
 
+            settings = SettingsManager.load(instance)
+            modrinth_warnings = ModrinthContentManager.ensure(
+                instance,
+                reporter,
+                block_launch_on_failure=bool(getattr(settings, "block_launch_on_modrinth_failure", True)),
+            )
+
             VersionManifestManager.get()
             reporter.status(stage=ProgressStage.LOADING_VERSION, message=f"Loading Minecraft {instance.version_id}...")
             version = ModLoaderManager.load(instance, reporter)
@@ -49,7 +57,6 @@ class MinecraftExecutor:
             AssetManager.load(version=version, reporter=reporter)
 
             reporter.status(stage=ProgressStage.BUILDING_CONTEXT, message="Building launch context...")
-            settings = SettingsManager.load(instance)
             context = ContextBuilder.build(instance, version, authentication)
 
             reporter.status(stage=ProgressStage.BUILDING_COMMAND, message="Building launch command...")
@@ -74,11 +81,14 @@ class MinecraftExecutor:
                 if native_dir.exists():
                     print("Native files:", list(native_dir.rglob("*")))
 
-            return {
+            result = {
                 "javaPath": java,
                 "minecraftJavaMajorVersion": java_major,
                 "minecraftVersion": version.id,
             }
+            if modrinth_warnings:
+                result["warnings"] = modrinth_warnings
+            return result
         except Exception:
             if not process_started:
                 run_lock.release()

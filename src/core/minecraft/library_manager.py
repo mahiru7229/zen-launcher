@@ -7,6 +7,7 @@ import zipfile
 from src.core.fs.paths import Paths
 from src.core.minecraft.library_rule_manager import LibraryRuleManager
 from src.core.network.httpx_downloader import HttpDownloader
+from src.core.progress.file_batch_progress import FileBatchProgress
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.minecraft.library import DownloadLibrary
 from src.models.minecraft.version import Version
@@ -34,15 +35,9 @@ class DownloadLibraryManager:
         downloaded_paths: list[Path] = []
 
         total = len(libraries)
-        completed = 0
 
-        if reporter is not None:
-            reporter.files(
-                stage=ProgressStage.DOWNLOADING_LIBRARIES,
-                message="Preparing Minecraft libraries...",
-                current=0,
-                total=total,
-            )
+        batch_progress = FileBatchProgress(reporter=reporter, stage=ProgressStage.DOWNLOADING_LIBRARIES, message="Preparing Minecraft libraries...", total=total)
+        batch_progress.start()
 
         if total == 0:
             return downloaded_paths
@@ -51,39 +46,30 @@ class DownloadLibraryManager:
             with concurrent.futures.ThreadPoolExecutor(
                 max_workers=MAX_WORKERS
             ) as executor:
-                future_to_library = {
-                    executor.submit(
-                        DownloadLibraryManager._download_single_library,
-                        library,
-                        version,
-                    ): library
-                    for library in libraries
-                }
+                future_to_library = {}
+                for library in libraries:
+                    token = object()
+                    child_reporter = batch_progress.reporter_for(token)
+                    future = executor.submit(DownloadLibraryManager._download_single_library, library, version) if child_reporter is None else executor.submit(DownloadLibraryManager._download_single_library, library, version, child_reporter)
+                    future_to_library[future] = (library, token)
 
                 for future in concurrent.futures.as_completed(
                     future_to_library
                 ):
-                    library = future_to_library[future]
+                    library, token = future_to_library[future]
 
                     try:
                         library_path = future.result()
                         downloaded_paths.append(library_path)
 
                     except Exception as error:
+                        batch_progress.discard(token)
                         raise RuntimeError(
                             "Failed to download library: "
                             f"{library.path}"
                         ) from error
 
-                    completed += 1
-
-                    if reporter is not None:
-                        reporter.files(
-                            stage=ProgressStage.DOWNLOADING_LIBRARIES,
-                            message="Preparing Minecraft libraries...",
-                            current=completed,
-                            total=total,
-                        )
+                    batch_progress.complete(token)
 
         finally:
             HttpDownloader.close_client()
@@ -94,6 +80,7 @@ class DownloadLibraryManager:
     def _download_single_library(
         library: DownloadLibrary,
         version: Version,
+        reporter: ProgressReporter | None = None,
     ) -> Path:
         library_path = Paths.libraries() / library.path
 
@@ -115,11 +102,10 @@ class DownloadLibraryManager:
 
         HttpDownloader.delete_file(library_path)
 
-        downloaded_path = HttpDownloader.download(
-            download_info=library,
-            path=library_path,
-            max_retry=5,
-        )
+        kwargs = {"download_info": library, "path": library_path, "max_retry": 5}
+        if reporter is not None:
+            kwargs.update({"reporter": reporter, "progress_stage": ProgressStage.DOWNLOADING_LIBRARIES, "progress_message": f"Downloading library {library_path.name}..."})
+        downloaded_path = HttpDownloader.download(**kwargs)
 
         if library.is_native:
             DownloadLibraryManager._extract_native(

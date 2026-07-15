@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import copy
 import json
+import math
 import os
 import threading
 from pathlib import Path
@@ -12,7 +13,7 @@ from src.core.fs.paths import Paths
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 4
+    SCHEMA_VERSION = 5
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
         "gui": {
@@ -34,6 +35,9 @@ class LauncherSettingsManager:
         "modrinth": {
             "include_beta": False,
             "include_alpha": False,
+        },
+        "network": {
+            "download_limit_mbps": 0.0,
         },
         "updates": {
             "auto_check": True,
@@ -166,6 +170,9 @@ class LauncherSettingsManager:
         modrinth["include_beta"] = self._as_bool(modrinth.get("include_beta"), False)
         modrinth["include_alpha"] = self._as_bool(modrinth.get("include_alpha"), False)
 
+        network = normalized.setdefault("network", {})
+        network["download_limit_mbps"] = self._as_download_limit(network.get("download_limit_mbps"))
+
         updates = normalized.setdefault("updates", {})
         updates["auto_check"] = self._as_bool(updates.get("auto_check"), True)
         channel = str(updates.get("channel") or "beta").strip().lower()
@@ -184,6 +191,16 @@ class LauncherSettingsManager:
             else:
                 result[key] = copy.deepcopy(value)
         return result
+
+    @staticmethod
+    def _as_download_limit(value: Any) -> float:
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return 0.0
+        if parsed <= 0 or not math.isfinite(parsed):
+            return 0.0
+        return min(parsed, 1024.0)
 
     @staticmethod
     def _as_bool(value: Any, default: bool) -> bool:

@@ -6,6 +6,7 @@ from src.core.instance.instance_manager import InstanceManager
 from src.core.modrinth.modrinth_client import ModrinthClient
 from src.core.modrinth.modrinth_mod_installer import ModrinthModInstaller
 from src.core.modrinth.modrinth_pack_installer import ModrinthPackInstaller
+from src.core.progress.progress_reporter import ProgressReporter
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 
@@ -15,6 +16,7 @@ class ModrinthController(BaseController):
     versions_changed = Signal(str, str, list)
     mod_installed = Signal(object)
     modpack_installed = Signal(object)
+    progress_received = Signal(object)
 
     def __init__(self, task_runner: TaskRunner) -> None:
         super().__init__()
@@ -31,14 +33,17 @@ class ModrinthController(BaseController):
         self._task_runner.run(task_id, lambda: (project_type, project_id, ModrinthClient.list_project_versions(project_id, loader="fabric", game_version=game_version, version_types=("release", "beta", "alpha"))), "Loading compatible Modrinth versions...", blocking=False)
 
     def install_mod(self, instance_name: str, version_id: str, allowed_version_types: tuple[str, ...] = ("release",)) -> None:
+        reporter = ProgressReporter(self.progress_received.emit)
+
         def task() -> object:
             instance = InstanceManager.load(instance_name)
-            return ModrinthModInstaller.install(instance, version_id, install_dependencies=True, allowed_version_types=allowed_version_types)
+            return ModrinthModInstaller.install(instance, version_id, install_dependencies=True, allowed_version_types=allowed_version_types, reporter=reporter)
 
         self._task_runner.run("modrinth.install.mod", task, f"Installing Modrinth mod into '{instance_name}'...")
 
     def install_modpack(self, project_id: str, version_id: str, instance_name: str, install_optional_files: bool, allowed_version_types: tuple[str, ...] = ("release",)) -> None:
-        self._task_runner.run("modrinth.install.modpack", lambda: ModrinthPackInstaller.install(project_id, version_id, instance_name, install_optional_files, allowed_version_types), f"Installing Modrinth modpack '{instance_name}'...")
+        reporter = ProgressReporter(self.progress_received.emit)
+        self._task_runner.run("modrinth.install.modpack", lambda: ModrinthPackInstaller.install(project_id, version_id, instance_name, install_optional_files, allowed_version_types, reporter), f"Installing Modrinth modpack '{instance_name}'...")
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:

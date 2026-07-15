@@ -94,6 +94,14 @@ class LaunchController(BaseController):
         self.launch_finished.emit(result)
 
         version = result.get("minecraftVersion", "unknown")
+        warnings = tuple(result.get("warnings", ()) or ())
+        if warnings:
+            self.status_changed.emit(tr("Minecraft {version} launched with warnings", version=version))
+            self.log_created.emit(tr("Minecraft process created with {count} warning(s): {version}", count=len(warnings), version=version))
+            for warning in warnings:
+                self.log_created.emit(f"Modrinth warning: {warning}")
+            return
+
         self.status_changed.emit(tr("Minecraft {version} launched", version=version))
         self.log_created.emit(tr("Minecraft process created successfully: {version}", version=version))
 

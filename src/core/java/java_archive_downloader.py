@@ -4,7 +4,9 @@ import time
 import httpx
 
 from src.core.java.java_checksum import JavaChecksum
+from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter
 from src.core.network.httpx_downloader import CHUNK_SIZE, HttpDownloader
+from src.core.progress.download_rate_meter import DownloadRateMeter
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.java.java_release import JavaRelease
 from src.models.progress.progress_stage import ProgressStage
@@ -46,12 +48,14 @@ class JavaArchiveDownloader:
             total = JavaArchiveDownloader._content_length(response, release.size)
             downloaded = 0
             last_percentage = -1
+            rate_meter = DownloadRateMeter(downloaded)
             JavaArchiveDownloader._report(reporter, release.major, downloaded, total)
 
             with destination.open("wb") as file:
                 for chunk in response.iter_bytes(chunk_size=CHUNK_SIZE):
                     if not chunk:
                         continue
+                    download_bandwidth_limiter.throttle(len(chunk))
                     file.write(chunk)
                     downloaded += len(chunk)
                     if total <= 0:
@@ -60,10 +64,10 @@ class JavaArchiveDownloader:
                     if percentage == last_percentage:
                         continue
                     last_percentage = percentage
-                    JavaArchiveDownloader._report(reporter, release.major, downloaded, total)
+                    JavaArchiveDownloader._report(reporter, release.major, downloaded, total, rate_meter.update(downloaded))
 
             if total > 0 and downloaded >= total and last_percentage < 100:
-                JavaArchiveDownloader._report(reporter, release.major, total, total)
+                JavaArchiveDownloader._report(reporter, release.major, total, total, rate_meter.update(total))
 
     @staticmethod
     def _content_length(response: httpx.Response, fallback: int) -> int:
@@ -76,7 +80,7 @@ class JavaArchiveDownloader:
             return fallback
 
     @staticmethod
-    def _report(reporter: ProgressReporter | None, major: int, current: int, total: int) -> None:
+    def _report(reporter: ProgressReporter | None, major: int, current: int, total: int, bytes_per_second: float | None = None) -> None:
         if reporter is None:
             return
-        reporter.bytes(stage=ProgressStage.DOWNLOADING_JAVA, message=f"Downloading Java {major}...", current=current, total=total)
+        reporter.bytes(stage=ProgressStage.DOWNLOADING_JAVA, message=f"Downloading Java {major}...", current=current, total=total, bytes_per_second=bytes_per_second)

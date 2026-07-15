@@ -31,3 +31,17 @@ def test_presents_instance_already_running_error():
     assert view.status == "Instance already running"
     assert "Close that game" in view.message
     assert "Survival" in view.message
+
+def test_presents_modrinth_missing_files_with_instance_setting_hint():
+    error = RuntimeError(
+        "Could not download 2 required Modrinth file(s) after 3 rounds. "
+        "Open Instance Settings > Modrinth downloads."
+    )
+
+    view = LaunchErrorPresenter.present(error)
+
+    assert view.title == "Required Modrinth files are missing"
+    assert view.status == "Modrinth files missing"
+    assert "Instance Settings > Modrinth downloads" in view.message
+    assert "Could not download 2 required Modrinth file(s)" in view.message
+

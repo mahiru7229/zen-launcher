@@ -15,6 +15,7 @@ from src.core.minecraft.launcher_manager import LauncherManager
 from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.minecraft.minecraft_executor import MinecraftExecutor
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.minecraft.version_manifest_manager import (
     VersionManifestManager,
@@ -335,19 +336,19 @@ def test_run_calls_pipeline_in_expected_order(
         call[0]
         for call in calls
     ] == [
+        "settings",
         "manifest",
         "version",
         "client",
         "libraries",
         "assets",
-        "settings",
         "context",
         "command",
         "java",
         "launch",
     ]
 
-    assert calls[1] == (
+    assert next(call for call in calls if call[0] == "version") == (
         "version",
         "1.20.1",
     )
@@ -885,3 +886,22 @@ def test_fabric_instance_uses_resolved_knot_client(monkeypatch: pytest.MonkeyPat
     assert launched["command"] == ["net.fabricmc.loader.impl.launch.knot.KnotClient"]
     assert result["minecraftVersion"] == "fabric-loader-0.19.3-1.21.1"
     assert result["minecraftJavaMajorVersion"] == 21
+
+def test_run_uses_per_instance_modrinth_failure_policy_and_returns_non_blocking_warnings(monkeypatch: pytest.MonkeyPatch):
+    patch_pipeline(monkeypatch)
+    settings = SimpleNamespace(block_launch_on_modrinth_failure=False)
+    received = {}
+
+    monkeypatch.setattr(SettingsManager, "load", lambda instance: settings)
+
+    def fake_ensure(instance, reporter, block_launch_on_failure=True):
+        received["block_launch_on_failure"] = block_launch_on_failure
+        return ("mods/example.jar must be installed manually",)
+
+    monkeypatch.setattr(ModrinthContentManager, "ensure", fake_ensure)
+
+    result = MinecraftExecutor.run(instance=make_instance(), authentication=object(), account=object())
+
+    assert received["block_launch_on_failure"] is False
+    assert result["warnings"] == ("mods/example.jar must be installed manually",)
+

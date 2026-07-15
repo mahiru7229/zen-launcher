@@ -18,6 +18,11 @@ QLabel#StageBadge[state="success"] {
     color: #bde98a;
 }
 
+QLabel#StageBadge[state="warning"] {
+    background: #4a3824;
+    color: #f0c37d;
+}
+
 QLabel#StageBadge[state="error"] {
     background: #5b302f;
     color: #ffd6d1;

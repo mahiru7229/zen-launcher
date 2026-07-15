@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QPushButton
+from PySide6.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QLabel, QPushButton
 
 from src.core.language.language_manager import language_manager
 from src.core.theme.theme_manager import theme_manager
@@ -39,6 +39,20 @@ class LauncherSettingsPage(BasePage):
         behavior_card.layout.addWidget(self.remember_window_size)
         behavior_card.layout.addWidget(self.debug_mode)
         self.root_layout.addWidget(behavior_card)
+
+        bandwidth_card = CardWidget("Download bandwidth", "The limit is shared by all simultaneous downloads. Leave it disabled for unlimited speed.")
+        self.limit_download_speed = QCheckBox("Limit download speed")
+        self.download_limit_mbps = QDoubleSpinBox()
+        self.download_limit_mbps.setRange(0.1, 1024.0)
+        self.download_limit_mbps.setDecimals(1)
+        self.download_limit_mbps.setSingleStep(1.0)
+        self.download_limit_mbps.setSuffix(" MB/s")
+        self.download_limit_mbps.setValue(10.0)
+        self.download_limit_mbps.setEnabled(False)
+        self.limit_download_speed.toggled.connect(self.download_limit_mbps.setEnabled)
+        bandwidth_card.layout.addWidget(self.limit_download_speed)
+        bandwidth_card.layout.addWidget(self.download_limit_mbps)
+        self.root_layout.addWidget(bandwidth_card)
 
         language_card = CardWidget("Language", "Add another language by placing a compatible JSON file in the lang folder.")
         self.language_combo = QComboBox()
@@ -186,6 +200,10 @@ class LauncherSettingsPage(BasePage):
         self.auto_check_updates.setChecked(bool(settings.get("auto_check_updates", True)))
         self.modrinth_include_beta.setChecked(bool(settings.get("modrinth_include_beta", False)))
         self.modrinth_include_alpha.setChecked(bool(settings.get("modrinth_include_alpha", False)))
+        download_limit = max(0.0, float(settings.get("download_limit_mbps", 0.0) or 0.0))
+        self.limit_download_speed.setChecked(download_limit > 0)
+        self.download_limit_mbps.setValue(download_limit if download_limit > 0 else 10.0)
+        self.download_limit_mbps.setEnabled(download_limit > 0)
         channel_index = self.update_channel_combo.findData(settings.get("update_channel", "beta"))
         self.update_channel_combo.setCurrentIndex(max(0, channel_index))
         self.reload_languages()
@@ -213,6 +231,7 @@ class LauncherSettingsPage(BasePage):
             "show_static_text": self.show_static_text.isChecked(),
             "modrinth_include_beta": self.modrinth_include_beta.isChecked(),
             "modrinth_include_alpha": self.modrinth_include_alpha.isChecked(),
+            "download_limit_mbps": self.download_limit_mbps.value() if self.limit_download_speed.isChecked() else 0.0,
         }
 
     def set_update_status(self, message: str) -> None:

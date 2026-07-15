@@ -10,17 +10,19 @@ from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modrinth.modrinth_client import ModrinthClient
 from src.core.modrinth.modrinth_downloader import ModrinthDownloader
 from src.core.modrinth.modrinth_registry import ModrinthRegistry
+from src.core.progress.progress_reporter import ProgressReporter
 from src.models.instance.instance import Instance
 from src.models.modrinth.install_result import ModrinthModInstallResult
 from src.models.modrinth.project import ModrinthProject
 from src.models.modrinth.version import ModrinthVersion
+from src.models.progress.progress_stage import ProgressStage
 
 
 class ModrinthModInstaller:
     MAX_DEPENDENCIES = 64
 
     @staticmethod
-    def install(instance: Instance, version_id: str, install_dependencies: bool = True, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None) -> ModrinthModInstallResult:
+    def install(instance: Instance, version_id: str, install_dependencies: bool = True, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None) -> ModrinthModInstallResult:
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
         if loader_name != ModLoaderManager.FABRIC:
             raise RuntimeError("Modrinth mod installation currently requires a Fabric instance.")
@@ -42,12 +44,39 @@ class ModrinthModInstaller:
             project = projects[version.project_id]
             file = version.primary_file(".jar")
             cache_path = Paths.modrinth_file_cache(version.project_id, version.version_id, file.filename)
-            ModrinthDownloader.download_file(file, cache_path)
+            previous = registry_mods.get(version.project_id, {}) if isinstance(registry_mods.get(version.project_id), dict) else {}
+            entry = {
+                "projectId": version.project_id,
+                "versionId": version.version_id,
+                "versionNumber": version.version_number,
+                "versionType": version.version_type,
+                "fileName": file.filename,
+                "sha1": file.sha1,
+                "sha512": file.sha512,
+                "size": file.size,
+                "downloadUrls": [file.url],
+                "title": project.title,
+                "locked": bool(previous.get("locked", False)),
+                "source": "modrinth",
+                "datePublished": version.date_published,
+                "updatedAt": datetime.now(timezone.utc).isoformat(),
+            }
+            try:
+                if reporter is None:
+                    ModrinthDownloader.download_file(file, cache_path)
+                else:
+                    ModrinthDownloader.download_file(file, cache_path, reporter=reporter, progress_stage=ProgressStage.DOWNLOADING_MODS, progress_message=f"Downloading {project.title}...")
+            except Exception as error:
+                entry["pendingDownload"] = True
+                entry["lastDownloadError"] = str(error)
+                registry_mods[version.project_id] = entry
+                warnings.append(f"{project.title}: download was deferred and will be retried on the next launch ({error}).")
+                continue
+
             added = ModManager.add_mods(instance, [cache_path], replace=True)
             if not added:
                 raise RuntimeError(f"Mod '{project.title}' was downloaded but could not be added to the instance.")
 
-            previous = registry_mods.get(version.project_id, {}) if isinstance(registry_mods.get(version.project_id), dict) else {}
             previous_name = str(previous.get("fileName") or "")
             new_name = added[0].file_name
             if previous_name and previous_name.casefold() != new_name.casefold():
@@ -56,19 +85,10 @@ class ModrinthModInstaller:
                     previous_path.unlink(missing_ok=True)
                     previous_path.with_name(previous_path.name + ModManager.DISABLED_SUFFIX).unlink(missing_ok=True)
 
-            registry_mods[version.project_id] = {
-                "projectId": version.project_id,
-                "versionId": version.version_id,
-                "versionNumber": version.version_number,
-                "versionType": version.version_type,
-                "fileName": new_name,
-                "sha1": file.sha1,
-                "title": project.title,
-                "locked": bool(previous.get("locked", False)),
-                "source": "modrinth",
-                "datePublished": version.date_published,
-                "updatedAt": datetime.now(timezone.utc).isoformat(),
-            }
+            entry["fileName"] = new_name
+            entry["pendingDownload"] = False
+            entry["lastDownloadError"] = ""
+            registry_mods[version.project_id] = entry
             installed_projects.append(project.title)
             installed_files.append(new_name)
 

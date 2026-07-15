@@ -5,6 +5,7 @@ from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modrinth.modrinth_client import ModrinthClient
 from src.core.modrinth.modrinth_mod_installer import ModrinthModInstaller
 from src.core.modrinth.modrinth_registry import ModrinthRegistry
+from src.core.progress.progress_reporter import ProgressReporter
 from src.models.instance.instance import Instance
 from src.models.modrinth.update import ModrinthModUpdateEntry, ModrinthModUpdateReport, ModrinthModUpdateResult
 
@@ -27,7 +28,7 @@ class ModrinthModUpdateManager:
         return ModrinthModUpdateReport(entries=tuple(entries))
 
     @staticmethod
-    def update(instance: Instance, project_ids: list[str] | tuple[str, ...] | set[str], allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None) -> ModrinthModUpdateResult:
+    def update(instance: Instance, project_ids: list[str] | tuple[str, ...] | set[str], allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None) -> ModrinthModUpdateResult:
         ModrinthModUpdateManager._ensure_fabric(instance)
         if InstanceRunLock.is_active(instance):
             raise RuntimeError("Close Minecraft before updating mods.")
@@ -58,7 +59,7 @@ class ModrinthModUpdateManager:
                 continue
             if latest.version_id == str(raw_entry.get("versionId") or "") or not ModrinthModUpdateManager._is_newer(latest, current):
                 continue
-            result = ModrinthModInstaller.install(instance, latest.version_id, install_dependencies=True, allowed_version_types=allowed_types)
+            result = ModrinthModInstaller.install(instance, latest.version_id, install_dependencies=True, allowed_version_types=allowed_types, reporter=reporter)
             updated_projects.extend(result.installed_projects)
             updated_files.extend(result.installed_files)
             warnings.extend(result.warnings)
@@ -68,9 +69,9 @@ class ModrinthModUpdateManager:
         return ModrinthModUpdateResult(updated_projects=tuple(dict.fromkeys(updated_projects)), updated_files=tuple(dict.fromkeys(updated_files)), skipped_locked=tuple(dict.fromkeys(skipped_locked)), warnings=tuple(warnings))
 
     @staticmethod
-    def update_all(instance: Instance, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None) -> ModrinthModUpdateResult:
+    def update_all(instance: Instance, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None) -> ModrinthModUpdateResult:
         registry = ModrinthRegistry.load(instance)
-        return ModrinthModUpdateManager.update(instance, list(registry.get("mods", {})), allowed_version_types)
+        return ModrinthModUpdateManager.update(instance, list(registry.get("mods", {})), allowed_version_types, reporter)
 
     @staticmethod
     def set_locked(instance: Instance, project_ids: list[str] | tuple[str, ...] | set[str], locked: bool) -> tuple[str, ...]:

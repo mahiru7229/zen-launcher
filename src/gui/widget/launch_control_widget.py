@@ -114,10 +114,17 @@ class LaunchControlWidget(QFrame):
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(100)
         self.progress_bar.setFormat("100%")
-        self.status_label.setText(tr("Minecraft {version} launched", version=version))
-        self.detail_label.setText(tr("Java: {path}", path=java_path))
-        self.stage_label.setText(tr("RUNNING"))
-        self._set_stage_state("success")
+        warnings = tuple(result.get("warnings", ()) or ())
+        if warnings:
+            self.status_label.setText(tr("Minecraft {version} launched with warnings", version=version))
+            self.detail_label.setText(str(warnings[0]))
+            self.stage_label.setText(tr("WARNING"))
+            self._set_stage_state("warning")
+        else:
+            self.status_label.setText(tr("Minecraft {version} launched", version=version))
+            self.detail_label.setText(tr("Java: {path}", path=java_path))
+            self.stage_label.setText(tr("RUNNING"))
+            self._set_stage_state("success")
         self._keep_launch_button_text()
 
 

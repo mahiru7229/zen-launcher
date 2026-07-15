@@ -89,3 +89,18 @@ def test_theme_and_modrinth_channels_are_created_and_persisted(tmp_path: Path) -
 
     assert updated["appearance"] == {"theme": "pixel-night", "show_static_text": False}
     assert updated["modrinth"] == {"include_beta": True, "include_alpha": True}
+
+
+def test_download_limit_is_unlimited_by_default_and_normalized(tmp_path: Path) -> None:
+    manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
+
+    assert manager.load()["network"] == {"download_limit_mbps": 0.0}
+
+    manager.update_section("network", {"download_limit_mbps": "12.5"})
+    assert manager.load()["network"]["download_limit_mbps"] == 12.5
+
+    manager.update_section("network", {"download_limit_mbps": -1})
+    assert manager.load()["network"]["download_limit_mbps"] == 0.0
+
+    manager.update_section("network", {"download_limit_mbps": 5000})
+    assert manager.load()["network"]["download_limit_mbps"] == 1024.0

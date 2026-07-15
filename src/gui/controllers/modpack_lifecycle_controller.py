@@ -6,6 +6,7 @@ from src.core.instance.instance_manager import InstanceManager
 from src.core.language.language_manager import tr
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
 from src.core.modrinth.modrinth_pack_update_manager import ModrinthPackUpdateManager
+from src.core.progress.progress_reporter import ProgressReporter
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 
@@ -14,6 +15,7 @@ class ModpackLifecycleController(BaseController):
     state_changed = Signal(object)
     update_checked = Signal(object)
     update_finished = Signal(object)
+    progress_received = Signal(object)
 
     def __init__(self, task_runner: TaskRunner) -> None:
         super().__init__()
@@ -37,7 +39,8 @@ class ModpackLifecycleController(BaseController):
         name = str(instance_name).strip()
         if not name:
             return
-        self._task_runner.run("modpack.update.apply", lambda: ModrinthPackUpdateManager.update(InstanceManager.load(name), allowed_version_types=allowed_version_types), tr("Updating Modrinth modpack for '{name}'...", name=name))
+        reporter = ProgressReporter(self.progress_received.emit)
+        self._task_runner.run("modpack.update.apply", lambda: ModrinthPackUpdateManager.update(InstanceManager.load(name), allowed_version_types=allowed_version_types, reporter=reporter), tr("Updating Modrinth modpack for '{name}'...", name=name))
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:

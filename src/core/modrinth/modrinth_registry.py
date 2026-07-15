@@ -104,6 +104,14 @@ class ModrinthRegistry:
             entry["versionNumber"] = str(entry.get("versionNumber") or "Unknown").strip()
             entry["fileName"] = Path(str(entry.get("fileName") or "")).name
             entry["sha1"] = str(entry.get("sha1") or "").strip().lower()
+            entry["sha512"] = str(entry.get("sha512") or "").strip().lower()
+            try:
+                entry["size"] = max(0, int(entry.get("size", 0) or 0))
+            except (TypeError, ValueError):
+                entry["size"] = 0
+            entry["downloadUrls"] = list(dict.fromkeys(str(url).strip() for url in entry.get("downloadUrls", []) if str(url).strip())) if isinstance(entry.get("downloadUrls"), (list, tuple)) else []
+            entry["pendingDownload"] = bool(entry.get("pendingDownload", False))
+            entry["lastDownloadError"] = str(entry.get("lastDownloadError") or "").strip()
             entry["title"] = str(entry.get("title") or key).strip()
             entry["versionType"] = str(entry.get("versionType") or "release").strip().lower()
             entry["datePublished"] = str(entry.get("datePublished") or "").strip()

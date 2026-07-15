@@ -111,7 +111,7 @@ class ThemeRuntime:
         "scrollbar.horizontal_track": ("QScrollBar:horizontal", 0),
         "scrollbar.horizontal_handle": ("QScrollBar::handle:horizontal", 6),
         "badge.status": ("QLabel#StatusBadge, QLabel#StageBadge[state=success]", 8),
-        "badge.warning": ("QLabel#WarningBadge, QLabel#StageBadge[state=busy]", 8),
+        "badge.warning": ("QLabel#WarningBadge, QLabel#StageBadge[state=busy], QLabel#StageBadge[state=warning]", 8),
         "badge.locked": ("QLabel#LockedBadge", 8),
         "badge.error": ("QLabel#StageBadge[state=error]", 8),
     }

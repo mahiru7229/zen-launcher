@@ -61,12 +61,6 @@ def test_installs_fabric_modpack_as_new_instance(tmp_path, monkeypatch):
     monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: version)
     monkeypatch.setattr(ModrinthDownloader, "download_file", lambda file, destination, force=False: destination.parent.mkdir(parents=True, exist_ok=True) or destination.write_bytes(pack_source.read_bytes()) or destination)
 
-    def fake_file_download(urls, destination, sha1="", sha512="", expected_size=0, force=False, restrict_hosts=True, max_retry=2):
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(b"fabric-mod")
-        return destination
-
-    monkeypatch.setattr(ModrinthDownloader, "download_urls", fake_file_download)
     monkeypatch.setattr(VersionManager, "load", lambda version_id: SimpleNamespace(id=version_id))
     monkeypatch.setattr(ModLoaderManager, "resolve", lambda game_version, loader_name, loader_version="auto": ("fabric", loader_version))
     monkeypatch.setattr(ModLoaderManager, "prepare", lambda version, loader_name, loader_version, reporter=None: version)
@@ -75,7 +69,8 @@ def test_installs_fabric_modpack_as_new_instance(tmp_path, monkeypatch):
 
     instance_dir = tmp_path / "instances" / "Test Instance"
     assert result.instance.name == "Test Instance"
-    assert (instance_dir / "mods" / "example.jar").read_bytes() == b"fabric-mod"
+    assert result.installed_files == 1
+    assert not (instance_dir / "mods" / "example.jar").exists()
     assert (instance_dir / "config" / "example.json").is_file()
     assert (instance_dir / "options.txt").read_text(encoding="utf-8") == "fov:0.5"
     metadata_path = instance_dir / ".mcw" / "modrinth-pack.json"
@@ -83,6 +78,8 @@ def test_installs_fabric_modpack_as_new_instance(tmp_path, monkeypatch):
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     assert metadata["schemaVersion"] == 3
     assert {item["path"] for item in metadata["managedFiles"]} == {"mods/example.jar", "config/example.json", "options.txt"}
+    queued = next(item for item in metadata["managedFiles"] if item["path"] == "mods/example.jar")
+    assert queued["downloads"] == ["https://cdn.modrinth.com/data/project/example.jar"]
 
 
 def test_cleanup_removes_instance_when_finalization_fails(tmp_path, monkeypatch):

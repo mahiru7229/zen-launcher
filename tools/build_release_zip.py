@@ -64,7 +64,7 @@ def build_release_zip(project_root: Path, executable: Path, version: str, output
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build an MCW Launcher ZIP that can be installed by the automatic updater.")
     parser.add_argument("--exe", type=Path, required=True, help="Path to the packaged MCW Launcher.exe")
-    parser.add_argument("--version", required=True, help="Version without a leading v, for example 0.5.0-beta.10")
+    parser.add_argument("--version", required=True, help="Version without a leading v, for example 0.5.1-beta.1")
     parser.add_argument("--output", type=Path, help="Output ZIP path")
     args = parser.parse_args()
 

@@ -78,3 +78,55 @@ def test_rejects_update_package_version_mismatch(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="version mismatch"):
         manager()._validate_package_manifest(content, info)
+
+
+def test_update_download_reports_progress(tmp_path: Path, monkeypatch) -> None:
+    import hashlib
+    import httpx
+
+    from src.core.network.httpx_downloader import HttpDownloader
+    from src.core.progress.progress_reporter import ProgressReporter
+    from src.models.progress.progress_stage import ProgressStage
+    from src.models.update.update_info import ReleaseAsset, UpdateInfo
+
+    content = b"launcher-update-archive"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"Content-Length": str(len(content))}, content=content)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    monkeypatch.setattr(HttpDownloader, "_client", client)
+    info = UpdateInfo(current_version="0.5.0-beta.9", version="0.5.0-beta.10", tag_name="v0.5.0-beta.10", title="Beta 10", release_notes="", release_url="", published_at="", prerelease=True, asset=ReleaseAsset("update.zip", "https://example.com/update.zip", len(content), hashlib.sha256(content).hexdigest()))
+    events = []
+    archive_path = tmp_path / "update.zip"
+
+    manager()._download_archive(info, archive_path, ProgressReporter(events.append), max_retry=1)
+
+    assert archive_path.read_bytes() == content
+    assert events
+    assert all(event.stage is ProgressStage.DOWNLOADING_UPDATE for event in events)
+    assert events[-1].percentage == 100
+
+
+def test_update_download_uses_shared_bandwidth_limiter(tmp_path: Path, monkeypatch) -> None:
+    import hashlib
+    import httpx
+
+    from src.core.network.httpx_downloader import HttpDownloader
+    from src.models.update.update_info import ReleaseAsset, UpdateInfo
+
+    content = b"limited-launcher-update"
+    throttled = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"Content-Length": str(len(content))}, content=content)
+
+    monkeypatch.setattr(HttpDownloader, "_client", httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True))
+    monkeypatch.setattr("src.core.update.update_manager.download_bandwidth_limiter.throttle", lambda size: throttled.append(size))
+    info = UpdateInfo(current_version="0.5.1-beta.1", version="0.5.1-beta.2", tag_name="v0.5.1-beta.2", title="Beta 2", release_notes="", release_url="", published_at="", prerelease=True, asset=ReleaseAsset("update.zip", "https://example.com/update.zip", len(content), hashlib.sha256(content).hexdigest()))
+
+    archive_path = tmp_path / "update.zip"
+    manager()._download_archive(info, archive_path, max_retry=1)
+
+    assert archive_path.read_bytes() == content
+    assert sum(throttled) == len(content)

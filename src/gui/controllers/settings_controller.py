@@ -54,6 +54,7 @@ class InstanceSettingsController(BaseController):
             settings.height = height
             settings.fullscreen = bool(data["fullscreen"])
             settings.offline_multiplayer_enabled = bool(data["offline_multiplayer_enabled"])
+            settings.block_launch_on_modrinth_failure = bool(data.get("block_launch_on_modrinth_failure", True))
             settings.jvm_arguments = list(data["jvm_arguments"])
             settings.game_arguments = list(data["game_arguments"])
             SettingsManager.save(instance, settings)

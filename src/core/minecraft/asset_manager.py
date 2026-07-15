@@ -7,6 +7,7 @@ from src.core.minecraft.asset_index_manager import (
     AssetIndexManager,
 )
 from src.core.network.httpx_downloader import HttpDownloader
+from src.core.progress.file_batch_progress import FileBatchProgress
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.minecraft.assets import DownloadAsset
 from src.models.minecraft.version import Version
@@ -38,15 +39,9 @@ class AssetManager:
         )
 
         total = len(assets)
-        completed = 0
 
-        if reporter is not None:
-            reporter.files(
-                stage=ProgressStage.DOWNLOADING_ASSETS,
-                message="Preparing Minecraft assets...",
-                current=0,
-                total=total,
-            )
+        batch_progress = FileBatchProgress(reporter=reporter, stage=ProgressStage.DOWNLOADING_ASSETS, message="Preparing Minecraft assets...", total=total)
+        batch_progress.start()
 
         if total == 0:
             return Paths.asset_index_dir()
@@ -55,42 +50,29 @@ class AssetManager:
             with concurrent.futures.ThreadPoolExecutor(
                 max_workers=MAX_WORKERS
             ) as executor:
-                future_to_asset = {
-                    executor.submit(
-                        AssetManager._download_single_asset,
-                        asset,
-                    ): asset
-                    for asset in assets
-                }
+                future_to_asset = {}
+                for asset in assets:
+                    token = object()
+                    child_reporter = batch_progress.reporter_for(token)
+                    future = executor.submit(AssetManager._download_single_asset, asset) if child_reporter is None else executor.submit(AssetManager._download_single_asset, asset, child_reporter)
+                    future_to_asset[future] = (asset, token)
 
                 for future in concurrent.futures.as_completed(
                     future_to_asset
                 ):
-                    asset = future_to_asset[future]
+                    asset, token = future_to_asset[future]
 
                     try:
                         future.result()
 
                     except Exception as error:
+                        batch_progress.discard(token)
                         raise RuntimeError(
                             "Failed to download asset: "
                             f"{asset.logical_name}"
                         ) from error
 
-                    completed += 1
-
-                    if reporter is not None:
-                        reporter.files(
-                            stage=(
-                                ProgressStage
-                                .DOWNLOADING_ASSETS
-                            ),
-                            message=(
-                                "Preparing Minecraft assets..."
-                            ),
-                            current=completed,
-                            total=total,
-                        )
+                    batch_progress.complete(token)
 
         finally:
             HttpDownloader.close_client()
@@ -100,6 +82,7 @@ class AssetManager:
     @staticmethod
     def _download_single_asset(
         asset: DownloadAsset,
+        reporter: ProgressReporter | None = None,
     ) -> Path:
         asset_path = Paths.asset_object(asset)
 
@@ -114,11 +97,10 @@ class AssetManager:
 
         HttpDownloader.delete_file(asset_path)
 
-        return HttpDownloader.download(
-            download_info=asset,
-            path=asset_path,
-            max_retry=5,
-        )
+        kwargs = {"download_info": asset, "path": asset_path, "max_retry": 5}
+        if reporter is not None:
+            kwargs.update({"reporter": reporter, "progress_stage": ProgressStage.DOWNLOADING_ASSETS, "progress_message": f"Downloading asset {asset.logical_name}..."})
+        return HttpDownloader.download(**kwargs)
 
     @staticmethod
     def _load_asset_index(

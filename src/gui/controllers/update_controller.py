@@ -6,6 +6,7 @@ from PySide6.QtCore import Signal, Slot
 
 from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.language.language_manager import tr
+from src.core.progress.progress_reporter import ProgressReporter
 from src.core.update.update_manager import UpdateManager
 from src.gui.config import GITHUB_REPOSITORY, UPDATE_CHANNEL, VERSION_ID
 from src.gui.controllers.base_controller import BaseController
@@ -18,6 +19,7 @@ class UpdateController(BaseController):
     no_update_available = Signal(bool)
     update_prepared = Signal(object)
     update_check_failed = Signal(object, bool)
+    progress_received = Signal(object)
 
     AUTO_CHECK_TASK_ID = "update.check.auto"
     MANUAL_CHECK_TASK_ID = "update.check.manual"
@@ -53,7 +55,8 @@ class UpdateController(BaseController):
         self._task_runner.run(task_id, lambda: self._manager.check_for_update(force_refresh=manual), tr("update.status.checking"), blocking=False)
 
     def prepare(self, info: UpdateInfo) -> None:
-        self._task_runner.run(self.PREPARE_TASK_ID, lambda: self._manager.prepare_update(info), tr("update.status.downloading"), blocking=True)
+        reporter = ProgressReporter(self.progress_received.emit)
+        self._task_runner.run(self.PREPARE_TASK_ID, lambda: self._manager.prepare_update(info, reporter), tr("update.status.downloading"), blocking=True)
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:

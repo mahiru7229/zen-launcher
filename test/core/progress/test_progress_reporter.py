@@ -85,6 +85,7 @@ def test_bytes_reports_byte_progress():
         message="Downloading client",
         current=512,
         total=1024,
+        bytes_per_second=256.0,
     )
 
     event = received[0]
@@ -93,6 +94,8 @@ def test_bytes_reports_byte_progress():
     assert event.current == 512
     assert event.total == 1024
     assert event.unit is ProgressUnit.BYTES
+    assert event.bytes_per_second == 256.0
+    assert event.remaining == 512
     assert event.fraction == 0.5
     assert event.percentage == 50.0
     assert event.is_determinate is True
@@ -371,3 +374,31 @@ def test_progress_stage_values_are_stable(
     value: str,
 ):
     assert stage.value == value
+
+def test_progress_event_remaining_never_becomes_negative():
+    event = ProgressEvent(
+        stage=ProgressStage.DOWNLOADING_CLIENT,
+        message="Client",
+        current=120,
+        total=100,
+        unit=ProgressUnit.BYTES,
+    )
+
+    assert event.remaining == 0
+
+
+def test_files_can_report_aggregate_download_speed():
+    received: list[ProgressEvent] = []
+    reporter = ProgressReporter(received.append)
+
+    reporter.files(
+        stage=ProgressStage.DOWNLOADING_LIBRARIES,
+        message="Downloading libraries",
+        current=2,
+        total=5,
+        bytes_per_second=1024.0,
+    )
+
+    event = received[0]
+    assert event.unit is ProgressUnit.FILES
+    assert event.bytes_per_second == 1024.0

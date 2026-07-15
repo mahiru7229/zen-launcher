@@ -4,6 +4,7 @@ from PySide6.QtCore import QByteArray, Signal
 
 from src.core.config.launcher_settings_manager import LauncherSettingsManager
 from src.core.language.language_manager import tr
+from src.core.network.download_bandwidth_limiter import download_bandwidth_limiter
 from src.gui.controllers.base_controller import BaseController
 
 
@@ -22,6 +23,7 @@ class GuiSettingsController(BaseController):
         "show_static_text": True,
         "modrinth_include_beta": False,
         "modrinth_include_alpha": False,
+        "download_limit_mbps": 0.0,
     }
 
     def __init__(self) -> None:
@@ -43,6 +45,7 @@ class GuiSettingsController(BaseController):
         updates = data.get("updates", {})
         appearance = data.get("appearance", {})
         modrinth = data.get("modrinth", {})
+        network = data.get("network", {})
         self._current = {
             "start_page": str(gui.get("start_page", self.DEFAULTS["start_page"])),
             "show_snapshots": bool(gui.get("show_snapshots", self.DEFAULTS["show_snapshots"])),
@@ -55,11 +58,14 @@ class GuiSettingsController(BaseController):
             "show_static_text": bool(appearance.get("show_static_text", self.DEFAULTS["show_static_text"])),
             "modrinth_include_beta": bool(modrinth.get("include_beta", self.DEFAULTS["modrinth_include_beta"])),
             "modrinth_include_alpha": bool(modrinth.get("include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
+            "download_limit_mbps": float(network.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]) or 0.0),
         }
+        download_bandwidth_limiter.configure_mbps(self._current["download_limit_mbps"])
         self.settings_changed.emit(dict(self._current))
         return dict(self._current)
 
     def save(self, data: dict) -> None:
+        download_limit_mbps = download_bandwidth_limiter.configure_mbps(data.get("download_limit_mbps", self.DEFAULTS["download_limit_mbps"]))
         self._current = {
             "start_page": str(data.get("start_page", self.DEFAULTS["start_page"])),
             "show_snapshots": bool(data.get("show_snapshots", self.DEFAULTS["show_snapshots"])),
@@ -72,6 +78,7 @@ class GuiSettingsController(BaseController):
             "show_static_text": bool(data.get("show_static_text", self.DEFAULTS["show_static_text"])),
             "modrinth_include_beta": bool(data.get("modrinth_include_beta", self.DEFAULTS["modrinth_include_beta"])),
             "modrinth_include_alpha": bool(data.get("modrinth_include_alpha", self.DEFAULTS["modrinth_include_alpha"])),
+            "download_limit_mbps": download_limit_mbps,
         }
         self._settings.save({
             "gui": {
@@ -90,6 +97,7 @@ class GuiSettingsController(BaseController):
                 "include_beta": self._current["modrinth_include_beta"],
                 "include_alpha": self._current["modrinth_include_alpha"],
             },
+            "network": {"download_limit_mbps": self._current["download_limit_mbps"]},
         })
         self.settings_changed.emit(dict(self._current))
         self.status_changed.emit(tr("Launcher settings saved"))

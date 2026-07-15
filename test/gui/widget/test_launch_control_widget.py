@@ -45,3 +45,19 @@ def test_exit_result_shows_instance_and_keeps_launch_button_text(app):
     assert "1" in widget.detail_label.text()
     assert widget.stage_label.text() == "CRASHED"
     assert widget.launch_button.text() == "Launch"
+
+def test_non_blocking_modrinth_warning_is_shown_without_failed_state(app):
+    widget = LaunchControlWidget()
+
+    widget.set_result({
+        "minecraftVersion": "1.21",
+        "javaPath": "javaw.exe",
+        "warnings": ("mods/example.jar must be installed manually",),
+    })
+
+    assert "warnings" in widget.status_label.text().lower()
+    assert "mods/example.jar" in widget.detail_label.text()
+    assert widget.stage_label.text() == "WARNING"
+    assert widget.stage_label.property("state") == "warning"
+    assert widget.launch_button.text() == "Launch"
+

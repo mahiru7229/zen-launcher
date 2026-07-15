@@ -27,6 +27,11 @@ class ProgressPresenter:
         "downloading_libraries": "LIBRARIES",
         "downloading_asset_index": "ASSET INDEX",
         "downloading_assets": "ASSETS",
+        "checking_mods": "MOD CHECK",
+        "downloading_mods": "MODS",
+        "checking_modpack": "MODPACK CHECK",
+        "downloading_modpack": "MODPACK",
+        "downloading_update": "LAUNCHER UPDATE",
         "building_context": "GAME DATA",
         "building_command": "COMMAND",
         "launching": "STARTING",
@@ -43,6 +48,11 @@ class ProgressPresenter:
         "downloading_libraries": "DOWNLOADING LIBRARIES...",
         "downloading_asset_index": "LOADING ASSETS...",
         "downloading_assets": "DOWNLOADING ASSETS...",
+        "checking_mods": "CHECKING MODS...",
+        "downloading_mods": "DOWNLOADING MODS...",
+        "checking_modpack": "CHECKING MODPACK...",
+        "downloading_modpack": "DOWNLOADING MODPACK...",
+        "downloading_update": "DOWNLOADING UPDATE...",
         "building_context": "PREPARING GAME...",
         "building_command": "PREPARING LAUNCH...",
         "launching": "STARTING...",
@@ -94,8 +104,18 @@ class ProgressPresenter:
         unit = getattr(event, "unit", None)
         unit_value = str(getattr(unit, "value", unit or "none"))
         quantity = cls._format_quantity(current, total, unit_value)
+        parts = [quantity]
+        remaining = max(total - current, 0)
 
-        return f"{quantity} · {percentage}%"
+        if remaining > 0:
+            parts.append(cls._format_remaining(remaining, unit_value))
+
+        speed = float(getattr(event, "bytes_per_second", 0.0) or 0.0)
+        if speed > 0 and remaining > 0:
+            parts.append(tr("progress.speed", speed=cls._format_bytes(round(speed))))
+
+        parts.append(f"{percentage}%")
+        return " · ".join(parts)
 
     @classmethod
     def _format_quantity(cls, current: int, total: int, unit: str) -> str:
@@ -109,6 +129,19 @@ class ProgressPresenter:
             return tr("{current} / {total} steps", current=f"{current:,}", total=f"{total:,}")
 
         return f"{current:,} / {total:,}"
+
+    @classmethod
+    def _format_remaining(cls, remaining: int, unit: str) -> str:
+        if unit == "bytes":
+            return tr("progress.remaining_bytes", remaining=cls._format_bytes(remaining))
+
+        if unit == "files":
+            return tr("progress.remaining_files", remaining=f"{remaining:,}")
+
+        if unit == "steps":
+            return tr("progress.remaining_steps", remaining=f"{remaining:,}")
+
+        return tr("progress.remaining_items", remaining=f"{remaining:,}")
 
     @staticmethod
     def _format_bytes(value: int) -> str:

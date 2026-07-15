@@ -16,8 +16,10 @@ from src.core.modrinth.modrinth_client import ModrinthClient
 from src.core.modrinth.modrinth_downloader import ModrinthDownloader
 from src.core.modrinth.modrinth_pack_installer import ModrinthPackInstaller
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
+from src.core.progress.progress_reporter import ProgressReporter
 from src.models.instance.instance import Instance
 from src.models.modrinth.pack_update import ModrinthPackUpdateInfo, ModrinthPackUpdateResult
+from src.models.progress.progress_stage import ProgressStage
 
 
 class ModrinthPackUpdateManager:
@@ -43,7 +45,7 @@ class ModrinthPackUpdateManager:
         return ModrinthPackUpdateInfo(project_id=project_id, pack_name=project.title, current_version_id=current_version_id, current_version_number=current_number, target_version_id=candidate.version_id, target_version_number=candidate.version_number, target_version_type=candidate.version_type, target_date_published=candidate.date_published)
 
     @staticmethod
-    def update(instance: Instance, target_version_id: str = "", allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None) -> ModrinthPackUpdateResult:
+    def update(instance: Instance, target_version_id: str = "", allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None) -> ModrinthPackUpdateResult:
         if InstanceRunLock.is_active(instance):
             raise RuntimeError("Close Minecraft before updating this modpack.")
         registry = ModrinthPackRegistry.load(instance)
@@ -69,7 +71,10 @@ class ModrinthPackUpdateManager:
 
         pack_file = target_version.primary_file(".mrpack")
         pack_path = Paths.modrinth_pack_cache(project_id, target_version.version_id, pack_file.filename)
-        ModrinthDownloader.download_file(pack_file, pack_path)
+        if reporter is None:
+            ModrinthDownloader.download_file(pack_file, pack_path)
+        else:
+            ModrinthDownloader.download_file(pack_file, pack_path, reporter=reporter, progress_stage=ProgressStage.DOWNLOADING_MODPACK, progress_message=f"Downloading {project.title} update manifest...")
         staging = Paths.modrinth_staging_root() / f"update-{uuid4().hex}"
         staging.mkdir(parents=True, exist_ok=False)
 
@@ -81,7 +86,10 @@ class ModrinthPackUpdateManager:
                 minecraft_version, loader_version = ModrinthPackInstaller._parse_dependencies(index)
                 selected_files, _, _ = ModrinthPackInstaller._selected_files(index, bool(registry.get("installOptionalFiles", True)))
                 managed_files = {entry["path"].casefold(): entry for entry in ModrinthPackInstaller._managed_download_entries(selected_files)}
-                ModrinthPackInstaller._download_files(selected_files, staging)
+                if reporter is None:
+                    ModrinthPackInstaller._download_files(selected_files, staging)
+                else:
+                    ModrinthPackInstaller._download_files(selected_files, staging, reporter)
                 for entry in ModrinthPackInstaller._extract_layer(archive, "overrides", staging):
                     managed_files[entry["path"].casefold()] = entry
                 for entry in ModrinthPackInstaller._extract_layer(archive, "client-overrides", staging):
@@ -89,7 +97,7 @@ class ModrinthPackUpdateManager:
 
             base_version = VersionManager.load(minecraft_version)
             resolved_loader = ModLoaderManager.resolve(minecraft_version, ModLoaderManager.FABRIC, loader_version)
-            ModLoaderManager.prepare(base_version, *resolved_loader)
+            ModLoaderManager.prepare(base_version, *resolved_loader, reporter=reporter)
 
             old_files = {str(item.get("path") or "").casefold(): item for item in registry.get("managedFiles", []) if isinstance(item, dict) and str(item.get("path") or "").strip()}
             root = Path(instance.instance_dir)

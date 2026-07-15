@@ -9,6 +9,7 @@ from src.core.mod.mod_manager import ModManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modrinth.modrinth_mod_update_manager import ModrinthModUpdateManager
 from src.core.modrinth.modrinth_registry import ModrinthRegistry
+from src.core.progress.progress_reporter import ProgressReporter
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
 from src.models.instance.instance import Instance
@@ -21,6 +22,7 @@ class ModController(BaseController):
     health_changed = Signal(object)
     updates_changed = Signal(object)
     instance_changed = Signal(object)
+    progress_received = Signal(object)
 
     def __init__(self, task_runner: TaskRunner) -> None:
         super().__init__()
@@ -112,7 +114,8 @@ class ModController(BaseController):
             return
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
-        self._task_runner.run("mods.update.apply", lambda: (instance_id, allowed_version_types, ModrinthModUpdateManager.update(instance, project_ids, allowed_version_types)), f"Updating {len(project_ids)} Modrinth mod(s)...")
+        reporter = ProgressReporter(self.progress_received.emit)
+        self._task_runner.run("mods.update.apply", lambda: (instance_id, allowed_version_types, ModrinthModUpdateManager.update(instance, project_ids, allowed_version_types, reporter)), f"Updating {len(project_ids)} Modrinth mod(s)...")
 
     def update_all(self, allowed_version_types: tuple[str, ...]) -> None:
         instance = self._require_instance()
@@ -120,7 +123,8 @@ class ModController(BaseController):
             return
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
-        self._task_runner.run("mods.update.apply", lambda: (instance_id, allowed_version_types, ModrinthModUpdateManager.update_all(instance, allowed_version_types)), "Updating all unlocked Modrinth mods...")
+        reporter = ProgressReporter(self.progress_received.emit)
+        self._task_runner.run("mods.update.apply", lambda: (instance_id, allowed_version_types, ModrinthModUpdateManager.update_all(instance, allowed_version_types, reporter)), "Updating all unlocked Modrinth mods...")
 
     def set_locked(self, project_ids: list[str], locked: bool) -> None:
         instance = self._require_instance()

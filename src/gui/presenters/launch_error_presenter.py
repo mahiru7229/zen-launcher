@@ -27,6 +27,14 @@ class LaunchErrorPresenter:
                 technical_message=technical_message,
             )
 
+        if "required modrinth file" in normalized or ("modrinth" in normalized and "after 3 rounds" in normalized):
+            return cls._build(
+                title="Required Modrinth files are missing",
+                summary="The launcher could not download every required Modrinth file after three rounds. Retry the launch, install the listed files manually, or open Instance Settings > Modrinth downloads for this instance to allow launch with missing files.",
+                status="Modrinth files missing",
+                technical_message=technical_message,
+            )
+
         if "sha-256" in normalized or "checksum" in normalized:
             return cls._build(
                 title="Download verification failed",

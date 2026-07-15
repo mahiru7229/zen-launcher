@@ -261,6 +261,10 @@ class MainWindow(QMainWindow):
         self.modrinth_controller.modpack_installed.connect(self._modrinth_modpack_installed)
 
         self.launch_controller.progress_received.connect(self._on_progress)
+        self.modrinth_controller.progress_received.connect(self._on_progress)
+        self.mod_controller.progress_received.connect(self._on_progress)
+        self.modpack_lifecycle_controller.progress_received.connect(self._on_progress)
+        self.update_controller.progress_received.connect(self._on_progress)
         self.launch_controller.launch_finished.connect(self.launch_control.set_result)
         self.launch_controller.launch_finished.connect(lambda _result: self.instance_controller.refresh_running(force=True))
         self.launch_controller.game_exited.connect(self._on_game_exited)

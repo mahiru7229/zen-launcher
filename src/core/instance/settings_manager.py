@@ -20,7 +20,8 @@ class SettingsManager:
         },
         "launch": {
             "game_arguments": [],
-            "offline_multiplayer_enabled": False
+            "offline_multiplayer_enabled": False,
+            "block_launch_on_modrinth_failure": True
         }
     }
 
@@ -135,7 +136,8 @@ class SettingsManager:
             width=int(window.get("width", 1280)),
             height=int(window.get("height", 720)),
             fullscreen=bool(window.get("fullscreen", False)),
-            offline_multiplayer_enabled=launch.get("offline_multiplayer_enabled",False)
+            offline_multiplayer_enabled=bool(launch.get("offline_multiplayer_enabled", False)),
+            block_launch_on_modrinth_failure=bool(launch.get("block_launch_on_modrinth_failure", True))
         )
 
     @staticmethod
@@ -154,6 +156,7 @@ class SettingsManager:
             },
             "launch": {
                 "game_arguments": settings.game_arguments,
-                "offline_multiplayer_enabled": settings.offline_multiplayer_enabled
+                "offline_multiplayer_enabled": settings.offline_multiplayer_enabled,
+                "block_launch_on_modrinth_failure": settings.block_launch_on_modrinth_failure
             }
         }

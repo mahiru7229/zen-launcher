@@ -228,6 +228,11 @@
     "launch.java_path": "Java: {path}",
     "progress.files": "{current} / {total} file",
     "progress.steps": "{current} / {total} bước",
+    "progress.remaining_bytes": "Còn {remaining}",
+    "progress.remaining_files": "Còn {remaining} file",
+    "progress.remaining_steps": "Còn {remaining} bước",
+    "progress.remaining_items": "Còn {remaining} mục",
+    "progress.speed": "{speed}/s",
     "about.developer_prefix": "Nhà phát triển: ",
     "about.developer_asset_note": "Phát triển bởi {developer}\nCó thể thay thế tài nguyên giao diện sau.",
     "common.stable_suffix": " (ổn định)",
@@ -521,10 +526,33 @@
     "account.security.reprotect": "Mã hóa lại thông tin",
     "account.security.reprotecting": "Đang mã hóa lại thông tin đăng nhập Microsoft…",
     "account.security.reprotected": "Thông tin tài khoản đã được mã hóa lại thành công.",
-    "account.security.summary": "Tài khoản Microsoft được bảo vệ: {protected}/{microsoft} • Cũ: {legacy} • Không hợp lệ: {invalid}"
+    "account.security.summary": "Tài khoản Microsoft được bảo vệ: {protected}/{microsoft} • Cũ: {legacy} • Không hợp lệ: {invalid}",
+    "instance_settings.modrinth.title": "Tải file Modrinth",
+    "instance_settings.modrinth.description": "Khuyến nghị: giữ tùy chọn này được bật. Chỉ tắt khi muốn tự tải thủ công các file modpack bị lỗi.",
+    "instance_settings.modrinth.block_launch": "Dừng khởi chạy khi thiếu file Modrinth bắt buộc",
+    "instance_settings.modrinth.block_launch.tooltip": "Tùy chọn này áp dụng riêng cho instance đang chọn. Tắt nó để Minecraft vẫn khởi chạy sau ba vòng tải thất bại, sau đó đặt thủ công các file còn thiếu vào đường dẫn launcher đã hiển thị.",
+    "launch.launched_with_warnings": "Minecraft {version} đã khởi chạy kèm cảnh báo",
+    "launch.warning_badge": "CẢNH BÁO",
+    "launch.created_with_warnings": "Đã tạo tiến trình Minecraft với {count} cảnh báo: {version}",
+    "launch_error.modrinth_missing.title": "Thiếu file Modrinth bắt buộc",
+    "launch_error.modrinth_missing.summary": "Launcher không thể tải đủ các file Modrinth bắt buộc sau ba vòng. Hãy thử Launch lại, tự cài các file được liệt kê, hoặc mở Cài đặt instance > Tải file Modrinth của instance này để cho phép khởi chạy khi còn thiếu file.",
+    "launch_error.modrinth_missing.status": "Thiếu file Modrinth",
+    "launcher_settings.bandwidth.title": "Băng thông tải xuống",
+    "launcher_settings.bandwidth.description": "Giới hạn được dùng chung cho mọi lượt tải đồng thời. Tắt tùy chọn để dùng tốc độ không giới hạn.",
+    "launcher_settings.bandwidth.enable": "Giới hạn tốc độ tải xuống"
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",
-    "Turn this off only when the selected theme PNG already contains its own fixed label, such as the word LAUNCH.": "launcher_settings.theme.show_static_text.tooltip"
+    "Turn this off only when the selected theme PNG already contains its own fixed label, such as the word LAUNCH.": "launcher_settings.theme.show_static_text.tooltip",
+    "Modrinth downloads": "instance_settings.modrinth.title",
+    "Recommended: keep this enabled. Turn it off only when you plan to download failed modpack files manually.": "instance_settings.modrinth.description",
+    "Stop launch when required Modrinth files are missing": "instance_settings.modrinth.block_launch",
+    "This option belongs to the selected instance. Disable it to let Minecraft launch after three failed download rounds, then place the missing files manually in the paths shown by the launcher.": "instance_settings.modrinth.block_launch.tooltip",
+    "Minecraft {version} launched with warnings": "launch.launched_with_warnings",
+    "WARNING": "launch.warning_badge",
+    "Minecraft process created with {count} warning(s): {version}": "launch.created_with_warnings",
+    "Required Modrinth files are missing": "launch_error.modrinth_missing.title",
+    "The launcher could not download every required Modrinth file after three rounds. Retry the launch, install the listed files manually, or open Instance Settings > Modrinth downloads for this instance to allow launch with missing files.": "launch_error.modrinth_missing.summary",
+    "Modrinth files missing": "launch_error.modrinth_missing.status"
   }
 }

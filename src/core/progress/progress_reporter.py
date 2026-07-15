@@ -19,6 +19,7 @@ class ProgressReporter:
         current: int | None = None,
         total: int | None = None,
         unit: ProgressUnit = ProgressUnit.NONE,
+        bytes_per_second: float | None = None,
     ) -> None:
         if self._callback is None:
             return
@@ -30,6 +31,7 @@ class ProgressReporter:
                 current=current,
                 total=total,
                 unit=unit,
+                bytes_per_second=bytes_per_second,
             )
         )
     def status(
@@ -48,6 +50,7 @@ class ProgressReporter:
         message: str,
         current: int,
         total: int,
+        bytes_per_second: float | None = None,
     ) -> None:
         self.report(
             stage=stage,
@@ -55,6 +58,7 @@ class ProgressReporter:
             current=current,
             total=total,
             unit=ProgressUnit.BYTES,
+            bytes_per_second=bytes_per_second,
         )
 
     def files(
@@ -63,6 +67,7 @@ class ProgressReporter:
         message: str,
         current: int,
         total: int,
+        bytes_per_second: float | None = None,
     ) -> None:
         self.report(
             stage=stage,
@@ -70,4 +75,5 @@ class ProgressReporter:
             current=current,
             total=total,
             unit=ProgressUnit.FILES,
+            bytes_per_second=bytes_per_second,
         )

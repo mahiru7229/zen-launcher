@@ -19,10 +19,12 @@ class DummyResponse:
         chunks: list[bytes],
         headers: dict[str, str] | None = None,
         status_error: Exception | None = None,
+        status_code: int = 200,
     ):
         self._chunks = chunks
         self.headers = headers or {}
         self._status_error = status_error
+        self.status_code = status_code
         self.requested_chunk_size = None
 
     def __enter__(self):
@@ -58,11 +60,13 @@ class DummyClient:
         method: str,
         url: str,
         *,
+        headers: dict[str, str] | None = None,
         timeout: float,
     ):
         self.received = {
             "method": method,
             "url": url,
+            "headers": headers or {},
             "timeout": timeout,
         }
         return self.response
@@ -79,6 +83,7 @@ class DummyReporter:
         message,
         current,
         total,
+        bytes_per_second=None,
     ):
         self.events.append(
             {
@@ -256,6 +261,7 @@ def test_download_stream_writes_all_non_empty_chunks(
     assert client.received == {
         "method": "GET",
         "url": info.url,
+        "headers": {"Accept": "application/octet-stream", "Accept-Encoding": "identity"},
         "timeout": 15.0,
     }
     assert response.requested_chunk_size == CHUNK_SIZE
@@ -901,3 +907,100 @@ def test_download_and_hash_reuses_existing_file_without_network(monkeypatch: pyt
     assert downloaded == path
     assert sha1 == hashlib.sha1(b"cached").hexdigest()
     assert size == 6
+
+
+def test_download_resumes_after_interrupted_response(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    content = (b"a" * CHUNK_SIZE) + b"end"
+    path = tmp_path / "file.jar"
+    requests: list[str | None] = []
+
+    class BrokenStream(httpx.SyncByteStream):
+        def __iter__(self):
+            yield content[:CHUNK_SIZE]
+            raise httpx.ReadError("connection dropped")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request.headers.get("Range"))
+        if len(requests) == 1:
+            return httpx.Response(200, headers={"Content-Length": str(len(content))}, stream=BrokenStream())
+        return httpx.Response(206, headers={"Content-Length": "3", "Content-Range": f"bytes {CHUNK_SIZE}-{len(content) - 1}/{len(content)}"}, content=content[CHUNK_SIZE:])
+
+    HttpDownloader._client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    monkeypatch.setattr("src.core.network.httpx_downloader.time.sleep", lambda seconds: None)
+
+    result = HttpDownloader.download(make_download_info(content=content), path, max_retry=2)
+
+    assert result.read_bytes() == content
+    assert requests == [None, f"bytes={CHUNK_SIZE}-"]
+
+
+def test_download_restarts_full_after_range_not_satisfiable(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    content = b"abcdef"
+    path = tmp_path / "file.jar"
+    path.with_name(path.name + ".part").write_bytes(content[:3])
+    requests: list[str | None] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request.headers.get("Range"))
+        if len(requests) == 1:
+            return httpx.Response(416, headers={"Content-Range": "bytes */6"})
+        return httpx.Response(200, headers={"Content-Length": "6"}, content=content)
+
+    HttpDownloader._client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+
+    result = HttpDownloader.download(make_download_info(content=content), path, max_retry=1)
+
+    assert result.read_bytes() == content
+    assert requests == ["bytes=3-", None]
+
+
+def test_download_fails_fast_for_non_retryable_http_status(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    path = tmp_path / "file.jar"
+    requests = []
+    sleeps = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(str(request.url))
+        return httpx.Response(404)
+
+    HttpDownloader._client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True)
+    monkeypatch.setattr("src.core.network.httpx_downloader.time.sleep", lambda seconds: sleeps.append(seconds))
+
+    with pytest.raises(RuntimeError, match="HTTP 404"):
+        HttpDownloader.download(make_download_info(), path, max_retry=5)
+
+    assert len(requests) == 1
+    assert sleeps == []
+
+
+def test_download_stream_reports_network_speed(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    from src.core.progress.download_rate_meter import DownloadRateMeter
+    from src.core.progress.progress_reporter import ProgressReporter
+
+    response = DummyResponse(chunks=[b"data"], headers={"Content-Length": "4"})
+    events = []
+
+    monkeypatch.setattr(HttpDownloader, "get_client", lambda: DummyClient(response))
+    monkeypatch.setattr(DownloadRateMeter, "update", lambda self, current: 2048.0)
+
+    HttpDownloader._download_stream(
+        download_info=make_download_info(content=b"data"),
+        path=tmp_path / "file.jar",
+        timeout=20.0,
+        reporter=ProgressReporter(events.append),
+        progress_stage=ProgressStage.DOWNLOADING_CLIENT,
+    )
+
+    assert any(event.bytes_per_second == 2048.0 for event in events)
+
+
+def test_download_stream_applies_shared_bandwidth_limit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    response = DummyResponse(chunks=[b"ab", b"cde"], headers={"Content-Length": "5"})
+    throttled = []
+
+    monkeypatch.setattr(HttpDownloader, "get_client", lambda: DummyClient(response))
+    monkeypatch.setattr("src.core.network.httpx_downloader.download_bandwidth_limiter.throttle", lambda size: throttled.append(size))
+
+    HttpDownloader._download_stream(download_info=make_download_info(content=b"abcde"), path=tmp_path / "file.jar", timeout=20.0)
+
+    assert throttled == [2, 3]

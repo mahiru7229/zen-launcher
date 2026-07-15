@@ -13,6 +13,14 @@ class ProgressEvent:
     total: int | None = None
 
     unit: ProgressUnit = ProgressUnit.NONE
+    bytes_per_second: float | None = None
+
+    @property
+    def remaining(self) -> int | None:
+        if self.current is None or self.total is None:
+            return None
+
+        return max(int(self.total) - int(self.current), 0)
 
     @property
     def fraction(self) -> float | None:

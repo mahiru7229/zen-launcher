@@ -17,7 +17,9 @@ from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modrinth.modrinth_client import ModrinthClient
 from src.core.modrinth.modrinth_downloader import ModrinthDownloader
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
+from src.core.progress.progress_reporter import ProgressReporter
 from src.models.modrinth.install_result import ModrinthModpackInstallResult
+from src.models.progress.progress_stage import ProgressStage
 
 
 class ModrinthPackInstaller:
@@ -33,7 +35,7 @@ class ModrinthPackInstaller:
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
 
     @staticmethod
-    def install(project_id: str, version_id: str, instance_name: str, install_optional_files: bool = True, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None) -> ModrinthModpackInstallResult:
+    def install(project_id: str, version_id: str, instance_name: str, install_optional_files: bool = True, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None) -> ModrinthModpackInstallResult:
         project = ModrinthClient.get_project(project_id)
         requested_name = str(instance_name or "").strip()
         base_name = ModrinthPackInstaller._validated_instance_name(requested_name or project.title)
@@ -51,7 +53,10 @@ class ModrinthPackInstaller:
             raise RuntimeError(f"Modrinth modpack version '{version.version_number}' uses the disabled {version.version_type} channel.")
         pack_file = version.primary_file(".mrpack")
         pack_path = Paths.modrinth_pack_cache(project.project_id, version.version_id, pack_file.filename)
-        ModrinthDownloader.download_file(pack_file, pack_path)
+        if reporter is None:
+            ModrinthDownloader.download_file(pack_file, pack_path)
+        else:
+            ModrinthDownloader.download_file(pack_file, pack_path, reporter=reporter, progress_stage=ProgressStage.DOWNLOADING_MODPACK, progress_message=f"Downloading {project.title} manifest...")
 
         staging = Paths.modrinth_staging_root() / uuid4().hex
         staging.mkdir(parents=True, exist_ok=False)
@@ -62,7 +67,6 @@ class ModrinthPackInstaller:
                 minecraft_version, loader_version = ModrinthPackInstaller._parse_dependencies(index)
                 selected_files, skipped_optional, skipped_server = ModrinthPackInstaller._selected_files(index, install_optional_files)
                 managed_files = {entry["path"].casefold(): entry for entry in ModrinthPackInstaller._managed_download_entries(selected_files)}
-                ModrinthPackInstaller._download_files(selected_files, staging)
                 for entry in ModrinthPackInstaller._extract_layer(archive, "overrides", staging):
                     managed_files[entry["path"].casefold()] = entry
                 for entry in ModrinthPackInstaller._extract_layer(archive, "client-overrides", staging):
@@ -70,7 +74,6 @@ class ModrinthPackInstaller:
 
             base_version = VersionManager.load(minecraft_version)
             resolved_loader = ModLoaderManager.resolve(minecraft_version, ModLoaderManager.FABRIC, loader_version)
-            ModLoaderManager.prepare(base_version, *resolved_loader)
             created_instance = InstanceManager.create(name=normalized_name, version=base_version, mod_loader=resolved_loader)
             shutil.copytree(staging, created_instance.instance_dir, dirs_exist_ok=True)
             ModrinthPackInstaller._write_metadata(created_instance.instance_dir, project.project_id, version.version_id, project.title, version.version_number, minecraft_version, loader_version, list(managed_files.values()), install_optional_files)
@@ -161,16 +164,24 @@ class ModrinthPackInstaller:
         return selected, skipped_optional, skipped_server
 
     @staticmethod
-    def _download_files(files: list[dict], staging: Path) -> None:
+    def _download_files(files: list[dict], staging: Path, reporter: ProgressReporter | None = None) -> None:
         def download(item: dict) -> Path:
             relative = ModrinthPackInstaller._safe_relative_path(str(item.get("path") or ""))
             hashes = item.get("hashes", {})
             return ModrinthDownloader.download_urls(urls=tuple(str(url) for url in item.get("downloads", [])), destination=staging.joinpath(*relative.parts), sha1=str(hashes.get("sha1") or ""), sha512=str(hashes.get("sha512") or ""), expected_size=int(item.get("fileSize", 0) or 0), restrict_hosts=True)
 
-        with ThreadPoolExecutor(max_workers=min(ModrinthPackInstaller.MAX_WORKERS, max(1, len(files)))) as executor:
+        total = len(files)
+        completed = 0
+        if reporter is not None:
+            reporter.files(stage=ProgressStage.DOWNLOADING_MODPACK, message="Downloading modpack files...", current=0, total=total)
+
+        with ThreadPoolExecutor(max_workers=min(ModrinthPackInstaller.MAX_WORKERS, max(1, total))) as executor:
             futures = [executor.submit(download, item) for item in files]
             for future in as_completed(futures):
                 future.result()
+                completed += 1
+                if reporter is not None:
+                    reporter.files(stage=ProgressStage.DOWNLOADING_MODPACK, message="Downloading modpack files...", current=completed, total=total)
 
     @staticmethod
     def _managed_download_entries(files: list[dict]) -> list[dict]:
@@ -178,7 +189,8 @@ class ModrinthPackInstaller:
         for item in files:
             relative = ModrinthPackInstaller._safe_relative_path(str(item.get("path") or ""))
             hashes = item.get("hashes", {}) if isinstance(item.get("hashes"), dict) else {}
-            managed.append({"path": relative.as_posix(), "sha1": str(hashes.get("sha1") or "").lower(), "sha512": str(hashes.get("sha512") or "").lower(), "size": int(item.get("fileSize", 0) or 0), "source": "download"})
+            client_state = str((item.get("env") or {}).get("client") or "required").strip().lower() if isinstance(item.get("env"), dict) else "required"
+            managed.append({"path": relative.as_posix(), "sha1": str(hashes.get("sha1") or "").lower(), "sha512": str(hashes.get("sha512") or "").lower(), "size": int(item.get("fileSize", 0) or 0), "source": "download", "downloads": [str(url).strip() for url in item.get("downloads", []) if str(url).strip()], "required": client_state == "required"})
         return managed
 
     @staticmethod

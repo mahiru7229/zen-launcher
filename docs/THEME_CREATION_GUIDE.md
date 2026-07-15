@@ -193,7 +193,7 @@ Asset lỗi bị bỏ qua riêng lẻ. Tuy vậy, nên test console/log để ph
 Công cụ release tự copy toàn bộ `themes/`:
 
 ```powershell
-python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.5.0-beta.10"
+python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.5.1-beta.1"
 ```
 
 Người dùng cũng có thể thêm theme mới vào folder `themes/` mà không cần rebuild EXE.

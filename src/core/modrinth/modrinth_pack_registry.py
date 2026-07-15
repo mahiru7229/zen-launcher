@@ -88,8 +88,16 @@ class ModrinthPackRegistry:
                 "sha512": str(item.get("sha512") or "").lower(),
                 "size": max(0, int(item.get("size", 0) or 0)),
                 "source": str(item.get("source") or "pack"),
+                "downloads": ModrinthPackRegistry._normalize_downloads(item.get("downloads", [])),
+                "required": bool(item.get("required", True)),
             }
         return sorted(normalized.values(), key=lambda item: item["path"].casefold())
+
+    @staticmethod
+    def _normalize_downloads(value: object) -> list[str]:
+        if not isinstance(value, (list, tuple)):
+            return []
+        return list(dict.fromkeys(str(url).strip() for url in value if str(url).strip()))
 
     @staticmethod
     def _normalize_preserved_files(value: object) -> list[dict]:

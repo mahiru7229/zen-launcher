@@ -66,7 +66,7 @@ class FabricVersionManager:
 
             metadata = FabricMetaClient.get_install_metadata(base_version.id, loader_version, force_refresh=force_refresh)
             profile = FabricMetaClient.get_profile(base_version.id, loader_version, force_refresh=force_refresh)
-            normalized_profile = FabricVersionManager._normalize_profile_libraries(profile, force_artifact_refresh=repair_libraries)
+            normalized_profile = FabricVersionManager._normalize_profile_libraries(profile, reporter=reporter, force_artifact_refresh=repair_libraries)
             merged = FabricVersionManager._merge_profiles(base_version.raw_json, normalized_profile, metadata)
             FabricVersionManager._write_json(cache_path, merged)
             version = VersionManager._parse_version(merged, cache_path)
@@ -126,7 +126,7 @@ class FabricVersionManager:
         return data
 
     @staticmethod
-    def _normalize_profile_libraries(profile: dict, force_artifact_refresh: bool = False) -> dict:
+    def _normalize_profile_libraries(profile: dict, reporter: ProgressReporter | None = None, force_artifact_refresh: bool = False) -> dict:
         normalized = deepcopy(profile)
         normalized_libraries: list[dict] = []
 
@@ -143,7 +143,10 @@ class FabricVersionManager:
             coordinate = str(item.get("name", "")).strip()
             repository_url = str(item.get("url") or "https://maven.fabricmc.net/")
             artifact = MavenArtifact.from_coordinate(coordinate, repository_url)
-            sha1, size = FabricVersionManager._load_artifact_metadata(artifact, force_artifact_refresh)
+            if reporter is None:
+                sha1, size = FabricVersionManager._load_artifact_metadata(artifact, force_artifact_refresh)
+            else:
+                sha1, size = FabricVersionManager._load_artifact_metadata(artifact, force_artifact_refresh, reporter)
             item["downloads"] = {
                 "artifact": {
                     "path": artifact.path.as_posix(),
@@ -169,7 +172,7 @@ class FabricVersionManager:
         return bool(value.get("path") and value.get("url") and size >= 0 and len(sha1) == 40 and all(character in "0123456789abcdef" for character in sha1))
 
     @staticmethod
-    def _load_artifact_metadata(artifact: MavenArtifact, force_artifact_refresh: bool = False) -> tuple[str, int]:
+    def _load_artifact_metadata(artifact: MavenArtifact, force_artifact_refresh: bool = False, reporter: ProgressReporter | None = None) -> tuple[str, int]:
         client = HttpDownloader.get_client()
         sha1 = ""
 
@@ -196,6 +199,9 @@ class FabricVersionManager:
             path=library_path,
             max_retry=3,
             force=force_artifact_refresh,
+            reporter=reporter,
+            progress_stage=ProgressStage.INSTALLING_MOD_LOADER,
+            progress_message=f"Downloading Fabric library {artifact.path.name}...",
         )
         return calculated_sha1, size
 

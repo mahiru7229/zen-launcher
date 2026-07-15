@@ -64,6 +64,18 @@ class InstanceSettingsPage(BasePage):
         window_card.layout.addWidget(self.offline_multiplayer)
         self.root_layout.addWidget(window_card)
 
+        modrinth_card = CardWidget(
+            "Modrinth downloads",
+            "Recommended: keep this enabled. Turn it off only when you plan to download failed modpack files manually.",
+        )
+        self.block_modrinth_failure = QCheckBox("Stop launch when required Modrinth files are missing")
+        self.block_modrinth_failure.setChecked(True)
+        self.block_modrinth_failure.setToolTip(
+            "This option belongs to the selected instance. Disable it to let Minecraft launch after three failed download rounds, then place the missing files manually in the paths shown by the launcher."
+        )
+        modrinth_card.layout.addWidget(self.block_modrinth_failure)
+        self.root_layout.addWidget(modrinth_card)
+
         arguments_card = CardWidget("Custom arguments", "Enter one argument per line.")
         self.jvm_arguments = QTextEdit()
         self.jvm_arguments.setObjectName("ArgumentEditor")
@@ -117,6 +129,7 @@ class InstanceSettingsPage(BasePage):
         self.window_height.setValue(int(getattr(settings, "height", 720)))
         self.fullscreen.setChecked(bool(getattr(settings, "fullscreen", False)))
         self.offline_multiplayer.setChecked(bool(getattr(settings, "offline_multiplayer_enabled", False)))
+        self.block_modrinth_failure.setChecked(bool(getattr(settings, "block_launch_on_modrinth_failure", True)))
         self.jvm_arguments.setPlainText("\n".join(getattr(settings, "jvm_arguments", [])))
         self.game_arguments.setPlainText("\n".join(getattr(settings, "game_arguments", [])))
 
@@ -129,6 +142,7 @@ class InstanceSettingsPage(BasePage):
             "height": self.window_height.value(),
             "fullscreen": self.fullscreen.isChecked(),
             "offline_multiplayer_enabled": self.offline_multiplayer.isChecked(),
+            "block_launch_on_modrinth_failure": self.block_modrinth_failure.isChecked(),
             "jvm_arguments": self._lines(self.jvm_arguments.toPlainText()),
             "game_arguments": self._lines(self.game_arguments.toPlainText()),
         }
@@ -149,6 +163,7 @@ class InstanceSettingsPage(BasePage):
         self.window_height.setValue(720)
         self.fullscreen.setChecked(False)
         self.offline_multiplayer.setChecked(False)
+        self.block_modrinth_failure.setChecked(True)
         self.jvm_arguments.clear()
         self.game_arguments.clear()
 
