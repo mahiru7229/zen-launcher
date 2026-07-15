@@ -4,6 +4,7 @@ from src.core.auth.offline_auth import OfflineAuthentication
 from src.core.account.repository.account_repository import AccountRepository
 from src.models.account.account import Account
 from src.models.account.account_source import AccountSource
+from src.core.auth.microsoft.microsoft_account_authenticator import MicrosoftAccountAuthenticator
 
 
 class AccountManager:
@@ -30,6 +31,15 @@ class AccountManager:
         if AccountRepository.get_selected_account() is None:
             AccountRepository.set_selected_account(account.account_id)
 
+        return account
+
+    @staticmethod
+    def create_microsoft_account() -> Account:
+        account = MicrosoftAccountAuthenticator.authenticate()
+        if AccountManager.is_account_exist(account.username):
+            raise RuntimeError(f"Account '{account.username}' already exists.")
+        AccountRepository.save(account)
+        AccountRepository.set_selected_account(account.account_id)
         return account
 
     @staticmethod

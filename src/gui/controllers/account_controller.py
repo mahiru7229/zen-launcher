@@ -5,6 +5,7 @@ import re
 from PySide6.QtCore import Signal
 
 from src.core.account.account_manager import AccountManager
+from src.core.auth.microsoft.microsoft_auth_gate import MicrosoftAuthenticationLockedError
 from src.core.language.language_manager import tr
 from src.gui.controllers.base_controller import BaseController
 
@@ -41,6 +42,19 @@ class AccountController(BaseController):
             return
         self.status_changed.emit(tr("Created offline account {username}", username=account.username))
         self.log_created.emit(tr("Offline account created: {username}", username=account.username))
+        self.refresh()
+
+    def create_microsoft(self) -> None:
+        try:
+            account = AccountManager.create_microsoft_account()
+        except MicrosoftAuthenticationLockedError:
+            self._emit_error(tr("Microsoft account"), RuntimeError(tr("Microsoft account sign-in is prepared but locked while MCW Launcher waits for Mojang/Microsoft application approval.")))
+            return
+        except Exception as error:
+            self._emit_error(tr("Microsoft account"), error)
+            return
+        self.status_changed.emit(tr("Microsoft account added: {username}", username=account.username))
+        self.log_created.emit(tr("Microsoft account added: {username}", username=account.username))
         self.refresh()
 
     def select(self, account_id: str) -> None:

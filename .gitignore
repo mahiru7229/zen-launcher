@@ -22,3 +22,4 @@ release/
 *.spec.bak
 config/launcher_settings.json
 
+/backups/

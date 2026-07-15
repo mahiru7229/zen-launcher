@@ -17,9 +17,12 @@ class LauncherSettingsPage(BasePage):
     language_changed = Signal(str)
     check_updates_requested = Signal()
     reload_theme_requested = Signal(str)
+    scan_java_requested = Signal()
+    open_java_requested = Signal(object)
 
     def __init__(self) -> None:
         super().__init__("Launcher Settings", "Preferences here belong to the GUI, not to an individual Minecraft instance.", "launcher_settings")
+        self._java_installations: list[object] = []
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -54,6 +57,24 @@ class LauncherSettingsPage(BasePage):
         modrinth_card.layout.addWidget(self.modrinth_include_beta)
         modrinth_card.layout.addWidget(self.modrinth_include_alpha)
         self.root_layout.addWidget(modrinth_card)
+
+        java_card = CardWidget("Java installations", "Scan Java from JAVA_HOME, PATH, Program Files, the Windows Registry, and managed runtimes.")
+        java_card.setProperty("themeRole", "java")
+        self.java_combo = QComboBox()
+        self.java_combo.currentIndexChanged.connect(self._update_java_details)
+        self.java_details = QLabel("Java scan has not run yet.")
+        self.java_details.setObjectName("MutedLabel")
+        self.java_details.setWordWrap(True)
+        scan_java_button = set_theme_icon(QPushButton("Scan Java installations"), "icon.action.java")
+        scan_java_button.clicked.connect(self.scan_java_requested.emit)
+        self.open_java_button = set_theme_icon(QPushButton("Open selected Java folder"), "icon.action.folder")
+        self.open_java_button.setEnabled(False)
+        self.open_java_button.clicked.connect(lambda: self.open_java_requested.emit(self.current_java_installation()))
+        java_card.layout.addWidget(self.java_combo)
+        java_card.layout.addWidget(self.java_details)
+        java_card.layout.addWidget(scan_java_button)
+        java_card.layout.addWidget(self.open_java_button)
+        self.root_layout.addWidget(java_card)
 
         update_card = CardWidget("Launcher updates", "MCW Launcher can check GitHub Releases and install ZIP updates after asking for confirmation.")
         current_version_label = QLabel(f"Current version: {VERSION}")
@@ -97,6 +118,32 @@ class LauncherSettingsPage(BasePage):
         self.root_layout.addWidget(save_button)
         self.root_layout.addWidget(reset_button)
         self.root_layout.addStretch()
+
+    def set_java_installations(self, installations: list) -> None:
+        self._java_installations = list(installations)
+        self.java_combo.blockSignals(True)
+        self.java_combo.clear()
+        for item in self._java_installations:
+            label = getattr(item, "display_name", None) or f"Java {getattr(item, 'major_version', '?')}"
+            self.java_combo.addItem(str(label))
+        self.java_combo.blockSignals(False)
+        self._update_java_details()
+
+    def current_java_installation(self) -> object | None:
+        index = self.java_combo.currentIndex()
+        if index < 0 or index >= len(self._java_installations):
+            return None
+        return self._java_installations[index]
+
+    def _update_java_details(self, _index: int = -1) -> None:
+        item = self.current_java_installation()
+        if item is None:
+            self.java_details.setText("No Java installation detected.")
+            self.open_java_button.setEnabled(False)
+            return
+        source = getattr(getattr(item, "source", None), "value", "unknown")
+        self.java_details.setText(tr("launcher_settings.java.details", major=getattr(item, "major_version", "?"), vendor=getattr(item, "vendor", "") or tr("common.unknown"), architecture=getattr(item, "architecture", "") or tr("common.unknown"), path=getattr(item, "executable", ""), source=source))
+        self.open_java_button.setEnabled(True)
 
     def reload_languages(self) -> None:
         current_locale = self.language_combo.currentData() if hasattr(self, "language_combo") else None

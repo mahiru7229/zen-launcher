@@ -16,6 +16,7 @@ class Paths:
     ACCOUNTS_ROOT = PROJECT_ROOT / "accounts"
     CONFIG_ROOT = PROJECT_ROOT / "config"
     LOGS_ROOT = PROJECT_ROOT / "logs"
+    BACKUPS_ROOT = PROJECT_ROOT / "backups"
     THEME_ROOT = PROJECT_ROOT / "themes" 
     INSTANCE_LOCKS_ROOT = INSTANCES_ROOT / ".runtime" / "locks"
     
@@ -27,6 +28,7 @@ class Paths:
             Paths.ACCOUNTS_ROOT,
             Paths.CONFIG_ROOT,
             Paths.LOGS_ROOT,
+            Paths.BACKUPS_ROOT,
             Paths.THEME_ROOT,
             Paths.INSTANCE_LOCKS_ROOT,
         ]
@@ -34,6 +36,23 @@ class Paths:
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
 
+
+    @staticmethod
+    def backups_root() -> Path:
+        Paths.BACKUPS_ROOT.mkdir(parents=True, exist_ok=True)
+        return Paths.BACKUPS_ROOT
+
+    @staticmethod
+    def instance_backups_dir(instance: Instance) -> Path:
+        directory = Paths.backups_root() / instance.instance_id
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    @staticmethod
+    def backup_staging_root() -> Path:
+        directory = Paths.CACHE_ROOT / "backups" / "staging"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
 
     @staticmethod
     def theme_asset(theme: str, *paths: str) -> Path:

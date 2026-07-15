@@ -77,6 +77,10 @@ Each instance has its own game directory, metadata, settings, saves, mods, and r
 - Verify downloaded files and protect modpack extraction paths.
 - Track Modrinth mod provenance, installed versions, update locks, and managed modpack files.
 - Detect missing or locally modified files that originally came from an installed `.mrpack`.
+- Check and install newer modpack versions.
+- Create a full safety backup before changing a managed modpack.
+- Preserve user-modified and unmanaged conflicting files instead of overwriting them silently.
+- Roll back instance files, runtime profile, and registry metadata when an update fails.
 
 ### PNG themes
 
@@ -93,7 +97,25 @@ See [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) for every filename,
 - Offline account support.
 - SQLite account storage.
 - Windows DPAPI protection for stored authentication tokens.
-- Microsoft authentication code is under development and may not be ready for normal use.
+- Prepared Microsoft OAuth, Xbox Live, XSTS, Minecraft Services, entitlement, profile, and token-refresh pipeline.
+- Microsoft sign-in remains locked behind an approval gate until the launcher application is accepted by Mojang/Microsoft.
+- The Microsoft account button remains visible and explains the approval status, but it does not open a browser, send OAuth requests, or save an account while locked.
+
+### Java diagnostics
+
+- Scan `JAVA_HOME`, PATH, Program Files, the Windows Registry, and managed runtime folders.
+- Verify that discovered Java executables can run.
+- Display Java major version, vendor, architecture, source, and executable path.
+- Open the folder of a selected Java installation from Launcher Settings.
+
+### Backup and restore
+
+- Create full-instance or worlds-only `.mcwbackup` archives.
+- Store backups separately under `backups/<instance-id>/`.
+- Restore through a transactional staging directory.
+- Create a safety backup before replacing current data.
+- Reject unsafe archive paths and symbolic links.
+- Keep launcher metadata, runtime locks, logs, and crash reports outside normal backup payloads.
 
 ### Language packs
 
@@ -139,6 +161,7 @@ mcw-launcher/
 │   ├── core/
 │   │   ├── account/
 │   │   ├── auth/
+│   │   ├── backup/
 │   │   ├── instance/
 │   │   ├── java/
 │   │   ├── language/
@@ -241,6 +264,7 @@ When running from source, runtime data is created beside the project. In a packa
 
 ```text
 accounts/       Account database
+backups/        Instance and world backup archives
 cache/          Minecraft and mod-loader cache
 config/         Launcher configuration
 instances/      Instance directories and metadata
@@ -262,9 +286,11 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 | [`docs/PACKAGE_FORMAT.md`](docs/PACKAGE_FORMAT.md) | `.mcwpack` package format |
 | [`docs/LANGUAGE_PACKS.md`](docs/LANGUAGE_PACKS.md) | Creating language packs |
 | [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) | PNG theme filenames, paths, and canvas sizes |
+| [`docs/THEME_CREATION_GUIDE.md`](docs/THEME_CREATION_GUIDE.md) | Step-by-step theme creation guide |
 | [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md) | Building updater-compatible release ZIPs |
 | [`docs/BETA7_RUNTIME_REPAIR.md`](docs/BETA7_RUNTIME_REPAIR.md) | Runtime monitoring, crash detection, and full instance repair |
 | [`docs/BETA8_MOD_MANAGEMENT.md`](docs/BETA8_MOD_MANAGEMENT.md) | Mod updates, version locks, compatibility analysis, and managed modpack files |
+| [`docs/BETA9_ACCOUNTS_JAVA_MODPACK_BACKUP.md`](docs/BETA9_ACCOUNTS_JAVA_MODPACK_BACKUP.md) | Microsoft approval gate, Java diagnostics, backups, and safe modpack updates |
 | [`docs/gui-api.en.md`](docs/gui-api.en.md) | GUI integration API in English |
 | [`docs/gui-api.vi.md`](docs/gui-api.vi.md) | GUI integration API in Vietnamese |
 
@@ -278,17 +304,19 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 | Instance system | Available |
 | Offline accounts | Available |
 | Automatic Java handling | Available |
+| Java diagnostics and multi-source scanning | Beta |
 | PySide6 GUI | Beta |
 | Fabric Loader | Beta |
 | Fabric Mod Manager | Beta — update, lock, and compatibility analysis available |
-| Modrinth mods and Fabric modpacks | Beta |
+| Modrinth mods and Fabric modpacks | Beta — safe pack update and conflict preservation available |
 | Release/Beta/Alpha Modrinth channels | Available |
 | English and Vietnamese language packs | Available |
-| Microsoft authentication | In development |
+| Microsoft authentication | Prepared but locked pending application approval |
 | Forge / NeoForge / Quilt | Not currently supported |
 | Optional PNG theme system | Beta |
 | Game lifecycle and crash detection | Beta |
 | Full instance repair | Beta |
+| Instance/world backup and transactional restore | Beta |
 
 ---
 
@@ -296,12 +324,13 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 
 Near-term priorities:
 
+- Keep Microsoft authentication locked until application approval is granted, then complete live end-to-end verification.
+- Add interactive per-file conflict resolution for modpack updates.
+- Add backup retention rules, backup size previews, and a dedicated backup browser.
 - Improve crash diagnostics and runtime history presentation.
-- Add a safe modpack update workflow using managed-file change detection.
 - Continue replacing hard-coded GUI text with semantic translation keys.
-- Complete Microsoft authentication.
 - Improve packaged-build testing and release automation.
-- Test and expand community PNG themes.
+- Test community PNG themes across multiple DPI and screen sizes.
 
 Other mod loaders should be developed and tested on separate branches before being included in stable beta releases.
 

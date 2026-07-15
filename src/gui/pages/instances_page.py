@@ -26,6 +26,12 @@ class InstancesPage(BasePage):
     repair_instance_requested = Signal(str)
     manage_mods_requested = Signal(str)
     browse_modpacks_requested = Signal()
+    backup_requested = Signal(str, str)
+    restore_backup_requested = Signal(str, object)
+    open_backups_requested = Signal(str)
+    scan_modpack_requested = Signal(str)
+    check_modpack_update_requested = Signal(str)
+    apply_modpack_update_requested = Signal(str)
 
     def __init__(self) -> None:
         super().__init__("Instances", "Create and manage isolated Minecraft instances, including Fabric Loader and per-instance mods.", "instances")
@@ -34,6 +40,7 @@ class InstancesPage(BasePage):
         self._fabric_versions: dict[str, list[object]] = {}
         self._pending_manage_loader_version = ""
         self._synchronizing = False
+        self._modpack_update_info: object | None = None
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -139,6 +146,39 @@ class InstancesPage(BasePage):
         manage_card.layout.addWidget(self.include_saves_checkbox)
         manage_card.layout.addLayout(action_grid)
         self.root_layout.addWidget(manage_card)
+
+        lifecycle_card = CardWidget("Backup and Modrinth pack lifecycle", "Create safe backups, restore an instance, and update managed Modrinth packs without overwriting user-modified files.")
+        lifecycle_card.setProperty("themeRole", "lifecycle")
+        self.backup_scope_combo = QComboBox()
+        self.backup_scope_combo.addItem("Full instance data", "full")
+        self.backup_scope_combo.addItem("Worlds only", "worlds")
+        self.create_backup_button = set_theme_icon(QPushButton("Create backup"), "icon.action.backup")
+        self.restore_backup_button = set_theme_icon(QPushButton("Restore backup"), "icon.action.restore")
+        self.open_backups_button = set_theme_icon(QPushButton("Open backups folder"), "icon.action.folder")
+        self.create_backup_button.clicked.connect(lambda: self.backup_requested.emit(self.current_instance_name(), str(self.backup_scope_combo.currentData() or "full")))
+        self.restore_backup_button.clicked.connect(self._choose_restore_backup)
+        self.open_backups_button.clicked.connect(lambda: self.open_backups_requested.emit(self.current_instance_name()))
+        lifecycle_card.layout.addWidget(QLabel("Backup scope"))
+        lifecycle_card.layout.addWidget(self.backup_scope_combo)
+        lifecycle_card.layout.addWidget(self.create_backup_button)
+        lifecycle_card.layout.addWidget(self.restore_backup_button)
+        lifecycle_card.layout.addWidget(self.open_backups_button)
+
+        self.modpack_status = QLabel("Select a Modrinth modpack instance to check its managed files and updates.")
+        self.modpack_status.setObjectName("MutedLabel")
+        self.modpack_status.setWordWrap(True)
+        self.scan_modpack_button = set_theme_icon(QPushButton("Scan managed pack files"), "icon.action.search")
+        self.check_modpack_update_button = set_theme_icon(QPushButton("Check modpack update"), "icon.action.update")
+        self.apply_modpack_update_button = set_theme_icon(QPushButton("Update modpack"), "icon.action.download")
+        self.apply_modpack_update_button.setObjectName("PrimaryButton")
+        self.scan_modpack_button.clicked.connect(lambda: self.scan_modpack_requested.emit(self.current_instance_name()))
+        self.check_modpack_update_button.clicked.connect(lambda: self.check_modpack_update_requested.emit(self.current_instance_name()))
+        self.apply_modpack_update_button.clicked.connect(self._confirm_modpack_update)
+        lifecycle_card.layout.addWidget(self.modpack_status)
+        lifecycle_card.layout.addWidget(self.scan_modpack_button)
+        lifecycle_card.layout.addWidget(self.check_modpack_update_button)
+        lifecycle_card.layout.addWidget(self.apply_modpack_update_button)
+        self.root_layout.addWidget(lifecycle_card)
         self.root_layout.addStretch()
 
     def set_versions(self, versions: list) -> None:
@@ -212,6 +252,13 @@ class InstancesPage(BasePage):
             self.manage_mods_button.setEnabled(False)
             self.repair_loader_button.setEnabled(False)
             self.repair_instance_button.setEnabled(False)
+            self.create_backup_button.setEnabled(False)
+            self.restore_backup_button.setEnabled(False)
+            self.open_backups_button.setEnabled(False)
+            self.scan_modpack_button.setEnabled(False)
+            self.check_modpack_update_button.setEnabled(False)
+            self.apply_modpack_update_button.setEnabled(False)
+            self.modpack_status.setText(tr("Select a Modrinth modpack instance to check its managed files and updates."))
             return
 
         loader_name, loader_version = self._instance_loader(instance)
@@ -227,6 +274,19 @@ class InstancesPage(BasePage):
         self.manage_mods_button.setEnabled(loader_name == "fabric")
         self.repair_loader_button.setEnabled(loader_name == "fabric")
         self.repair_instance_button.setEnabled(True)
+        self.create_backup_button.setEnabled(True)
+        self.restore_backup_button.setEnabled(True)
+        self.open_backups_button.setEnabled(True)
+        pack_registry = Path(instance.instance_dir) / ".mcw" / "modrinth-pack.json"
+        is_managed_pack = pack_registry.is_file()
+        self.scan_modpack_button.setEnabled(is_managed_pack)
+        self.check_modpack_update_button.setEnabled(is_managed_pack)
+        self.apply_modpack_update_button.setEnabled(False)
+        self._modpack_update_info = None
+        if is_managed_pack:
+            self.modpack_status.setText(tr("Managed Modrinth pack detected. Scan files or check for a newer pack version."))
+        else:
+            self.modpack_status.setText(tr("This instance is not managed by a Modrinth modpack."))
         self._manage_loader_selected()
 
     def _set_manage_loader_available(self, available: bool) -> None:
@@ -311,6 +371,53 @@ class InstancesPage(BasePage):
         if loader_name == "vanilla":
             loader_version = "-1"
         return loader_name, loader_version
+
+    def set_modpack_state(self, report: object) -> None:
+        changes = tuple(getattr(report, "changes", ()) or ())
+        modified = int(getattr(report, "modified_count", 0))
+        missing = int(getattr(report, "missing_count", 0))
+        managed = int(getattr(report, "managed_files", 0))
+        if not changes:
+            self.modpack_status.setText(tr("Managed pack files are healthy: {count} file(s) verified.", count=managed))
+        else:
+            self.modpack_status.setText(tr("Managed pack changes detected: {modified} modified, {missing} missing. User changes will be preserved during update.", modified=modified, missing=missing))
+
+    def set_modpack_update_info(self, info: object | None) -> None:
+        self._modpack_update_info = info
+        available = bool(info is not None and getattr(info, "available", False))
+        self.apply_modpack_update_button.setEnabled(available)
+        if info is None:
+            self.modpack_status.setText(tr("This instance is not managed by a Modrinth modpack."))
+        elif available:
+            self.modpack_status.setText(tr("Modpack update available: {current} → {target} ({channel}).", current=getattr(info, "current_version_number", "?"), target=getattr(info, "target_version_number", "?"), channel=str(getattr(info, "target_version_type", "release")).title()))
+        else:
+            self.modpack_status.setText(tr("This Modrinth modpack is up to date."))
+
+    def set_modpack_busy(self, busy: bool) -> None:
+        managed = self.scan_modpack_button.isEnabled() or self.check_modpack_update_button.isEnabled() or self._modpack_update_info is not None
+        self.scan_modpack_button.setEnabled(managed and not busy)
+        self.check_modpack_update_button.setEnabled(managed and not busy)
+        self.apply_modpack_update_button.setEnabled(bool(self._modpack_update_info is not None and getattr(self._modpack_update_info, "available", False)) and not busy)
+
+    def _choose_restore_backup(self) -> None:
+        name = self.current_instance_name()
+        if not name:
+            return
+        path, _ = QFileDialog.getOpenFileName(self, tr("Restore MCW backup"), "", tr("MCW Backup (*.mcwbackup)"))
+        if not path:
+            return
+        answer = QMessageBox.question(self, tr("Restore backup"), tr("Restore this backup into '{name}'? A safety backup will be created first.", name=name), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if answer == QMessageBox.StandardButton.Yes:
+            self.restore_backup_requested.emit(name, Path(path))
+
+    def _confirm_modpack_update(self) -> None:
+        name = self.current_instance_name()
+        info = self._modpack_update_info
+        if not name or info is None or not getattr(info, "available", False):
+            return
+        answer = QMessageBox.question(self, tr("Update Modrinth modpack"), tr("Update '{name}' from {current} to {target}? A full safety backup will be created and user-modified files will be preserved.", name=name, current=getattr(info, "current_version_number", "?"), target=getattr(info, "target_version_number", "?")), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if answer == QMessageBox.StandardButton.Yes:
+            self.apply_modpack_update_requested.emit(name)
 
     def _request_create(self) -> None:
         self.create_requested.emit(self.create_name_input.text(), self.version_combo.currentText(), self.selected_create_loader())

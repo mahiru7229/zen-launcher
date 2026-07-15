@@ -64,6 +64,30 @@ class MicrosoftOAuth:
         return MicrosoftOAuthToken.from_dict(response.json())
 
     @staticmethod
+    def refresh(refresh_token: str) -> MicrosoftOAuthToken:
+        if not str(refresh_token).strip():
+            raise ValueError("Microsoft refresh token cannot be empty.")
+        data = {
+            "client_id": MicrosoftAuthConfig.CLIENT_ID,
+            "grant_type": "refresh_token",
+            "refresh_token": str(refresh_token),
+            "redirect_uri": MicrosoftAuthConfig.REDIRECT_URI,
+            "scope": " ".join(MicrosoftAuthConfig.SCOPES),
+        }
+        try:
+            response = httpx.post(MicrosoftAuthConfig.TOKEN_URL, data=data, timeout=30.0)
+            response.raise_for_status()
+        except httpx.HTTPStatusError as error:
+            try:
+                payload = error.response.json()
+            except ValueError:
+                payload = {"error_description": error.response.text}
+            raise RuntimeError(f"Microsoft OAuth refresh failed: {payload.get('error_description') or payload.get('error') or 'unknown error'}") from error
+        except httpx.HTTPError as error:
+            raise RuntimeError("Could not connect to Microsoft OAuth.") from error
+        return MicrosoftOAuthToken.from_dict(response.json())
+
+    @staticmethod
     def request_authorization_code() -> tuple[str, str]:
         session = MicrosoftOAuth.create_session()
 

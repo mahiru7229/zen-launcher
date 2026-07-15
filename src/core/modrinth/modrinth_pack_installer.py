@@ -235,4 +235,4 @@ class ModrinthPackInstaller:
 
     @staticmethod
     def _write_metadata(instance_dir: Path, project_id: str, version_id: str, title: str, version_number: str, minecraft_version: str, loader_version: str, managed_files: list[dict], install_optional_files: bool) -> None:
-        ModrinthPackRegistry.save(instance_dir, {"projectId": project_id, "versionId": version_id, "name": title, "versionNumber": version_number, "minecraftVersion": minecraft_version, "loader": "fabric", "loaderVersion": loader_version, "installOptionalFiles": bool(install_optional_files), "managedFiles": managed_files})
+        ModrinthPackRegistry.save(instance_dir, {"projectId": project_id, "versionId": version_id, "name": title, "versionNumber": version_number, "minecraftVersion": minecraft_version, "loader": "fabric", "loaderVersion": loader_version, "installOptionalFiles": bool(install_optional_files), "managedFiles": managed_files, "preservedFiles": []})

@@ -17,6 +17,9 @@ from src.core.runtime.game_runtime_manager import GameRuntimeManager
 from src.core.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
 from src.gui.config import LAUNCHER_NAME, MINIMUM_HEIGHT, MINIMUM_WIDTH, RIGHT_PANEL_WIDTH, SIDEBAR_WIDTH, VERSION_ID, WINDOW_HEIGHT, WINDOW_WIDTH
 from src.gui.controllers.account_controller import AccountController
+from src.gui.controllers.backup_controller import BackupController
+from src.gui.controllers.java_controller import JavaController
+from src.gui.controllers.modpack_lifecycle_controller import ModpackLifecycleController
 from src.gui.controllers.gui_settings_controller import GuiSettingsController
 from src.gui.controllers.instance_controller import InstanceController
 from src.gui.controllers.launch_controller import LaunchController
@@ -59,6 +62,9 @@ class MainWindow(QMainWindow):
         self.task_runner = TaskRunner(self)
         self.version_controller = VersionController(self.task_runner)
         self.account_controller = AccountController()
+        self.backup_controller = BackupController(self.task_runner)
+        self.java_controller = JavaController(self.task_runner)
+        self.modpack_lifecycle_controller = ModpackLifecycleController(self.task_runner)
         self.instance_controller = InstanceController(self.task_runner)
         self.mod_loader_controller = ModLoaderController(self.task_runner)
         self.mod_controller = ModController(self.task_runner)
@@ -156,6 +162,7 @@ class MainWindow(QMainWindow):
         self.running_instances_timer.timeout.connect(self.instance_controller.refresh_running)
 
         self.account_page.create_offline_requested.connect(self.account_controller.create_offline)
+        self.account_page.create_microsoft_requested.connect(self.account_controller.create_microsoft)
         self.account_page.select_requested.connect(self.account_controller.select)
         self.account_page.remove_requested.connect(self.account_controller.remove)
         self.account_page.refresh_requested.connect(self.account_controller.refresh)
@@ -174,6 +181,12 @@ class MainWindow(QMainWindow):
         self.instances_page.delete_requested.connect(self.instance_controller.delete)
         self.instances_page.import_requested.connect(self.instance_controller.import_package)
         self.instances_page.export_requested.connect(self.instance_controller.export_package)
+        self.instances_page.backup_requested.connect(self.backup_controller.create)
+        self.instances_page.restore_backup_requested.connect(self.backup_controller.restore)
+        self.instances_page.open_backups_requested.connect(self._open_backups_folder)
+        self.instances_page.scan_modpack_requested.connect(self.modpack_lifecycle_controller.scan)
+        self.instances_page.check_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.check_update(name, self.modrinth_modpack_dialog.allowed_version_types, force_refresh=True))
+        self.instances_page.apply_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.update(name, self.modrinth_modpack_dialog.allowed_version_types))
 
         self.instance_settings_page.load_requested.connect(self.instance_settings_controller.load)
         self.instance_settings_page.save_requested.connect(self.instance_settings_controller.save)
@@ -183,6 +196,8 @@ class MainWindow(QMainWindow):
         self.launcher_settings_page.language_changed.connect(self._preview_language)
         self.launcher_settings_page.check_updates_requested.connect(lambda: self.update_controller.check(manual=True))
         self.launcher_settings_page.reload_theme_requested.connect(self._preview_theme)
+        self.launcher_settings_page.scan_java_requested.connect(self.java_controller.scan)
+        self.launcher_settings_page.open_java_requested.connect(self._open_java_folder)
         self.logs_page.export_diagnostics_requested.connect(self._export_diagnostics)
         self.logs_page.open_logs_folder_requested.connect(self._open_logs_folder)
         self.logs_page.open_latest_game_log_requested.connect(self._open_latest_game_log)
@@ -196,6 +211,12 @@ class MainWindow(QMainWindow):
 
         self.account_controller.accounts_changed.connect(self.account_page.set_accounts)
         self.account_controller.selected_account_changed.connect(self._account_selected)
+        self.java_controller.installations_changed.connect(self.launcher_settings_page.set_java_installations)
+        self.backup_controller.backup_created.connect(self._on_backup_created)
+        self.backup_controller.restore_finished.connect(self._on_backup_restored)
+        self.modpack_lifecycle_controller.state_changed.connect(self.instances_page.set_modpack_state)
+        self.modpack_lifecycle_controller.update_checked.connect(self._on_modpack_update_checked)
+        self.modpack_lifecycle_controller.update_finished.connect(self._on_modpack_updated)
 
         self.instance_controller.instances_changed.connect(self.instances_page.set_instances)
         self.instance_controller.instances_changed.connect(self.instance_settings_page.set_instances)
@@ -257,6 +278,9 @@ class MainWindow(QMainWindow):
         controllers = (
             self.version_controller,
             self.account_controller,
+            self.backup_controller,
+            self.java_controller,
+            self.modpack_lifecycle_controller,
             self.instance_controller,
             self.mod_loader_controller,
             self.mod_controller,
@@ -288,6 +312,7 @@ class MainWindow(QMainWindow):
         self.instance_controller.refresh_running(force=True)
         self.running_instances_timer.start()
         self.version_controller.refresh()
+        self.java_controller.scan()
         self.logs_page.append(tr("Started {launcher_name}", launcher_name=LAUNCHER_NAME))
         if settings.get("auto_check_updates", True):
             QTimer.singleShot(1500, lambda: self.update_controller.check(manual=False))
@@ -380,6 +405,57 @@ class MainWindow(QMainWindow):
         self.modrinth_modpack_dialog.close()
         QMessageBox.information(self, tr("modrinth.modpack.install"), tr("modrinth.modpack.installed", name=selected_name))
 
+
+    def _open_java_folder(self, installation: object) -> None:
+        if installation is None:
+            return
+        executable = Path(getattr(installation, "executable", ""))
+        directory = executable.parent.parent if executable.parent.name.casefold() == "bin" else executable.parent
+        if not directory.exists():
+            self._show_error(tr("Java installations"), tr("The selected Java directory no longer exists."))
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(directory.resolve())))
+
+    def _open_backups_folder(self, instance_name: str) -> None:
+        name = str(instance_name).strip()
+        if not name:
+            return
+        try:
+            directory = Paths.instance_backups_dir(InstanceManager.load(name))
+        except Exception as error:
+            self._show_error(tr("Instance backups"), str(error))
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(directory.resolve())))
+
+    def _on_backup_created(self, result: object) -> None:
+        backup = getattr(result, "backup", None)
+        path = getattr(backup, "path", "")
+        self.instance_controller.refresh(selected_name=str(getattr(self._selected_instance, "name", "")))
+        QMessageBox.information(self, tr("Instance backup"), tr("Backup created successfully:\n{path}", path=path))
+
+    def _on_backup_restored(self, result: object) -> None:
+        name = str(getattr(result, "instance_name", ""))
+        safety = getattr(result, "safety_backup", None)
+        self.instance_controller.refresh(selected_name=name)
+        message = tr("Backup restored successfully for '{name}'.", name=name)
+        if safety:
+            message += tr("\nSafety backup: {path}", path=safety)
+        QMessageBox.information(self, tr("Restore backup"), message)
+
+    def _on_modpack_update_checked(self, info: object) -> None:
+        self.instances_page.set_modpack_update_info(info)
+        if info is not None and getattr(info, "available", False):
+            self.logs_page.append(tr("Modpack update available: {current} → {target}", current=getattr(info, "current_version_number", "?"), target=getattr(info, "target_version_number", "?")))
+
+    def _on_modpack_updated(self, result: object) -> None:
+        name = str(getattr(result, "instance_name", ""))
+        self.instance_controller.refresh(selected_name=name)
+        preserved = tuple(getattr(result, "preserved_files", ()) or ())
+        message = tr("Updated '{name}' to modpack version {version}.", name=name, version=getattr(result, "target_version", "?"))
+        if preserved:
+            message += tr("\n{count} user-modified file(s) were preserved.", count=len(preserved))
+        message += tr("\nSafety backup: {path}", path=getattr(result, "backup_path", ""))
+        QMessageBox.information(self, tr("Update Modrinth modpack"), message)
 
     def _on_game_exited(self, result: object) -> None:
         selected_name = str(getattr(self._selected_instance, "name", ""))
@@ -489,6 +565,8 @@ class MainWindow(QMainWindow):
         if instance is not None:
             self.instance_settings_page.select_instance(instance.name)
             self.instance_settings_controller.load(instance.name)
+            if (Path(instance.instance_dir) / ".mcw" / "modrinth-pack.json").is_file():
+                QTimer.singleShot(0, lambda name=instance.name: self.modpack_lifecycle_controller.scan(name))
 
     def _apply_gui_settings(self, settings: dict) -> None:
         requested_locale = str(settings.get("language", "en-US"))
@@ -545,6 +623,8 @@ class MainWindow(QMainWindow):
         if _task_id == "mods.update.check":
             self.mod_manager_dialog.set_update_checking(True)
             return
+        if _task_id.startswith("modpack."):
+            self.instances_page.set_modpack_busy(True)
         if _task_id.startswith("update."):
             self.launcher_settings_page.set_update_busy(True)
             self.launcher_settings_page.set_update_status(message)
@@ -558,6 +638,8 @@ class MainWindow(QMainWindow):
     def _on_task_completed(self, task_id: str, _result: object) -> None:
         if task_id == "mods.update.check":
             self.mod_manager_dialog.set_update_checking(False)
+        if task_id.startswith("modpack."):
+            self.instances_page.set_modpack_busy(False)
         if task_id.startswith("update."):
             self.launcher_settings_page.set_update_busy(False)
         if not task_id.startswith("modrinth."):

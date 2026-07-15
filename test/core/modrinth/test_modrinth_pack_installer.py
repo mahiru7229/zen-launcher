@@ -81,7 +81,7 @@ def test_installs_fabric_modpack_as_new_instance(tmp_path, monkeypatch):
     metadata_path = instance_dir / ".mcw" / "modrinth-pack.json"
     assert metadata_path.is_file()
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    assert metadata["schemaVersion"] == 2
+    assert metadata["schemaVersion"] == 3
     assert {item["path"] for item in metadata["managedFiles"]} == {"mods/example.jar", "config/example.json", "options.txt"}
 
 

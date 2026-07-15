@@ -11,12 +11,13 @@ from src.gui.theme.runtime import set_theme_icon
 
 class AccountPage(BasePage):
     create_offline_requested = Signal(str)
+    create_microsoft_requested = Signal()
     select_requested = Signal(str)
     remove_requested = Signal(str)
     refresh_requested = Signal()
 
     def __init__(self) -> None:
-        super().__init__("Accounts", "Store offline accounts now; Microsoft authentication can be plugged into this page later.", "accounts")
+        super().__init__("Accounts", "Manage offline accounts. Microsoft sign-in is prepared but remains locked until application approval is granted.", "accounts")
         self._accounts: dict[str, object] = {}
         self._build_ui()
 
@@ -53,17 +54,23 @@ class AccountPage(BasePage):
         self.root_layout.addWidget(selected_card)
 
         create_card = CardWidget("Create offline account", "Minecraft usernames use 3-16 letters, numbers, or underscores.")
+        create_card.setProperty("themeRole", "microsoft")
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Example: Steve")
         create_button = set_theme_icon(QPushButton("Create and select"), "icon.action.add")
         create_button.setObjectName("PrimaryButton")
         create_button.clicked.connect(lambda: self.create_offline_requested.emit(self.username_input.text()))
-        microsoft_button = set_theme_icon(QPushButton("Microsoft account — in progress"), "icon.action.account")
-        microsoft_button.setEnabled(False)
+        self.microsoft_button = set_theme_icon(QPushButton("Add Microsoft account — approval pending"), "icon.action.microsoft")
+        self.microsoft_button.setToolTip("The authentication pipeline is prepared, but sign-in is locked until Mojang/Microsoft approves the launcher application.")
+        self.microsoft_button.clicked.connect(self.create_microsoft_requested.emit)
+        self.microsoft_status = QLabel("Microsoft authentication status: Pending application approval")
+        self.microsoft_status.setObjectName("LockedBadge")
+        self.microsoft_status.setWordWrap(True)
         create_card.layout.addWidget(QLabel("Username"))
         create_card.layout.addWidget(self.username_input)
         create_card.layout.addWidget(create_button)
-        create_card.layout.addWidget(microsoft_button)
+        create_card.layout.addWidget(self.microsoft_button)
+        create_card.layout.addWidget(self.microsoft_status)
         self.root_layout.addWidget(create_card)
         self.root_layout.addStretch()
 

@@ -350,6 +350,25 @@ class InstanceManager:
         return instance
 
     @staticmethod
+    def set_runtime_profile(name: str, version: Version, mod_loader: tuple[str, str]) -> Instance:
+        instance = InstanceManager.load(name)
+        normalized_loader = (str(mod_loader[0]).strip().lower(), str(mod_loader[1]).strip())
+        if normalized_loader[0] == "vanilla":
+            normalized_loader = ("vanilla", "-1")
+        instance.version_id = version.id
+        instance.mod_loader = normalized_loader
+        InstanceManager._save_instance_metadata(instance)
+        instances_data = InstanceManager._load_instances_data()
+        for item in instances_data.get("instances", []):
+            if item.get("name") == name:
+                item["version_id"] = version.id
+                item["mod_loader"] = normalized_loader
+                item["instance_dir"] = str(instance.instance_dir)
+                break
+        InstanceManager._save_instances(instances_data)
+        return instance
+
+    @staticmethod
     def set_mod_loader(name: str, mod_loader: tuple[str, str]) -> Instance:
         instance = InstanceManager.load(name)
         normalized_loader = (str(mod_loader[0]).strip().lower(), str(mod_loader[1]).strip())

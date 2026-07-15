@@ -112,7 +112,15 @@
     "icon.state.busy": "icons/states/busy.png",
     "icon.state.success": "icons/states/success.png",
     "icon.state.warning": "icons/states/warning.png",
-    "icon.state.error": "icons/states/error.png"
+    "icon.state.error": "icons/states/error.png",
+    "surface.microsoft_card": "surfaces/cards/microsoft.png",
+    "surface.java_card": "surfaces/cards/java.png",
+    "surface.lifecycle_card": "surfaces/cards/lifecycle.png",
+    "badge.locked": "surfaces/badges/locked.png",
+    "icon.action.microsoft": "icons/actions/microsoft.png",
+    "icon.action.java": "icons/actions/java.png",
+    "icon.action.backup": "icons/actions/backup.png",
+    "icon.action.restore": "icons/actions/restore.png"
   },
   "text_assets": {
     "control.launch": "button.launch"

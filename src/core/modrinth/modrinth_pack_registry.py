@@ -9,7 +9,7 @@ from src.models.modrinth.pack_state import ModrinthManagedFileChange, ModrinthPa
 
 
 class ModrinthPackRegistry:
-    SCHEMA_VERSION = 2
+    SCHEMA_VERSION = 3
     FILE_NAME = "modrinth-pack.json"
 
     @staticmethod
@@ -41,6 +41,7 @@ class ModrinthPackRegistry:
         payload = dict(data)
         payload["schemaVersion"] = ModrinthPackRegistry.SCHEMA_VERSION
         payload["managedFiles"] = ModrinthPackRegistry._normalize_files(payload.get("managedFiles", []))
+        payload["preservedFiles"] = ModrinthPackRegistry._normalize_preserved_files(payload.get("preservedFiles", []))
         temp = path.with_suffix(path.suffix + ".part")
         temp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         temp.replace(path)
@@ -87,6 +88,26 @@ class ModrinthPackRegistry:
                 "sha512": str(item.get("sha512") or "").lower(),
                 "size": max(0, int(item.get("size", 0) or 0)),
                 "source": str(item.get("source") or "pack"),
+            }
+        return sorted(normalized.values(), key=lambda item: item["path"].casefold())
+
+    @staticmethod
+    def _normalize_preserved_files(value: object) -> list[dict]:
+        if not isinstance(value, list):
+            return []
+        normalized: dict[str, dict] = {}
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            relative = ModrinthPackRegistry._safe_relative(str(item.get("path") or ""))
+            if relative is None:
+                continue
+            key = relative.as_posix()
+            normalized[key.casefold()] = {
+                "path": key,
+                "reason": str(item.get("reason") or "preserved"),
+                "previousSha1": str(item.get("previousSha1") or "").lower(),
+                "targetSha1": str(item.get("targetSha1") or "").lower(),
             }
         return sorted(normalized.values(), key=lambda item: item["path"].casefold())
 

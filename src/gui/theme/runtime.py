@@ -65,6 +65,9 @@ class ThemeRuntime:
         "background.dialog.modrinth": ("QDialog#ModrinthDialog", 0),
         "background.dialog.update": ("QDialog#UpdateDialog", 0),
         "background.dialog.message": ("QMessageBox", 0),
+        "surface.microsoft_card": ('QFrame#Card[themeRole="microsoft"]', 14),
+        "surface.java_card": ('QFrame#Card[themeRole="java"]', 14),
+        "surface.lifecycle_card": ('QFrame#Card[themeRole="lifecycle"]', 14),
         "surface.card": ("QFrame#Card", 14),
         "surface.hero_card": ("QFrame#HeroCard", 18),
         "surface.inset": ("QFrame#InsetPanel", 12),
@@ -108,6 +111,7 @@ class ThemeRuntime:
         "scrollbar.horizontal_handle": ("QScrollBar::handle:horizontal", 6),
         "badge.status": ("QLabel#StatusBadge, QLabel#StageBadge[state=success]", 8),
         "badge.warning": ("QLabel#WarningBadge, QLabel#StageBadge[state=busy]", 8),
+        "badge.locked": ("QLabel#LockedBadge", 8),
         "badge.error": ("QLabel#StageBadge[state=error]", 8),
     }
 

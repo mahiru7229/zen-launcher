@@ -4,7 +4,10 @@ from pathlib import Path
 import subprocess
 import re
 import os
-import winreg
+try:
+    import winreg
+except ImportError:  # Windows-only standard library module
+    winreg = None
 
 
 class JavaManager:
@@ -41,7 +44,28 @@ class JavaManager:
         javas.extend(JavaManager._scan_path())
         javas.extend(JavaManager._scan_program_files())
         javas.extend(JavaManager._scan_registry())
+        javas.extend(JavaManager._scan_managed_runtimes())
         return JavaManager._remove_duplicates(javas)
+
+    @staticmethod
+    def _scan_managed_runtimes() -> list[JavaInstallation]:
+        return JavaManager._scan_source(JavaManager._get_java_in_managed_runtimes(), JavaSource.MINECRAFT_RUNTIME)
+
+    @staticmethod
+    def _get_java_in_managed_runtimes() -> list[Path]:
+        from src.core.java.managed_java_repository import ManagedJavaRepository
+
+        root = ManagedJavaRepository.root()
+        results: list[Path] = []
+        try:
+            directories = tuple(root.iterdir())
+        except OSError:
+            return results
+        for directory in directories:
+            executable = directory / "bin" / "javaw.exe"
+            if directory.is_dir() and executable.is_file():
+                results.append(executable)
+        return results
 
     @staticmethod
     def _scan_registry() -> list[JavaInstallation]:
@@ -51,6 +75,8 @@ class JavaManager:
         )
     @staticmethod
     def _get_java_in_registry() -> list[Path]:
+        if winreg is None:
+            return []
         java_paths: list[Path] = []
 
         registry_views = (
@@ -257,6 +283,7 @@ class JavaManager:
     @staticmethod
     def _remove_duplicates(javas: list[JavaInstallation]) -> list[JavaInstallation]:
         source_priority = {
+            JavaSource.MINECRAFT_RUNTIME: 4,
             JavaSource.PROGRAM_FILES: 3,
             JavaSource.JAVA_HOME: 2,
             JavaSource.REGISTRY: 1,
