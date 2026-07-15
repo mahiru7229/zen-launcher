@@ -2,16 +2,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QDragEnterEvent, QDropEvent, QDesktopServices
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import QAbstractItemView, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout
 
 from src.core.language.language_manager import tr
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.gui.theme.runtime import set_theme_icon
 from src.models.instance.instance import Instance
 from src.models.mod.mod_info import ModInfo
-from src.gui.theme.runtime import set_theme_icon
+from src.models.mod.mod_issue import ModHealthReport, ModIssue
+from src.models.modrinth.update import ModrinthModUpdateEntry, ModrinthModUpdateReport
 
 
 class ModManagerDialog(QDialog):
@@ -20,45 +21,71 @@ class ModManagerDialog(QDialog):
     remove_requested = Signal(list)
     enabled_requested = Signal(list, bool)
     modrinth_requested = Signal()
+    check_updates_requested = Signal(object)
+    update_projects_requested = Signal(list, object)
+    update_all_requested = Signal(object)
+    lock_requested = Signal(list, bool)
+    analyze_requested = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._instance: Instance | None = None
         self._mods: list[ModInfo] = []
+        self._updates = ModrinthModUpdateReport(entries=())
+        self._health = ModHealthReport(issues=(), enabled_mods=0, disabled_mods=0)
+        self._include_beta = False
+        self._include_alpha = False
+        self._busy = False
         self.setWindowTitle("Mod Manager")
         self.setObjectName("ModManagerDialog")
-        self.resize(1050, 680)
+        self.resize(1260, 760)
         self.setAcceptDrops(True)
         self._build_ui()
+
+    @property
+    def allowed_version_types(self) -> tuple[str, ...]:
+        values = ["release"]
+        if self._include_beta:
+            values.append("beta")
+        if self._include_alpha:
+            values.append("alpha")
+        return tuple(values)
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
         root.setContentsMargins(18, 18, 18, 18)
-        root.setSpacing(12)
+        root.setSpacing(10)
 
         self.title_label = QLabel("No instance selected")
         self.title_label.setObjectName("PageTitle")
         self.summary_label = QLabel("Choose a Fabric instance to manage its mods.")
         self.summary_label.setObjectName("MutedLabel")
         self.summary_label.setWordWrap(True)
+        self.health_label = QLabel("")
+        self.health_label.setObjectName("MutedLabel")
+        self.health_label.setWordWrap(True)
         root.addWidget(self.title_label)
         root.addWidget(self.summary_label)
+        root.addWidget(self.health_label)
 
         search_row = QHBoxLayout()
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search name, mod id, version, or file...")
+        self.search_input.setPlaceholderText("Search name, mod id, version, source, update, or file...")
         self.search_input.textChanged.connect(self._apply_filter)
-        refresh_button = set_theme_icon(QPushButton("Refresh"), "icon.action.refresh")
-        refresh_button.clicked.connect(self.refresh_requested.emit)
-        open_folder_button = set_theme_icon(QPushButton("Open mod folder"), "icon.action.folder")
-        open_folder_button.clicked.connect(self._open_folder)
+        self.refresh_button = set_theme_icon(QPushButton("Refresh"), "icon.action.refresh")
+        self.refresh_button.clicked.connect(self.refresh_requested.emit)
+        self.open_folder_button = set_theme_icon(QPushButton("Open mod folder"), "icon.action.folder")
+        self.open_folder_button.clicked.connect(self._open_folder)
+        self.analyze_button = set_theme_icon(QPushButton("Analyze dependencies"), "icon.action.repair")
+        self.analyze_button.clicked.connect(self.analyze_requested.emit)
         search_row.addWidget(self.search_input, 1)
-        search_row.addWidget(refresh_button)
-        search_row.addWidget(open_folder_button)
+        search_row.addWidget(self.refresh_button)
+        search_row.addWidget(self.analyze_button)
+        search_row.addWidget(self.open_folder_button)
         root.addLayout(search_row)
 
-        self.table = QTableWidget(0, 7)
-        self.table.setHorizontalHeaderLabels(["State", "Name", "Version", "Mod ID", "Environment", "Status", "File"])
+        self.table = QTableWidget(0, 10)
+        self.table.setHorizontalHeaderLabels(["State", "Name", "Version", "Source", "Update", "Lock", "Mod ID", "Environment", "Status", "File"])
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -66,20 +93,40 @@ class ModManagerDialog(QDialog):
         self.table.setSortingEnabled(True)
         self.table.verticalHeader().setVisible(False)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
-        self.table.itemSelectionChanged.connect(self._render_details)
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(9, QHeaderView.ResizeMode.Stretch)
+        self.table.itemSelectionChanged.connect(self._selection_changed)
         root.addWidget(self.table, 1)
+
+        update_row = QHBoxLayout()
+        self.check_updates_button = set_theme_icon(QPushButton("Check updates"), "icon.action.refresh")
+        self.update_selected_button = set_theme_icon(QPushButton("Update selected"), "icon.action.download")
+        self.update_all_button = set_theme_icon(QPushButton("Update all"), "icon.action.download")
+        self.lock_button = QPushButton("Lock version")
+        self.unlock_button = QPushButton("Unlock version")
+        self.check_updates_button.clicked.connect(lambda: self.check_updates_requested.emit(self.allowed_version_types))
+        self.update_selected_button.clicked.connect(self._request_update_selected)
+        self.update_all_button.clicked.connect(self._request_update_all)
+        self.lock_button.clicked.connect(lambda: self._request_lock(True))
+        self.unlock_button.clicked.connect(lambda: self._request_lock(False))
+        update_row.addWidget(self.check_updates_button)
+        update_row.addWidget(self.update_selected_button)
+        update_row.addWidget(self.update_all_button)
+        update_row.addWidget(self.lock_button)
+        update_row.addWidget(self.unlock_button)
+        update_row.addStretch()
+        root.addLayout(update_row)
 
         action_row = QHBoxLayout()
         self.add_button = set_theme_icon(QPushButton("Add mod files"), "icon.action.add")
         self.add_button.setObjectName("PrimaryButton")
         self.modrinth_button = set_theme_icon(QPushButton("Browse Modrinth"), "icon.action.modrinth")
-        self.modrinth_button.clicked.connect(self.modrinth_requested.emit)
         self.enable_button = set_theme_icon(QPushButton("Enable"), "icon.action.enable")
         self.disable_button = set_theme_icon(QPushButton("Disable"), "icon.action.disable")
         self.remove_button = set_theme_icon(QPushButton("Remove"), "icon.action.remove")
         self.remove_button.setObjectName("DangerButton")
         self.add_button.clicked.connect(self._choose_add)
+        self.modrinth_button.clicked.connect(self.modrinth_requested.emit)
         self.enable_button.clicked.connect(lambda: self._request_enabled(True))
         self.disable_button.clicked.connect(lambda: self._request_enabled(False))
         self.remove_button.clicked.connect(self._request_remove)
@@ -94,15 +141,18 @@ class ModManagerDialog(QDialog):
         self.details = QPlainTextEdit()
         self.details.setObjectName("DetailsOutput")
         self.details.setReadOnly(True)
-        self.details.setPlaceholderText("Select a mod to view metadata and dependencies.")
-        self.details.setMaximumHeight(170)
+        self.details.setPlaceholderText("Select a mod to view metadata, dependencies, update state, and compatibility issues.")
+        self.details.setMaximumHeight(210)
         root.addWidget(self.details)
 
     def set_instance(self, instance: Instance | None) -> None:
         self._instance = instance
         self._mods = []
+        self._updates = ModrinthModUpdateReport(entries=())
+        self._health = ModHealthReport(issues=(), enabled_mods=0, disabled_mods=0)
         self.table.setRowCount(0)
         self.details.clear()
+        self.health_label.clear()
 
         if instance is None:
             self.title_label.setText(tr("No instance selected"))
@@ -114,49 +164,106 @@ class ModManagerDialog(QDialog):
         self.title_label.setText(tr("Mods — {name}", name=instance.name))
         if loader_name == ModLoaderManager.FABRIC:
             self.summary_label.setText(tr("Minecraft {version} • Fabric Loader {loader_version} • Drop .jar files into this window to add them.", version=instance.version_id, loader_version=loader_version))
-            self._set_actions_enabled(True)
+            self._set_actions_enabled(not self._busy)
         else:
             self.summary_label.setText(tr("This instance is Vanilla. Apply Fabric Loader from the Instances page before adding mods."))
             self._set_actions_enabled(False)
 
     def set_mods(self, mods: list[ModInfo]) -> None:
         self._mods = list(mods)
-        self.table.setSortingEnabled(False)
-        self.table.setRowCount(len(self._mods))
+        self._render_table()
+        self._render_summary()
 
-        for row, mod in enumerate(self._mods):
-            values = [tr("Enabled" if mod.enabled else "Disabled"), mod.name, mod.version, mod.mod_id, mod.environment, tr(mod.status), mod.file_name]
-            for column, value in enumerate(values):
-                item = QTableWidgetItem(value)
-                item.setData(Qt.ItemDataRole.UserRole, mod)
-                if mod.error:
-                    item.setToolTip(mod.error)
-                self.table.setItem(row, column, item)
+    def set_update_report(self, report: ModrinthModUpdateReport) -> None:
+        self._updates = report if isinstance(report, ModrinthModUpdateReport) else ModrinthModUpdateReport(entries=())
+        self._render_table()
+        self._render_summary()
 
-        self.table.setSortingEnabled(True)
-        self._apply_filter()
-        enabled_count = sum(1 for mod in self._mods if mod.enabled)
-        if self._instance is not None and self._is_fabric_instance():
-            self.summary_label.setText(tr("{count} mod(s) found • {enabled_count} enabled • {path}", count=len(self._mods), enabled_count=enabled_count, path=self._instance.instance_dir / "mods"))
+    def set_health_report(self, report: ModHealthReport) -> None:
+        self._health = report if isinstance(report, ModHealthReport) else ModHealthReport(issues=(), enabled_mods=0, disabled_mods=0)
+        self._render_table()
+        self._render_summary()
+
+    def set_channel_preferences(self, include_beta: bool, include_alpha: bool) -> None:
+        self._include_beta = bool(include_beta)
+        self._include_alpha = bool(include_alpha)
 
     def set_busy(self, busy: bool) -> None:
-        enabled = not busy and self._is_fabric_instance()
-        self._set_actions_enabled(enabled)
+        self._busy = bool(busy)
+        self._set_actions_enabled(not self._busy and self._is_fabric_instance())
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         paths = self._jar_paths_from_urls(event.mimeData().urls())
-        if paths and self._is_fabric_instance():
+        if paths and self._is_fabric_instance() and not self._busy:
             event.acceptProposedAction()
         else:
             event.ignore()
 
     def dropEvent(self, event: QDropEvent) -> None:
         paths = self._jar_paths_from_urls(event.mimeData().urls())
-        if paths and self._is_fabric_instance():
+        if paths and self._is_fabric_instance() and not self._busy:
             self._request_add(paths)
             event.acceptProposedAction()
         else:
             event.ignore()
+
+    def _render_table(self) -> None:
+        selected_files = {mod.file_name.casefold() for mod in self._selected_mods()}
+        updates = self._updates_by_file()
+        issues = self._issues_by_mod_id()
+        self.table.setSortingEnabled(False)
+        self.table.setRowCount(len(self._mods))
+
+        for row, mod in enumerate(self._mods):
+            update = updates.get(mod.file_name.casefold())
+            mod_issues = issues.get(mod.mod_id.casefold(), ())
+            source = tr("mod_manager.source.modrinth") if update is not None else tr("mod_manager.source.local")
+            update_text = "—"
+            lock_text = "—"
+            if update is not None:
+                update_text = tr(f"mod_manager.update.status.{update.status.casefold().replace(' ', '_')}", default=update.status)
+                if update.update_available and not update.warning:
+                    update_text = f"{update.current_version_number} → {update.latest_version_number}"
+                lock_text = tr("mod_manager.lock.locked") if update.locked else tr("mod_manager.lock.unlocked")
+            status = tr(mod.status)
+            if mod_issues:
+                errors = sum(1 for issue in mod_issues if issue.severity == "error")
+                warnings = sum(1 for issue in mod_issues if issue.severity == "warning")
+                status = f"{status} • {errors}E/{warnings}W"
+            values = [tr("Enabled" if mod.enabled else "Disabled"), mod.name, mod.version, source, update_text, lock_text, mod.mod_id, mod.environment, status, mod.file_name]
+            tooltip = "\n".join(issue.message for issue in mod_issues)
+            if mod.error:
+                tooltip = "\n".join(item for item in (mod.error, tooltip) if item)
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                item.setData(Qt.ItemDataRole.UserRole, mod)
+                if tooltip:
+                    item.setToolTip(tooltip)
+                self.table.setItem(row, column, item)
+
+        self.table.setSortingEnabled(True)
+        self._apply_filter()
+        if selected_files:
+            for row in range(self.table.rowCount()):
+                item = self.table.item(row, 0)
+                mod = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+                if isinstance(mod, ModInfo) and mod.file_name.casefold() in selected_files:
+                    self.table.selectRow(row)
+        self._update_action_state()
+        self._render_details()
+
+    def _render_summary(self) -> None:
+        if self._instance is None or not self._is_fabric_instance():
+            return
+        enabled_count = sum(1 for mod in self._mods if mod.enabled)
+        self.summary_label.setText(tr("{count} mod(s) found • {enabled_count} enabled • {path}", count=len(self._mods), enabled_count=enabled_count, path=self._instance.instance_dir / "mods"))
+        tracked = len(self._updates.entries)
+        channels = "/".join(item.title() for item in self.allowed_version_types)
+        self.health_label.setText(tr("mod_manager.health_summary", errors=self._health.error_count, warnings=self._health.warning_count, tracked=tracked, updates=self._updates.update_count, channels=channels))
+
+    def _selection_changed(self) -> None:
+        self._render_details()
+        self._update_action_state()
 
     def _choose_add(self) -> None:
         files, _ = QFileDialog.getOpenFileNames(self, tr("Add Fabric mods"), "", tr("Fabric mods (*.jar)"))
@@ -167,13 +274,11 @@ class ModManagerDialog(QDialog):
         existing_names = {mod.file_name.casefold() for mod in self._mods}
         conflicts = [path.name for path in paths if path.name.casefold() in existing_names]
         replace = False
-
         if conflicts:
             answer = QMessageBox.question(self, tr("Replace mods"), tr("The following files already exist:\n\n{files}\n\nReplace them?", files="\n".join(conflicts)), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if answer != QMessageBox.StandardButton.Yes:
                 return
             replace = True
-
         self.add_requested.emit(paths, replace)
 
     def _request_remove(self) -> None:
@@ -189,51 +294,75 @@ class ModManagerDialog(QDialog):
         if paths:
             self.enabled_requested.emit(paths, enabled)
 
+    def _request_update_selected(self) -> None:
+        project_ids = [entry.project_id for entry in self._selected_update_entries() if entry.update_available and not entry.locked and not entry.warning and not entry.file_missing]
+        if not project_ids:
+            return
+        answer = QMessageBox.question(self, tr("Update mods"), tr("Update {count} selected Modrinth mod(s)?", count=len(project_ids)), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if answer == QMessageBox.StandardButton.Yes:
+            self.update_projects_requested.emit(project_ids, self.allowed_version_types)
+
+    def _request_update_all(self) -> None:
+        count = self._updates.update_count
+        if count < 1:
+            QMessageBox.information(self, tr("Update mods"), tr("All unlocked Modrinth mods are up to date."))
+            return
+        answer = QMessageBox.question(self, tr("Update mods"), tr("Update all {count} unlocked Modrinth mod(s)?", count=count), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if answer == QMessageBox.StandardButton.Yes:
+            self.update_all_requested.emit(self.allowed_version_types)
+
+    def _request_lock(self, locked: bool) -> None:
+        project_ids = [entry.project_id for entry in self._selected_update_entries()]
+        if project_ids:
+            self.lock_requested.emit(project_ids, locked)
+
     def _selected_paths(self) -> list[Path]:
-        paths: list[Path] = []
-        for index in self.table.selectionModel().selectedRows():
+        return [mod.path for mod in self._selected_mods()]
+
+    def _selected_mods(self) -> list[ModInfo]:
+        mods: list[ModInfo] = []
+        selection = self.table.selectionModel()
+        if selection is None:
+            return mods
+        for index in selection.selectedRows():
             item = self.table.item(index.row(), 0)
             mod = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
             if isinstance(mod, ModInfo):
-                paths.append(mod.path)
-        return paths
+                mods.append(mod)
+        return mods
+
+    def _selected_update_entries(self) -> list[ModrinthModUpdateEntry]:
+        updates = self._updates_by_file()
+        return [updates[mod.file_name.casefold()] for mod in self._selected_mods() if mod.file_name.casefold() in updates]
 
     def _render_details(self) -> None:
-        selected = self._selected_paths()
-        if not selected:
+        selected_mods = self._selected_mods()
+        if not selected_mods:
             self.details.clear()
             return
-
-        mod = next((item for item in self._mods if item.path == selected[0]), None)
-        if mod is None:
-            return
-
+        mod = selected_mods[0]
+        update = self._updates_by_file().get(mod.file_name.casefold())
+        mod_issues = self._issues_by_mod_id().get(mod.mod_id.casefold(), ())
         dependencies = "\n".join(f"  {name}: {requirement}" for name, requirement in mod.dependencies.items()) or tr("  None declared")
         authors = ", ".join(mod.authors) or tr("Unknown")
         licenses = ", ".join(mod.licenses) or tr("Unknown")
-        text = [
-            f"{mod.name} ({mod.mod_id})",
-            tr("Version: {version}", version=mod.version),
-            tr("State: {state}", state=tr("Enabled" if mod.enabled else "Disabled")),
-            tr("Environment: {environment}", environment=mod.environment),
-            tr("Authors: {authors}", authors=authors),
-            tr("License: {licenses}", licenses=licenses),
-            tr("Status: {status}", status=tr(mod.status)),
-            "",
-            mod.description or tr("No description."),
-            "",
-            tr("Dependencies:"),
-            dependencies,
-        ]
+        text = [f"{mod.name} ({mod.mod_id})", tr("Version: {version}", version=mod.version), tr("State: {state}", state=tr("Enabled" if mod.enabled else "Disabled")), tr("Environment: {environment}", environment=mod.environment), tr("Authors: {authors}", authors=authors), tr("License: {licenses}", licenses=licenses), tr("Status: {status}", status=tr(mod.status)), "", mod.description or tr("No description."), "", tr("Dependencies:"), dependencies]
+        if update is not None:
+            text.extend(["", "Modrinth:", f"  Project: {update.title} ({update.project_id})", f"  Installed: {update.current_version_number}", f"  Latest allowed: {update.latest_version_number} ({update.latest_version_type})", f"  Version lock: {'On' if update.locked else 'Off'}", f"  Update state: {update.status}"])
+            if update.warning:
+                text.append(f"  Warning: {update.warning}")
+        if mod_issues:
+            text.extend(["", "Compatibility issues:"])
+            text.extend(f"  [{issue.severity.upper()}] {issue.message}" for issue in mod_issues)
         if mod.error:
             text.extend(["", tr("Warning:"), mod.error])
         self.details.setPlainText("\n".join(text))
 
     def _apply_filter(self) -> None:
         query = self.search_input.text().strip().casefold()
-        for row, mod in enumerate(self._mods):
-            haystack = " ".join((mod.name, mod.mod_id, mod.version, mod.file_name, mod.status)).casefold()
-            self.table.setRowHidden(row, bool(query and query not in haystack))
+        for row in range(self.table.rowCount()):
+            values = [self.table.item(row, column).text() for column in range(self.table.columnCount()) if self.table.item(row, column) is not None]
+            self.table.setRowHidden(row, bool(query and query not in " ".join(values).casefold()))
 
     def _open_folder(self) -> None:
         if self._instance is not None:
@@ -242,11 +371,27 @@ class ModManagerDialog(QDialog):
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder.resolve())))
 
     def _set_actions_enabled(self, enabled: bool) -> None:
-        self.add_button.setEnabled(enabled)
-        self.modrinth_button.setEnabled(enabled)
-        self.enable_button.setEnabled(enabled)
-        self.disable_button.setEnabled(enabled)
-        self.remove_button.setEnabled(enabled)
+        for button in (self.refresh_button, self.analyze_button, self.open_folder_button, self.add_button, self.modrinth_button, self.enable_button, self.disable_button, self.remove_button, self.check_updates_button):
+            button.setEnabled(enabled)
+        self._update_action_state()
+
+    def _update_action_state(self) -> None:
+        enabled = not self._busy and self._is_fabric_instance()
+        selected = self._selected_update_entries()
+        self.update_selected_button.setEnabled(enabled and any(entry.update_available and not entry.locked and not entry.warning and not entry.file_missing for entry in selected))
+        self.update_all_button.setEnabled(enabled and self._updates.update_count > 0)
+        self.lock_button.setEnabled(enabled and any(not entry.locked for entry in selected))
+        self.unlock_button.setEnabled(enabled and any(entry.locked for entry in selected))
+
+    def _updates_by_file(self) -> dict[str, ModrinthModUpdateEntry]:
+        return {entry.file_name.casefold(): entry for entry in self._updates.entries if entry.file_name}
+
+    def _issues_by_mod_id(self) -> dict[str, tuple[ModIssue, ...]]:
+        result: dict[str, list[ModIssue]] = {}
+        for issue in self._health.issues:
+            for mod_id in issue.mod_ids:
+                result.setdefault(mod_id.casefold(), []).append(issue)
+        return {key: tuple(value) for key, value in result.items()}
 
     def _is_fabric_instance(self) -> bool:
         if self._instance is None:
@@ -257,11 +402,28 @@ class ModManagerDialog(QDialog):
     def retranslate_dynamic(self) -> None:
         instance = self._instance
         mods = list(self._mods)
+        updates = self._updates
+        health = self._health
         self.set_instance(instance)
         if instance is not None:
-            self.set_mods(mods)
+            self._mods = mods
+            self._updates = updates
+            self._health = health
+            self._render_table()
+            self._render_summary()
+        self.refresh_button.setText(tr("mod_manager.refresh"))
+        self.open_folder_button.setText(tr("mod_manager.open_folder"))
+        self.analyze_button.setText(tr("mod_manager.analyze"))
+        self.check_updates_button.setText(tr("mod_manager.check_updates"))
+        self.update_selected_button.setText(tr("mod_manager.update_selected"))
+        self.update_all_button.setText(tr("mod_manager.update_all"))
+        self.lock_button.setText(tr("mod_manager.lock_version"))
+        self.unlock_button.setText(tr("mod_manager.unlock_version"))
+        self.add_button.setText(tr("mod_manager.add_files"))
+        self.enable_button.setText(tr("mod_manager.enable"))
+        self.disable_button.setText(tr("mod_manager.disable"))
+        self.remove_button.setText(tr("mod_manager.remove"))
         self.modrinth_button.setText(tr("modrinth.browse"))
-        self._render_details()
 
     @staticmethod
     def _jar_paths_from_urls(urls: list[QUrl]) -> list[Path]:

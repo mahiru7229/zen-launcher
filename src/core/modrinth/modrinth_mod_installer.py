@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import datetime, timezone
 
 from src.core.fs.paths import Paths
 from src.core.instance.instance_run_lock import InstanceRunLock
@@ -30,9 +31,10 @@ class ModrinthModInstaller:
         allowed_types = ModrinthClient.normalize_version_types(allowed_version_types)
         if root_version.version_type not in allowed_types:
             raise RuntimeError(f"Modrinth version '{root_version.version_number}' uses the disabled {root_version.version_type} channel.")
-        plan, projects, warnings = ModrinthModInstaller._build_plan(root_version, instance.version_id, install_dependencies, allowed_types)
         registry = ModrinthRegistry.load(instance)
         registry_mods = registry.setdefault("mods", {})
+        locked_dependencies = {project_id for project_id, entry in registry_mods.items() if project_id != root_version.project_id and isinstance(entry, dict) and bool(entry.get("locked", False))}
+        plan, projects, warnings = ModrinthModInstaller._build_plan(root_version, instance.version_id, install_dependencies, allowed_types, locked_dependencies)
         installed_projects: list[str] = []
         installed_files: list[str] = []
 
@@ -58,9 +60,14 @@ class ModrinthModInstaller:
                 "projectId": version.project_id,
                 "versionId": version.version_id,
                 "versionNumber": version.version_number,
+                "versionType": version.version_type,
                 "fileName": new_name,
                 "sha1": file.sha1,
                 "title": project.title,
+                "locked": bool(previous.get("locked", False)),
+                "source": "modrinth",
+                "datePublished": version.date_published,
+                "updatedAt": datetime.now(timezone.utc).isoformat(),
             }
             installed_projects.append(project.title)
             installed_files.append(new_name)
@@ -69,13 +76,14 @@ class ModrinthModInstaller:
         return ModrinthModInstallResult(installed_projects=tuple(installed_projects), installed_files=tuple(installed_files), warnings=tuple(warnings))
 
     @staticmethod
-    def _build_plan(root_version: ModrinthVersion, game_version: str, install_dependencies: bool, allowed_version_types: tuple[str, ...] = ("release", "beta", "alpha")) -> tuple[list[ModrinthVersion], dict[str, ModrinthProject], list[str]]:
+    def _build_plan(root_version: ModrinthVersion, game_version: str, install_dependencies: bool, allowed_version_types: tuple[str, ...] = ("release", "beta", "alpha"), locked_dependency_projects: set[str] | None = None) -> tuple[list[ModrinthVersion], dict[str, ModrinthProject], list[str]]:
         plan: list[ModrinthVersion] = []
         projects: dict[str, ModrinthProject] = {}
         warnings: list[str] = []
         visited_versions: set[str] = set()
         visiting_projects: set[str] = set()
         selected_projects: dict[str, str] = {}
+        locked_dependency_projects = set(locked_dependency_projects or ())
 
         def visit(version: ModrinthVersion) -> None:
             if version.version_id in visited_versions:
@@ -107,6 +115,9 @@ class ModrinthModInstaller:
                 if install_dependencies:
                     for dependency in version.dependencies:
                         if dependency.dependency_type != "required":
+                            continue
+                        if dependency.project_id and dependency.project_id in locked_dependency_projects:
+                            warnings.append(f"Locked dependency project {dependency.project_id} was kept at its installed version.")
                             continue
                         dependency_version = ModrinthModInstaller._resolve_dependency(dependency.version_id, dependency.project_id, game_version, allowed_version_types)
                         if dependency_version is None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path, PurePosixPath
 from uuid import uuid4
+import hashlib
 import json
 import re
 import shutil
@@ -15,6 +16,7 @@ from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.modrinth.modrinth_client import ModrinthClient
 from src.core.modrinth.modrinth_downloader import ModrinthDownloader
+from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
 from src.models.modrinth.install_result import ModrinthModpackInstallResult
 
 
@@ -59,16 +61,19 @@ class ModrinthPackInstaller:
                 index = ModrinthPackInstaller._read_index(archive)
                 minecraft_version, loader_version = ModrinthPackInstaller._parse_dependencies(index)
                 selected_files, skipped_optional, skipped_server = ModrinthPackInstaller._selected_files(index, install_optional_files)
+                managed_files = {entry["path"].casefold(): entry for entry in ModrinthPackInstaller._managed_download_entries(selected_files)}
                 ModrinthPackInstaller._download_files(selected_files, staging)
-                ModrinthPackInstaller._extract_layer(archive, "overrides", staging)
-                ModrinthPackInstaller._extract_layer(archive, "client-overrides", staging)
+                for entry in ModrinthPackInstaller._extract_layer(archive, "overrides", staging):
+                    managed_files[entry["path"].casefold()] = entry
+                for entry in ModrinthPackInstaller._extract_layer(archive, "client-overrides", staging):
+                    managed_files[entry["path"].casefold()] = entry
 
             base_version = VersionManager.load(minecraft_version)
             resolved_loader = ModLoaderManager.resolve(minecraft_version, ModLoaderManager.FABRIC, loader_version)
             ModLoaderManager.prepare(base_version, *resolved_loader)
             created_instance = InstanceManager.create(name=normalized_name, version=base_version, mod_loader=resolved_loader)
             shutil.copytree(staging, created_instance.instance_dir, dirs_exist_ok=True)
-            ModrinthPackInstaller._write_metadata(created_instance.instance_dir, project.project_id, version.version_id, project.title, version.version_number, minecraft_version, loader_version)
+            ModrinthPackInstaller._write_metadata(created_instance.instance_dir, project.project_id, version.version_id, project.title, version.version_number, minecraft_version, loader_version, list(managed_files.values()), install_optional_files)
             return ModrinthModpackInstallResult(instance=created_instance, pack_name=project.title, pack_version=version.version_number, installed_files=len(selected_files), skipped_optional_files=skipped_optional, skipped_server_files=skipped_server)
         except Exception:
             if created_instance is not None:
@@ -168,9 +173,19 @@ class ModrinthPackInstaller:
                 future.result()
 
     @staticmethod
-    def _extract_layer(archive: zipfile.ZipFile, prefix: str, staging: Path) -> None:
+    def _managed_download_entries(files: list[dict]) -> list[dict]:
+        managed: list[dict] = []
+        for item in files:
+            relative = ModrinthPackInstaller._safe_relative_path(str(item.get("path") or ""))
+            hashes = item.get("hashes", {}) if isinstance(item.get("hashes"), dict) else {}
+            managed.append({"path": relative.as_posix(), "sha1": str(hashes.get("sha1") or "").lower(), "sha512": str(hashes.get("sha512") or "").lower(), "size": int(item.get("fileSize", 0) or 0), "source": "download"})
+        return managed
+
+    @staticmethod
+    def _extract_layer(archive: zipfile.ZipFile, prefix: str, staging: Path) -> list[dict]:
         normalized_prefix = prefix.rstrip("/") + "/"
         extracted_size = 0
+        managed: list[dict] = []
         for info in archive.infolist():
             name = info.filename.replace("\\", "/")
             if not name.startswith(normalized_prefix) or name.endswith("/"):
@@ -183,8 +198,20 @@ class ModrinthPackInstaller:
             relative = ModrinthPackInstaller._safe_relative_path(name[len(normalized_prefix):])
             target = staging.joinpath(*relative.parts)
             target.parent.mkdir(parents=True, exist_ok=True)
+            sha1 = hashlib.sha1()
+            sha512 = hashlib.sha512()
+            written = 0
             with archive.open(info, "r") as source, target.open("wb") as output:
-                shutil.copyfileobj(source, output)
+                while True:
+                    chunk = source.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    output.write(chunk)
+                    sha1.update(chunk)
+                    sha512.update(chunk)
+                    written += len(chunk)
+            managed.append({"path": relative.as_posix(), "sha1": sha1.hexdigest(), "sha512": sha512.hexdigest(), "size": written, "source": prefix})
+        return managed
 
     @staticmethod
     def _safe_relative_path(value: str) -> PurePosixPath:
@@ -207,9 +234,5 @@ class ModrinthPackInstaller:
         return name
 
     @staticmethod
-    def _write_metadata(instance_dir: Path, project_id: str, version_id: str, title: str, version_number: str, minecraft_version: str, loader_version: str) -> None:
-        path = Path(instance_dir) / ".mcw" / "modrinth-pack.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temp = path.with_suffix(path.suffix + ".part")
-        temp.write_text(json.dumps({"schemaVersion": 1, "projectId": project_id, "versionId": version_id, "name": title, "versionNumber": version_number, "minecraftVersion": minecraft_version, "loader": "fabric", "loaderVersion": loader_version}, ensure_ascii=False, indent=2), encoding="utf-8")
-        temp.replace(path)
+    def _write_metadata(instance_dir: Path, project_id: str, version_id: str, title: str, version_number: str, minecraft_version: str, loader_version: str, managed_files: list[dict], install_optional_files: bool) -> None:
+        ModrinthPackRegistry.save(instance_dir, {"projectId": project_id, "versionId": version_id, "name": title, "versionNumber": version_number, "minecraftVersion": minecraft_version, "loader": "fabric", "loaderVersion": loader_version, "installOptionalFiles": bool(install_optional_files), "managedFiles": managed_files})

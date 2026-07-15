@@ -78,7 +78,7 @@ Example:
     "icon": "grass_block",
     "notes": "",
 
-    "launcher_version": "v0.5.0-beta.7",
+    "launcher_version": "v0.5.0-beta.8",
     "metadata_version": 2
 }
 ```

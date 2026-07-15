@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-VERSION = "v0.5.0 Beta 7"
-VERSION_ID = "0.5.0-beta.7"
+VERSION = "v0.5.0 Beta 8"
+VERSION_ID = "0.5.0-beta.8"
 VERSION_TAG = f"v{VERSION_ID}"
 UPDATE_CHANNEL = "beta"
 GITHUB_REPOSITORY = "mahiru7229/mcw-launcher"

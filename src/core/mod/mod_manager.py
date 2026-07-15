@@ -159,6 +159,10 @@ class ModManager:
             authors=ModManager._parse_authors(data.get("authors")),
             licenses=ModManager._parse_licenses(data.get("license")),
             dependencies=dict(data.get("depends") or {}) if isinstance(data.get("depends"), dict) else {},
+            recommends=dict(data.get("recommends") or {}) if isinstance(data.get("recommends"), dict) else {},
+            suggests=dict(data.get("suggests") or {}) if isinstance(data.get("suggests"), dict) else {},
+            conflicts=dict(data.get("conflicts") or {}) if isinstance(data.get("conflicts"), dict) else {},
+            breaks=dict(data.get("breaks") or {}) if isinstance(data.get("breaks"), dict) else {},
             status=status,
             error=error,
         )

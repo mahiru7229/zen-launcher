@@ -15,5 +15,9 @@ class ModInfo:
     authors: tuple[str, ...] = ()
     licenses: tuple[str, ...] = ()
     dependencies: dict[str, object] = field(default_factory=dict)
+    recommends: dict[str, object] = field(default_factory=dict)
+    suggests: dict[str, object] = field(default_factory=dict)
+    conflicts: dict[str, object] = field(default_factory=dict)
+    breaks: dict[str, object] = field(default_factory=dict)
     status: str = "Ready"
     error: str = ""

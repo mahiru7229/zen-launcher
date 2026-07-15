@@ -210,8 +210,15 @@ class MainWindow(QMainWindow):
         self.mod_manager_dialog.remove_requested.connect(self.mod_controller.remove)
         self.mod_manager_dialog.enabled_requested.connect(self.mod_controller.set_enabled)
         self.mod_manager_dialog.modrinth_requested.connect(self._open_modrinth_mod_browser)
+        self.mod_manager_dialog.check_updates_requested.connect(self.mod_controller.check_updates)
+        self.mod_manager_dialog.update_projects_requested.connect(self.mod_controller.update_projects)
+        self.mod_manager_dialog.update_all_requested.connect(self.mod_controller.update_all)
+        self.mod_manager_dialog.lock_requested.connect(self.mod_controller.set_locked)
+        self.mod_manager_dialog.analyze_requested.connect(self.mod_controller.analyze)
         self.mod_controller.instance_changed.connect(self.mod_manager_dialog.set_instance)
         self.mod_controller.mods_changed.connect(self.mod_manager_dialog.set_mods)
+        self.mod_controller.updates_changed.connect(self.mod_manager_dialog.set_update_report)
+        self.mod_controller.health_changed.connect(self.mod_manager_dialog.set_health_report)
 
         self.modrinth_mod_dialog.search_requested.connect(self._search_modrinth_mods)
         self.modrinth_modpack_dialog.search_requested.connect(self._search_modrinth_modpacks)
@@ -353,6 +360,7 @@ class MainWindow(QMainWindow):
 
     def _modrinth_mod_installed(self, result: object) -> None:
         self.mod_controller.refresh()
+        self.mod_controller.check_updates(self.mod_manager_dialog.allowed_version_types)
         count = len(getattr(result, "installed_files", ()) or ())
         warnings = tuple(getattr(result, "warnings", ()) or ())
         message = tr("modrinth.mod.installed", count=count)
@@ -492,6 +500,7 @@ class MainWindow(QMainWindow):
         include_alpha = bool(settings.get("modrinth_include_alpha", False))
         self.modrinth_mod_dialog.set_channel_preferences(include_beta, include_alpha)
         self.modrinth_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
         self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(settings.get("theme", "mcw-default")), bool(settings.get("show_static_text", True)))
 
     def _preview_theme(self, theme_id: str) -> None:
@@ -501,6 +510,7 @@ class MainWindow(QMainWindow):
     def _set_modrinth_channel_preferences(self, include_beta: bool, include_alpha: bool) -> None:
         self.modrinth_mod_dialog.set_channel_preferences(include_beta, include_alpha)
         self.modrinth_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
         self.gui_settings_controller.set_modrinth_channels(include_beta, include_alpha)
 
     def _preview_language(self, locale: str) -> None:

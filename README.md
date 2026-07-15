@@ -61,6 +61,9 @@ Each instance has its own game directory, metadata, settings, saves, mods, and r
 - Add, remove, enable, or disable mod files.
 - Read metadata from `fabric.mod.json`.
 - Drag and drop supported mod JAR files into the Mod Manager.
+- Analyze duplicate mod IDs, missing/disabled dependencies, version constraints, and declared Fabric conflicts.
+- Check, install, and bulk-install compatible Modrinth mod updates.
+- Lock individual Modrinth mods to prevent automatic dependency or bulk updates.
 
 > Fabric API is a separate mod and is not installed automatically by the Fabric Loader itself.
 
@@ -72,6 +75,8 @@ Each instance has its own game directory, metadata, settings, saves, mods, and r
 - Filter versions by Release, Beta, and Alpha channels. Release remains enabled by default; Beta and Alpha require explicit opt-in.
 - Persist channel preferences in `config/launcher_settings.json`.
 - Verify downloaded files and protect modpack extraction paths.
+- Track Modrinth mod provenance, installed versions, update locks, and managed modpack files.
+- Detect missing or locally modified files that originally came from an installed `.mrpack`.
 
 ### PNG themes
 
@@ -259,6 +264,7 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 | [`docs/THEME_ASSET_GUIDE.md`](docs/THEME_ASSET_GUIDE.md) | PNG theme filenames, paths, and canvas sizes |
 | [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md) | Building updater-compatible release ZIPs |
 | [`docs/BETA7_RUNTIME_REPAIR.md`](docs/BETA7_RUNTIME_REPAIR.md) | Runtime monitoring, crash detection, and full instance repair |
+| [`docs/BETA8_MOD_MANAGEMENT.md`](docs/BETA8_MOD_MANAGEMENT.md) | Mod updates, version locks, compatibility analysis, and managed modpack files |
 | [`docs/gui-api.en.md`](docs/gui-api.en.md) | GUI integration API in English |
 | [`docs/gui-api.vi.md`](docs/gui-api.vi.md) | GUI integration API in Vietnamese |
 
@@ -274,7 +280,7 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 | Automatic Java handling | Available |
 | PySide6 GUI | Beta |
 | Fabric Loader | Beta |
-| Fabric Mod Manager | Beta |
+| Fabric Mod Manager | Beta — update, lock, and compatibility analysis available |
 | Modrinth mods and Fabric modpacks | Beta |
 | Release/Beta/Alpha Modrinth channels | Available |
 | English and Vietnamese language packs | Available |
@@ -291,7 +297,7 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 Near-term priorities:
 
 - Improve crash diagnostics and runtime history presentation.
-- Improve mod dependency warnings.
+- Add a safe modpack update workflow using managed-file change detection.
 - Continue replacing hard-coded GUI text with semantic translation keys.
 - Complete Microsoft authentication.
 - Improve packaged-build testing and release automation.

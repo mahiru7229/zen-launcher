@@ -78,7 +78,11 @@ def test_installs_fabric_modpack_as_new_instance(tmp_path, monkeypatch):
     assert (instance_dir / "mods" / "example.jar").read_bytes() == b"fabric-mod"
     assert (instance_dir / "config" / "example.json").is_file()
     assert (instance_dir / "options.txt").read_text(encoding="utf-8") == "fov:0.5"
-    assert (instance_dir / ".mcw" / "modrinth-pack.json").is_file()
+    metadata_path = instance_dir / ".mcw" / "modrinth-pack.json"
+    assert metadata_path.is_file()
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert metadata["schemaVersion"] == 2
+    assert {item["path"] for item in metadata["managedFiles"]} == {"mods/example.jar", "config/example.json", "options.txt"}
 
 
 def test_cleanup_removes_instance_when_finalization_fails(tmp_path, monkeypatch):
