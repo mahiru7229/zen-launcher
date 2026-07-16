@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import zipfile
 
@@ -11,6 +12,7 @@ from src.core.modrinth.modrinth_pack_installer import ModrinthPackInstaller
 from src.core.modrinth.modrinth_pack_registry import ModrinthPackRegistry
 from src.core.modrinth.modrinth_registry import ModrinthRegistry
 from src.core.network.download_pause import is_download_paused
+from src.core.progress.file_batch_progress import FileBatchProgress
 from src.core.progress.progress_reporter import ProgressReporter
 from src.models.instance.instance import Instance
 from src.models.progress.progress_stage import ProgressStage
@@ -18,6 +20,8 @@ from src.models.progress.progress_stage import ProgressStage
 
 class ModrinthContentManager:
     MAX_DOWNLOAD_ROUNDS = 3
+    MAX_DOWNLOAD_WORKERS = 8
+    PROGRESS_EMIT_INTERVAL_SECONDS = 0.08
 
     @staticmethod
     def ensure(instance: Instance, reporter: ProgressReporter | None = None, block_launch_on_failure: bool = True) -> tuple[str, ...]:
@@ -194,25 +198,61 @@ class ModrinthContentManager:
     def _download_pack_round(missing: list[dict], reporter: ProgressReporter | None, round_number: int) -> dict[str, str]:
         total = len(missing)
         message = f"Downloading missing Modrinth modpack files (round {round_number}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS})..."
-        ModrinthContentManager._report_files(reporter, ProgressStage.DOWNLOADING_MODPACK, message, 0, total)
-        errors: dict[str, str] = {}
+        batch_progress = FileBatchProgress(
+            reporter=reporter,
+            stage=ProgressStage.DOWNLOADING_MODPACK,
+            message=message,
+            total=total,
+            min_emit_interval_seconds=ModrinthContentManager.PROGRESS_EMIT_INTERVAL_SECONDS,
+        )
+        batch_progress.start()
+        if total == 0:
+            return {}
 
-        for completed, item in enumerate(missing, start=1):
+        def download(item: dict, child_reporter: object | None) -> None:
             entry = item["entry"]
-            path = str(item["path"])
             target = item["target"]
-            try:
-                if target is None:
-                    raise RuntimeError("Unsafe managed path")
-                urls = tuple(str(url).strip() for url in entry.get("downloads", []) if str(url).strip()) if isinstance(entry.get("downloads"), list) else ()
-                if not urls:
-                    raise RuntimeError("No saved download source is available")
-                ModrinthDownloader.download_urls(urls=urls, destination=target, sha1=str(entry.get("sha1") or ""), sha512=str(entry.get("sha512") or ""), expected_size=int(entry.get("size", 0) or 0), restrict_hosts=True, max_retry=1, reporter=reporter, progress_stage=ProgressStage.DOWNLOADING_MODPACK, progress_message=f"Downloading modpack file {target.name} (round {round_number}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS})...")
-            except Exception as error:
-                if is_download_paused(error):
-                    raise
-                errors[path] = str(error)
-            ModrinthContentManager._report_files(reporter, ProgressStage.DOWNLOADING_MODPACK, message, completed, total)
+            if target is None:
+                raise RuntimeError("Unsafe managed path")
+            urls = tuple(str(url).strip() for url in entry.get("downloads", []) if str(url).strip()) if isinstance(entry.get("downloads"), list) else ()
+            if not urls:
+                raise RuntimeError("No saved download source is available")
+            ModrinthDownloader.download_urls(
+                urls=urls,
+                destination=target,
+                sha1=str(entry.get("sha1") or ""),
+                sha512=str(entry.get("sha512") or ""),
+                expected_size=int(entry.get("size", 0) or 0),
+                restrict_hosts=True,
+                max_retry=1,
+                reporter=child_reporter,
+                progress_stage=ProgressStage.DOWNLOADING_MODPACK,
+                progress_message=f"Downloading modpack file {target.name} (round {round_number}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS})...",
+            )
+
+        errors: dict[str, str] = {}
+        workers = min(ModrinthContentManager.MAX_DOWNLOAD_WORKERS, total)
+        with ThreadPoolExecutor(max_workers=max(1, workers), thread_name_prefix="mcw-modpack-download") as executor:
+            future_map = {}
+            for item in missing:
+                token = object()
+                child_reporter = batch_progress.reporter_for(token)
+                future = executor.submit(download, item, child_reporter)
+                future_map[future] = (item, token)
+
+            for future in as_completed(future_map):
+                item, token = future_map[future]
+                path = str(item["path"])
+                try:
+                    future.result()
+                except Exception as error:
+                    if is_download_paused(error):
+                        for pending in future_map:
+                            pending.cancel()
+                        raise
+                    errors[path] = str(error)
+                finally:
+                    batch_progress.complete(token)
 
         return errors
 
@@ -220,12 +260,23 @@ class ModrinthContentManager:
     def _download_mod_round(instance: Instance, missing: list[dict], reporter: ProgressReporter | None, round_number: int) -> dict[str, str]:
         total = len(missing)
         message = f"Downloading missing Modrinth mods (round {round_number}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS})..."
-        ModrinthContentManager._report_files(reporter, ProgressStage.DOWNLOADING_MODS, message, 0, total)
-        errors: dict[str, str] = {}
+        batch_progress = FileBatchProgress(
+            reporter=reporter,
+            stage=ProgressStage.DOWNLOADING_MODS,
+            message=message,
+            total=total,
+            min_emit_interval_seconds=ModrinthContentManager.PROGRESS_EMIT_INTERVAL_SECONDS,
+        )
+        batch_progress.start()
+        if total == 0:
+            return {}
 
-        for completed, entry in enumerate(missing, start=1):
-            title = ModrinthContentManager._mod_title(entry)
+        errors: dict[str, str] = {}
+        jobs: list[tuple[dict, str, Path, tuple[str, ...], object, object | None]] = []
+
+        for entry in missing:
             key = ModrinthContentManager._mod_key(entry)
+            token = object()
             try:
                 project_id = str(entry.get("projectId") or "").strip()
                 version_id = str(entry.get("versionId") or "").strip()
@@ -242,19 +293,54 @@ class ModrinthContentManager:
                 if not filename:
                     raise RuntimeError("Invalid tracked filename")
                 cache_path = Paths.modrinth_file_cache(project_id, version_id, filename)
-                ModrinthDownloader.download_urls(urls=urls, destination=cache_path, sha1=str(entry.get("sha1") or ""), sha512=str(entry.get("sha512") or ""), expected_size=int(entry.get("size", 0) or 0), restrict_hosts=False, max_retry=1, reporter=reporter, progress_stage=ProgressStage.DOWNLOADING_MODS, progress_message=f"Downloading {title} (round {round_number}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS})...")
-                added = ModManager.add_mods(instance, [cache_path], replace=True)
-                if not added:
-                    raise RuntimeError("The downloaded mod could not be added to the instance.")
-                entry["fileName"] = added[0].file_name
-                ModrinthContentManager._set_mod_download_state(entry, False, "")
+                jobs.append((entry, key, cache_path, urls, token, batch_progress.reporter_for(token)))
             except Exception as error:
                 if is_download_paused(error):
                     raise
                 error_message = str(error)
                 errors[key] = error_message
                 ModrinthContentManager._set_mod_download_state(entry, True, error_message)
-            ModrinthContentManager._report_files(reporter, ProgressStage.DOWNLOADING_MODS, message, completed, total)
+                batch_progress.complete(token)
+
+        def download(job: tuple[dict, str, Path, tuple[str, ...], object, object | None]) -> Path:
+            entry, _key, cache_path, urls, _token, child_reporter = job
+            title = ModrinthContentManager._mod_title(entry)
+            return ModrinthDownloader.download_urls(
+                urls=urls,
+                destination=cache_path,
+                sha1=str(entry.get("sha1") or ""),
+                sha512=str(entry.get("sha512") or ""),
+                expected_size=int(entry.get("size", 0) or 0),
+                restrict_hosts=False,
+                max_retry=1,
+                reporter=child_reporter,
+                progress_stage=ProgressStage.DOWNLOADING_MODS,
+                progress_message=f"Downloading {title} (round {round_number}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS})...",
+            )
+
+        workers = min(ModrinthContentManager.MAX_DOWNLOAD_WORKERS, len(jobs))
+        if jobs:
+            with ThreadPoolExecutor(max_workers=max(1, workers), thread_name_prefix="mcw-mod-download") as executor:
+                future_map = {executor.submit(download, job): job for job in jobs}
+                for future in as_completed(future_map):
+                    entry, key, _cache_path, _urls, token, _child_reporter = future_map[future]
+                    try:
+                        downloaded_path = future.result()
+                        added = ModManager.add_mods(instance, [downloaded_path], replace=True)
+                        if not added:
+                            raise RuntimeError("The downloaded mod could not be added to the instance.")
+                        entry["fileName"] = added[0].file_name
+                        ModrinthContentManager._set_mod_download_state(entry, False, "")
+                    except Exception as error:
+                        if is_download_paused(error):
+                            for pending in future_map:
+                                pending.cancel()
+                            raise
+                        error_message = str(error)
+                        errors[key] = error_message
+                        ModrinthContentManager._set_mod_download_state(entry, True, error_message)
+                    finally:
+                        batch_progress.complete(token)
 
         return errors
 

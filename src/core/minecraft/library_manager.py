@@ -38,7 +38,7 @@ class DownloadLibraryManager:
 
         total = len(libraries)
 
-        batch_progress = FileBatchProgress(reporter=reporter, stage=ProgressStage.DOWNLOADING_LIBRARIES, message="Preparing Minecraft libraries...", total=total)
+        batch_progress = FileBatchProgress(reporter=reporter, stage=ProgressStage.DOWNLOADING_LIBRARIES, message="Preparing Minecraft libraries...", total=total, min_emit_interval_seconds=0.08)
         batch_progress.start()
 
         if total == 0:

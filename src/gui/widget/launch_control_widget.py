@@ -27,6 +27,7 @@ class LaunchControlWidget(QFrame):
         self._pause_pending = False
         self._status_message = "Ready"
         self._detail_message = "Select an account and an instance, then launch."
+        self._stage_state: str | None = None
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -98,7 +99,6 @@ class LaunchControlWidget(QFrame):
         self.detail_label.setText(view.detail)
         self.stage_label.setText(view.stage_text)
         self._set_stage_state("busy")
-        self._refresh_launch_button()
 
         if view.percentage is None:
             self.progress_bar.setRange(0, 0)
@@ -254,6 +254,10 @@ class LaunchControlWidget(QFrame):
 
     def _set_stage_state(self, state: str) -> None:
         icon_state = "ready" if state == "success" and self._mode == "idle" else state
+        state_key = f"{state}:{icon_state}"
+        if self._stage_state == state_key:
+            return
+        self._stage_state = state_key
         set_theme_pixmap(self.stage_icon, f"icon.state.{icon_state}", 32, 32)
         self.stage_label.setProperty("state", state)
         self.stage_label.style().unpolish(self.stage_label)

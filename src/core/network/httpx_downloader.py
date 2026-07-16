@@ -19,7 +19,7 @@ from src.core.progress.progress_reporter import ProgressReporter
 from src.models.progress.progress_stage import ProgressStage
 
 
-CHUNK_SIZE = 64 * 1024
+CHUNK_SIZE = 512 * 1024
 
 
 class DownloadInfo(Protocol):

@@ -254,3 +254,47 @@ def test_pause_is_not_swallowed_as_a_modrinth_download_failure(tmp_path, monkeyp
 
     with pytest.raises(DownloadPausedError):
         ModrinthContentManager.ensure(instance)
+
+
+def test_missing_pack_files_download_in_parallel(tmp_path, monkeypatch):
+    from threading import Lock
+    import time
+
+    instance = make_instance(tmp_path)
+    content = b"parallel-mod"
+    entries = []
+    for index in range(6):
+        filename = f"parallel-{index}.jar"
+        entries.append({
+            "path": f"mods/{filename}",
+            "sha1": hashlib.sha1(content).hexdigest(),
+            "sha512": hashlib.sha512(content).hexdigest(),
+            "size": len(content),
+            "source": "download",
+            "downloads": [f"https://cdn.modrinth.com/data/pack/{filename}"],
+        })
+    ModrinthPackRegistry.save(instance.instance_dir, {"projectId": "pack", "versionId": "v1", "managedFiles": entries})
+
+    lock = Lock()
+    active = 0
+    max_active = 0
+
+    def fake_download_urls(urls, destination, **kwargs):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        try:
+            time.sleep(0.04)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(content)
+            return destination
+        finally:
+            with lock:
+                active -= 1
+
+    monkeypatch.setattr(ModrinthDownloader, "download_urls", fake_download_urls)
+
+    assert ModrinthContentManager.ensure(instance) == ()
+    assert max_active > 1
+    assert max_active <= ModrinthContentManager.MAX_DOWNLOAD_WORKERS

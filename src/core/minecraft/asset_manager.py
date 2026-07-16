@@ -40,7 +40,7 @@ class AssetManager:
 
         total = len(assets)
 
-        batch_progress = FileBatchProgress(reporter=reporter, stage=ProgressStage.DOWNLOADING_ASSETS, message="Preparing Minecraft assets...", total=total)
+        batch_progress = FileBatchProgress(reporter=reporter, stage=ProgressStage.DOWNLOADING_ASSETS, message="Preparing Minecraft assets...", total=total, min_emit_interval_seconds=0.08)
         batch_progress.start()
 
         if total == 0:

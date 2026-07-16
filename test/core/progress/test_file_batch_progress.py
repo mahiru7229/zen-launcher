@@ -33,3 +33,32 @@ def test_cached_files_never_add_a_fake_download_speed() -> None:
     batch.complete(object())
 
     assert all(event.bytes_per_second is None for event in events)
+
+
+def test_batch_progress_throttles_large_batches_but_always_reports_completion() -> None:
+    now = [0.0]
+    events = []
+    batch = FileBatchProgress(
+        reporter=ProgressReporter(events.append),
+        stage=ProgressStage.DOWNLOADING_ASSETS,
+        message="Preparing assets...",
+        total=100,
+        clock=lambda: now[0],
+        min_emit_interval_seconds=0.1,
+    )
+
+    batch.start()
+    for _ in range(10):
+        batch.complete(object())
+
+    assert [event.current for event in events] == [0]
+
+    now[0] = 0.11
+    batch.complete(object())
+    assert [event.current for event in events] == [0, 11]
+
+    for _ in range(89):
+        batch.complete(object())
+
+    assert events[-1].current == 100
+    assert events[-1].percentage == 100

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from threading import Lock
 from typing import Any
 
 from PySide6.QtCore import Signal, Slot
@@ -31,6 +32,8 @@ class LaunchController(BaseController):
         self._selected_instance = None
         self._selected_account = None
         self._debug_mode = False
+        self._progress_log_lock = Lock()
+        self._last_progress_log_key: tuple[object, ...] | None = None
 
         self._task_runner.task_succeeded.connect(self._on_task_succeeded)
         self._task_runner.task_failed.connect(self._on_task_failed)
@@ -92,7 +95,21 @@ class LaunchController(BaseController):
 
     def _on_progress(self, event: ProgressEvent) -> None:
         self.progress_received.emit(event)
+        key = self._progress_log_key(event)
+        with self._progress_log_lock:
+            if key == self._last_progress_log_key:
+                return
+            self._last_progress_log_key = key
         self.log_created.emit(self._format_progress(event))
+
+    @staticmethod
+    def _progress_log_key(event: ProgressEvent) -> tuple[object, ...]:
+        stage = getattr(getattr(event, "stage", None), "value", getattr(event, "stage", None))
+        if not event.is_determinate:
+            return stage, str(event.message), None
+        percentage = int(event.percentage or 0)
+        bucket = 100 if percentage >= 100 else (percentage // 10) * 10
+        return stage, bucket
 
 
     def _on_game_exit(self, result: object) -> None:
