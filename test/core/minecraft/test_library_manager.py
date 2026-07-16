@@ -1088,3 +1088,31 @@ def test_extract_native_does_nothing_when_marker_exists(
     assert not (
         destination / "new-native.dll"
     ).exists()
+
+def test_extract_native_rejects_parent_path_traversal(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    version = make_version(tmp_path / "version.json")
+    native_zip = tmp_path / "native.jar"
+    destination = tmp_path / "natives"
+    with zipfile.ZipFile(native_zip, "w") as archive:
+        archive.writestr("../outside.dll", b"escape")
+    monkeypatch.setattr(Paths, "natives", lambda version: destination)
+
+    with pytest.raises(RuntimeError, match="Unsafe path"):
+        DownloadLibraryManager._extract_native(native_zip, version, "unsafe")
+
+    assert not (tmp_path / "outside.dll").exists()
+    assert not (destination / ".extracted" / "unsafe").exists()
+
+
+def test_extract_native_rejects_marker_directory_entries(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    version = make_version(tmp_path / "version.json")
+    native_zip = tmp_path / "native.jar"
+    destination = tmp_path / "natives"
+    with zipfile.ZipFile(native_zip, "w") as archive:
+        archive.writestr(".extracted/fake-marker", b"poison")
+    monkeypatch.setattr(Paths, "natives", lambda version: destination)
+
+    with pytest.raises(RuntimeError, match="Unsafe path"):
+        DownloadLibraryManager._extract_native(native_zip, version, "real-marker")
+
+    assert not (destination / ".extracted" / "real-marker").exists()

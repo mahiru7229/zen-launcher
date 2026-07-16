@@ -22,7 +22,7 @@ class OfflineAuthentication:
     def uuid_generator(player_name:str) -> str:
         data = f"OfflinePlayer:{player_name}".encode("utf-8")
 
-        md5 = bytearray(hashlib.md5(data).digest())
+        md5 = bytearray(hashlib.md5(data, usedforsecurity=False).digest())
 
         # UUID version 3
         md5[6] &= 0x0F

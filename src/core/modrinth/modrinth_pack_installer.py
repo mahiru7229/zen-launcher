@@ -210,7 +210,7 @@ class ModrinthPackInstaller:
             relative = ModrinthPackInstaller._safe_relative_path(name[len(normalized_prefix):])
             target = staging.joinpath(*relative.parts)
             target.parent.mkdir(parents=True, exist_ok=True)
-            sha1 = hashlib.sha1()
+            sha1 = hashlib.sha1(usedforsecurity=False)
             sha512 = hashlib.sha512()
             written = 0
             with archive.open(info, "r") as source, target.open("wb") as output:

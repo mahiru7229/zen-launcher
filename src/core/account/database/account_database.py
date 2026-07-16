@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import contextmanager
+from collections.abc import Iterator
 from pathlib import Path
 from threading import Lock
 
@@ -48,7 +50,7 @@ class AccountDatabase:
     @staticmethod
     def initialize() -> Path:
         database_path = AccountDatabase._prepare_database_path()
-        with AccountDatabase.connect() as connection:
+        with AccountDatabase.session() as connection:
             connection.execute("SELECT 1")
         return database_path
 
@@ -76,8 +78,18 @@ class AccountDatabase:
             raise RuntimeError(f"Cannot open the account database at '{database_path}': {error}") from error
 
     @staticmethod
+    @contextmanager
+    def session() -> Iterator[sqlite3.Connection]:
+        connection = AccountDatabase.connect()
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
+
+    @staticmethod
     def verify_integrity() -> bool:
-        with AccountDatabase.connect() as connection:
+        with AccountDatabase.session() as connection:
             AccountDatabase._verify_integrity(connection)
         return True
 

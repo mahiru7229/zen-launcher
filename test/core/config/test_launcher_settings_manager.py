@@ -68,13 +68,66 @@ def test_update_settings_are_created_and_persisted(tmp_path: Path) -> None:
     manager = LauncherSettingsManager(tmp_path / "launcher_settings.json")
 
     data = manager.load()
-    assert data["updates"] == {"auto_check": True, "channel": "beta", "last_checked_at": None}
+    assert data["updates"] == {
+        "auto_check": True,
+        "channel": "stable",
+        "channel_policy_version": manager.UPDATE_CHANNEL_POLICY_VERSION,
+        "last_checked_at": None,
+    }
 
     manager.update_section("updates", {"auto_check": False, "last_checked_at": "2026-07-15T12:00:00+00:00"})
     updated = manager.load()["updates"]
     assert updated["auto_check"] is False
-    assert updated["channel"] == "beta"
+    assert updated["channel"] == "stable"
     assert updated["last_checked_at"] == "2026-07-15T12:00:00+00:00"
+
+
+def test_existing_beta_channel_is_migrated_to_stable_once(tmp_path: Path) -> None:
+    path = tmp_path / "launcher_settings.json"
+    path.write_text(json.dumps({
+        "schema_version": 5,
+        "updates": {
+            "auto_check": True,
+            "channel": "beta",
+            "last_checked_at": None,
+        },
+    }), encoding="utf-8")
+    manager = LauncherSettingsManager(path)
+
+    migrated = manager.load()["updates"]
+
+    assert migrated["channel"] == "stable"
+    assert migrated["channel_policy_version"] == manager.UPDATE_CHANNEL_POLICY_VERSION
+
+
+def test_user_can_opt_back_into_beta_after_stable_migration(tmp_path: Path) -> None:
+    path = tmp_path / "launcher_settings.json"
+    path.write_text(json.dumps({
+        "schema_version": 5,
+        "updates": {"channel": "beta"},
+    }), encoding="utf-8")
+    manager = LauncherSettingsManager(path)
+
+    assert manager.load()["updates"]["channel"] == "stable"
+    manager.update_section("updates", {"channel": "beta"})
+
+    assert manager.load()["updates"]["channel"] == "beta"
+
+
+def test_already_migrated_beta_opt_in_is_preserved(tmp_path: Path) -> None:
+    path = tmp_path / "launcher_settings.json"
+    path.write_text(json.dumps({
+        "schema_version": 6,
+        "updates": {
+            "auto_check": True,
+            "channel": "beta",
+            "channel_policy_version": LauncherSettingsManager.UPDATE_CHANNEL_POLICY_VERSION,
+            "last_checked_at": None,
+        },
+    }), encoding="utf-8")
+    manager = LauncherSettingsManager(path)
+
+    assert manager.load()["updates"]["channel"] == "beta"
 
 
 def test_theme_and_modrinth_channels_are_created_and_persisted(tmp_path: Path) -> None:

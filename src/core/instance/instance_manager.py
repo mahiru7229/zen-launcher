@@ -1,5 +1,6 @@
 from src.models.minecraft.version import Version
 from src.models.instance.instance import Instance
+from src.models.progress.progress_callback import ProgressCallback
 from src.core.fs.paths import Paths
 from src.core.package.package_manager import PackageManager
 from src.config import VERSION_TAG
@@ -8,11 +9,22 @@ from pathlib import Path
 from datetime import datetime, timezone
 import json
 import os
+import re
 import shutil
 import uuid
 
 
 class InstanceManager:
+    INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
+    WINDOWS_RESERVED_NAMES = {"con", "prn", "aux", "nul", *(f"com{index}" for index in range(1, 10)), *(f"lpt{index}" for index in range(1, 10))}
+
+    @staticmethod
+    def validate_name(value: str) -> str:
+        name = str(value).strip()
+        device_name = name.split(".", 1)[0].casefold()
+        if not name or name in {".", ".."} or name.endswith((" ", ".")) or not InstanceManager.INSTANCE_NAME_PATTERN.fullmatch(name) or device_name in InstanceManager.WINDOWS_RESERVED_NAMES:
+            raise RuntimeError("The instance name is not valid on Windows.")
+        return name
 
     @staticmethod
     def _save_instance_metadata(instance: Instance) -> None:
@@ -54,17 +66,21 @@ class InstanceManager:
 
     @staticmethod
     def _load_instance_metadata(path: Path) -> Instance:
-        data = json.loads(
-            path.read_text(encoding="utf-8")
-        )
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError("instance.json must contain an object.")
+            instance_id = str(data["id"]).strip()
+            name = str(data["name"]).strip()
+            version_id = str(data["version_id"]).strip()
+            raw_loader = data.get("mod_loader", ("vanilla", "-1"))
+            if not instance_id or not name or not version_id or not isinstance(raw_loader, (list, tuple)) or len(raw_loader) != 2:
+                raise ValueError("instance.json is missing required fields.")
+            mod_loader = (str(raw_loader[0]).strip().lower() or "vanilla", str(raw_loader[1]).strip() or "-1")
+        except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
+            raise RuntimeError(f"Invalid instance metadata: {path}") from error
 
-        return Instance(
-            instance_id=data["id"],
-            name=data["name"],
-            version_id=data["version_id"],
-            mod_loader=tuple(data.get("mod_loader", ("vanilla", "-1"))),
-            instance_dir=path.parent
-        )
+        return Instance(instance_id=instance_id, name=name, version_id=version_id, mod_loader=mod_loader, instance_dir=path.parent)
 
     @staticmethod
     def list_instances() -> list[Instance]:
@@ -81,7 +97,10 @@ class InstanceManager:
             if not metadata_path.exists():
                 continue
 
-            instance = InstanceManager._load_instance_metadata(metadata_path)
+            try:
+                instance = InstanceManager.load(instance_dir.name)
+            except RuntimeError:
+                continue
             instances.append(instance)
 
         return instances
@@ -92,6 +111,7 @@ class InstanceManager:
         new_name: str,
         include_saves: bool = False
     ) -> Instance:
+        new_name = InstanceManager.validate_name(new_name)
         if not InstanceManager.is_instance_exist(source_name):
             raise RuntimeError(
                 f"Instance '{source_name}' does not exist."
@@ -165,21 +185,13 @@ class InstanceManager:
                 pass
 
     @staticmethod
-    def export(
-        instance_name: str,
-        output_path: Path,
-        include_saves: bool = False
-    ) -> Path:
+    def export(instance_name: str, output_path: Path, include_saves: bool = False, on_progress: ProgressCallback | None = None) -> Path:
         instance = InstanceManager.load(instance_name)
 
-        return PackageManager.export_instance(
-            instance,
-            output_path,
-            include_saves
-        )
+        return PackageManager.export_instance(instance, output_path, include_saves, on_progress)
 
     @staticmethod
-    def import_instance(package_path: Path) -> Instance:
+    def import_instance(package_path: Path, on_progress: ProgressCallback | None = None) -> Instance:
         temp_dir = Paths.instances_root() / "_import_temp"
 
         if temp_dir.exists():
@@ -191,10 +203,7 @@ class InstanceManager:
         )
 
         try:
-            PackageManager.extract(
-                package_path,
-                temp_dir
-            )
+            PackageManager.extract(package_path, temp_dir, on_progress)
 
             metadata_files = list(
                 temp_dir.rglob("instance.json")
@@ -211,6 +220,7 @@ class InstanceManager:
             instance = InstanceManager._load_instance_metadata(
                 metadata_path
             )
+            instance.name = InstanceManager.validate_name(instance.name)
 
             if InstanceManager.is_instance_exist(instance.name):
                 raise RuntimeError(
@@ -241,6 +251,7 @@ class InstanceManager:
 
     @staticmethod
     def rename(instance_name: str, new_name: str) -> Path:
+        new_name = InstanceManager.validate_name(new_name)
         if not InstanceManager.is_instance_exist(instance_name):
             raise RuntimeError(
                 f"Instance '{instance_name}' does not exist!"
@@ -324,6 +335,7 @@ class InstanceManager:
         version: Version,
         mod_loader=("vanilla", "-1")
     ) -> Instance:
+        name = InstanceManager.validate_name(name)
         if InstanceManager.is_instance_exist(name):
             raise RuntimeError(
                 f"Instance '{name}' already exists."
@@ -413,7 +425,7 @@ class InstanceManager:
 
     @staticmethod
     def next_available_name(preferred_name: str) -> str:
-        base_name = str(preferred_name).strip() or "New Instance"
+        base_name = InstanceManager.validate_name(str(preferred_name).strip() or "New Instance")
         try:
             existing_names = {instance.name.casefold() for instance in InstanceManager.list_instances()}
         except Exception:
@@ -479,13 +491,12 @@ class InstanceManager:
     @staticmethod
     def _load_instances_data() -> dict:
         try:
-            return json.loads(
-                Paths.instance_data_path().read_text(
-                    encoding="utf-8"
-                )
-            )
-        except (FileNotFoundError, json.JSONDecodeError):
+            data = json.loads(Paths.instance_data_path().read_text(encoding="utf-8"))
+        except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError):
             return {"instances": []}
+        if not isinstance(data, dict) or not isinstance(data.get("instances", []), list):
+            return {"instances": []}
+        return data
 
     @staticmethod
     def _add_instances_data(
@@ -510,14 +521,15 @@ class InstanceManager:
     @staticmethod
     def _save_instances(data: dict) -> Path:
         instance_data_path = Paths.instance_data_path()
-
-        instance_data_path.write_text(
-            json.dumps(
-                data,
-                indent=4,
-                ensure_ascii=False
-            ),
-            encoding="utf-8"
-        )
-
+        instance_data_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = instance_data_path.with_name(f"{instance_data_path.name}.tmp")
+        try:
+            with temporary.open("w", encoding="utf-8", newline="\n") as file:
+                file.write(json.dumps(data, indent=4, ensure_ascii=False) + "\n")
+                file.flush()
+                os.fsync(file.fileno())
+            temporary.replace(instance_data_path)
+        except Exception:
+            temporary.unlink(missing_ok=True)
+            raise
         return instance_data_path

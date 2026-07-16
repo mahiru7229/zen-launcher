@@ -269,6 +269,7 @@ def test_run_redirects_stdout_to_log_file(
     )
     assert log_file.mode == "w"
     assert log_file.encoding.lower().replace("-", "") == "utf8"
+    assert log_file.closed is True
 
 
 def test_run_redirects_stderr_to_stdout(

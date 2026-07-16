@@ -199,13 +199,6 @@ def test_load_manifest_returns_empty_dict_for_invalid_json(
     assert result == {}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "_load_manifest currently expects a Path and "
-        "does not handle None returned after network failure."
-    ),
-)
 def test_load_manifest_returns_empty_dict_for_none_path():
     assert (
         VersionManifestManager._load_manifest(None)
@@ -455,3 +448,28 @@ def test_latest_version_returns_empty_string_after_download_failure(
         VersionManifestManager.latest_version()
         == ""
     )
+
+def test_download_manifest_uses_cached_file_after_network_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    manifest_path = tmp_path / "manifest.json"
+    cached = make_manifest_data()
+    manifest_path.write_text(json.dumps(cached), encoding="utf-8")
+    monkeypatch.setattr(Paths, "version_manifest", lambda: manifest_path)
+
+    def fail_request(*args, **kwargs):
+        raise requests.RequestException("offline")
+
+    monkeypatch.setattr(requests, "get", fail_request)
+
+    assert VersionManifestManager._download_manifest() == manifest_path
+    assert VersionManifestManager.get()[0].id == "1.21.8"
+
+
+def test_download_manifest_does_not_replace_cache_with_invalid_response(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    manifest_path = tmp_path / "manifest.json"
+    cached_text = json.dumps(make_manifest_data())
+    manifest_path.write_text(cached_text, encoding="utf-8")
+    monkeypatch.setattr(Paths, "version_manifest", lambda: manifest_path)
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: SimpleNamespace(text="<html>error</html>"))
+
+    assert VersionManifestManager._download_manifest() == manifest_path
+    assert manifest_path.read_text(encoding="utf-8") == cached_text

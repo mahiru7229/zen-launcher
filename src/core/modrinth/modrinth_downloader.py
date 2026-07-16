@@ -157,7 +157,7 @@ class ModrinthDownloader:
 
                 if not append:
                     existing_size = 0
-                    sha1_hash = hashlib.sha1()
+                    sha1_hash = hashlib.sha1(usedforsecurity=False)
                     sha512_hash = hashlib.sha512()
 
                 content_length = HttpDownloader._content_length(response, 0)
@@ -200,7 +200,7 @@ class ModrinthDownloader:
 
     @staticmethod
     def _hash_partial(path: Path, expected_size: int) -> tuple[int, hashlib._Hash, hashlib._Hash]:
-        sha1_hash = hashlib.sha1()
+        sha1_hash = hashlib.sha1(usedforsecurity=False)
         sha512_hash = hashlib.sha512()
         if not path.is_file():
             return 0, sha1_hash, sha512_hash
@@ -218,7 +218,7 @@ class ModrinthDownloader:
             return size, sha1_hash, sha512_hash
         except OSError:
             path.unlink(missing_ok=True)
-            return 0, hashlib.sha1(), hashlib.sha512()
+            return 0, hashlib.sha1(usedforsecurity=False), hashlib.sha512()
 
     @staticmethod
     def verify(path: Path, sha1: str = "", sha512: str = "", expected_size: int = 0) -> bool:
@@ -233,7 +233,7 @@ class ModrinthDownloader:
 
         if not sha1 and not sha512:
             return False
-        sha1_hash = hashlib.sha1() if sha1 else None
+        sha1_hash = hashlib.sha1(usedforsecurity=False) if sha1 else None
         sha512_hash = hashlib.sha512() if sha512 else None
         try:
             with path.open("rb") as source:

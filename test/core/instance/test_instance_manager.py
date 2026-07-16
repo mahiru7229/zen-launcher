@@ -239,3 +239,63 @@ def test_clone_resets_runtime_history_and_play_time(temporary_paths: Path, fake_
     assert cloned_data["last_game_log"] == ""
     assert cloned_data["last_crash_report"] == ""
     assert not (cloned.instance_dir / ".mcw" / "runtime-history.json").exists()
+
+
+def test_list_instances_skips_corrupted_metadata(temporary_paths: Path, fake_version) -> None:
+    good = InstanceManager.create(name="Good Instance", version=fake_version)
+    broken_dir = temporary_paths / "Broken Instance"
+    broken_dir.mkdir()
+    (broken_dir / "instance.json").write_text("{broken-json", encoding="utf-8")
+
+    instances = InstanceManager.list_instances()
+
+    assert [instance.name for instance in instances] == [good.name]
+
+
+@pytest.mark.parametrize("name", ["CON", "nul.txt", "COM1", "LPT9", "../escape", "bad:name"])
+def test_create_rejects_invalid_windows_instance_names(temporary_paths: Path, fake_version, name: str) -> None:
+    with pytest.raises(RuntimeError, match="not valid on Windows"):
+        InstanceManager.create(name=name, version=fake_version)
+
+
+def test_list_instances_repairs_metadata_name_to_directory_name(temporary_paths: Path, fake_version) -> None:
+    instance = InstanceManager.create(name="Correct Folder", version=fake_version)
+    metadata_path = instance.instance_dir / "instance.json"
+    data = __import__("json").loads(metadata_path.read_text(encoding="utf-8"))
+    data["name"] = "Stale Name"
+    metadata_path.write_text(__import__("json").dumps(data), encoding="utf-8")
+
+    instances = InstanceManager.list_instances()
+
+    assert [item.name for item in instances] == ["Correct Folder"]
+    assert __import__("json").loads(metadata_path.read_text(encoding="utf-8"))["name"] == "Correct Folder"
+
+
+def test_import_rejects_instance_name_that_escapes_instances_root(temporary_paths: Path, tmp_path: Path) -> None:
+    import json
+    import zipfile
+
+    package_path = tmp_path / "unsafe-name.mcwpack"
+    package_metadata = {
+        "format": "mcwpack",
+        "format_version": 1,
+        "package_type": "instance",
+        "launcher_name": "mcw-launcher",
+        "launcher_version": "v0.5.1-rc.1",
+        "created_at": "2026-07-16T00:00:00+00:00",
+        "include_saves": False,
+    }
+    instance_metadata = {
+        "id": "unsafe-id",
+        "name": "../escape",
+        "version_id": "1.20.1",
+        "mod_loader": ["vanilla", "-1"],
+    }
+    with zipfile.ZipFile(package_path, "w") as archive:
+        archive.writestr("package.json", json.dumps(package_metadata))
+        archive.writestr("instance.json", json.dumps(instance_metadata))
+
+    with pytest.raises(RuntimeError, match="not valid on Windows"):
+        InstanceManager.import_instance(package_path)
+
+    assert not (temporary_paths.parent / "escape").exists()

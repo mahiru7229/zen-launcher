@@ -13,7 +13,7 @@ from src.models.instance.instance import Instance
 
 
 class JavaRuntime:
-    _process_logs: dict[int, tuple[Path, TextIO]] = {}
+    _process_logs: dict[int, Path] = {}
     _process_logs_lock = threading.RLock()
 
     @classmethod
@@ -56,10 +56,11 @@ class JavaRuntime:
             log_file.close()
             raise
 
+        log_file.close()
         pid = getattr(process, "pid", None)
         if isinstance(pid, int) and pid > 0:
             with cls._process_logs_lock:
-                cls._process_logs[pid] = (log_path, log_file)
+                cls._process_logs[pid] = log_path
         return process
 
     @staticmethod
@@ -91,7 +92,7 @@ class JavaRuntime:
             return None
         with cls._process_logs_lock:
             record = cls._process_logs.get(pid)
-        return record[0] if record is not None else None
+        return record
 
     @classmethod
     def close_process_log(cls, process: object) -> None:
@@ -99,10 +100,4 @@ class JavaRuntime:
         if not isinstance(pid, int) or pid <= 0:
             return
         with cls._process_logs_lock:
-            record = cls._process_logs.pop(pid, None)
-        if record is None:
-            return
-        try:
-            record[1].close()
-        except OSError:
-            pass
+            cls._process_logs.pop(pid, None)

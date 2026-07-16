@@ -3,7 +3,6 @@ from __future__ import annotations
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox, QLabel, QPushButton
 
-from src.core.language.language_manager import language_manager
 from src.core.theme.theme_manager import theme_manager
 from src.gui.config import NAVIGATION_ITEMS, VERSION
 from src.gui.pages.base_page import BasePage
@@ -95,8 +94,8 @@ class LauncherSettingsPage(BasePage):
         current_version_label.setObjectName("ValueLabel")
         self.auto_check_updates = QCheckBox("Automatically check for updates when the launcher starts")
         self.update_channel_combo = QComboBox()
-        self.update_channel_combo.addItem("Beta", "beta")
         self.update_channel_combo.addItem("Stable", "stable")
+        self.update_channel_combo.addItem("Beta", "beta")
         self.update_status_label = QLabel("Update status: Not checked")
         self.update_status_label.setObjectName("ValueLabel")
         self.update_status_label.setWordWrap(True)
@@ -204,7 +203,7 @@ class LauncherSettingsPage(BasePage):
         self.limit_download_speed.setChecked(download_limit > 0)
         self.download_limit_mbps.setValue(download_limit if download_limit > 0 else 10.0)
         self.download_limit_mbps.setEnabled(download_limit > 0)
-        channel_index = self.update_channel_combo.findData(settings.get("update_channel", "beta"))
+        channel_index = self.update_channel_combo.findData(settings.get("update_channel", "stable"))
         self.update_channel_combo.setCurrentIndex(max(0, channel_index))
         self.reload_languages()
         language_index = self.language_combo.findData(settings.get("language", "en-US"))
@@ -226,7 +225,7 @@ class LauncherSettingsPage(BasePage):
             "remember_window_size": self.remember_window_size.isChecked(),
             "language": self.language_combo.currentData() or "en-US",
             "auto_check_updates": self.auto_check_updates.isChecked(),
-            "update_channel": self.update_channel_combo.currentData() or "beta",
+            "update_channel": self.update_channel_combo.currentData() or "stable",
             "theme": self.theme_combo.currentData() or "mcw-default",
             "show_static_text": self.show_static_text.isChecked(),
             "modrinth_include_beta": self.modrinth_include_beta.isChecked(),

@@ -1,7 +1,9 @@
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import concurrent.futures
 import json
+import shutil
+import stat
 import zipfile
 
 from src.core.fs.paths import Paths
@@ -154,15 +156,36 @@ class DownloadLibraryManager:
 
         with zipfile.ZipFile(native_path, "r") as archive:
             for member in archive.infolist():
-                if member.filename.startswith("META-INF/"):
+                relative = DownloadLibraryManager._safe_native_path(member)
+                if relative is None:
                     continue
 
-                archive.extract(
-                    member,
-                    destination,
-                )
+                target = destination.joinpath(*relative.parts)
+                if member.is_dir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with archive.open(member, "r") as source, target.open("wb") as output:
+                    shutil.copyfileobj(source, output, length=1024 * 1024)
 
         marker_path.touch()
+
+    @staticmethod
+    def _safe_native_path(member: zipfile.ZipInfo) -> PurePosixPath | None:
+        normalized = str(member.filename).replace("\\", "/").strip()
+        if not normalized:
+            return None
+        path = PurePosixPath(normalized)
+        if path.parts and path.parts[0].casefold() == "meta-inf":
+            return None
+        if stat.S_ISLNK((member.external_attr >> 16) & 0xFFFF):
+            raise RuntimeError(f"Native archive contains a symbolic link: {member.filename}")
+        if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+            raise RuntimeError(f"Unsafe path in native archive: {member.filename}")
+        if not path.parts or ":" in path.parts[0] or path.parts[0].casefold() == ".extracted":
+            raise RuntimeError(f"Unsafe path in native archive: {member.filename}")
+        return path
 
     @staticmethod
     def _load_download_object(

@@ -18,7 +18,7 @@ class GuiSettingsController(BaseController):
         "remember_window_size": True,
         "language": "en-US",
         "auto_check_updates": True,
-        "update_channel": "beta",
+        "update_channel": "stable",
         "theme": "mcw-default",
         "show_static_text": True,
         "modrinth_include_beta": False,

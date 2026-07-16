@@ -158,3 +158,36 @@ def test_presenter_hides_speed_for_multi_file_checks_without_network_activity():
     view = ProgressPresenter.present(event)
 
     assert view.detail == "4 / 10 files · 6 files left · 40%"
+
+
+def test_presenter_formats_instance_export_progress():
+    event = ProgressEvent(
+        stage=ProgressStage.EXPORTING_INSTANCE,
+        message="Exporting mods/example.jar...",
+        current=3 * 1024 * 1024,
+        total=12 * 1024 * 1024,
+        unit=ProgressUnit.BYTES,
+    )
+
+    view = ProgressPresenter.present(event)
+
+    assert view.stage_text == "EXPORT"
+    assert view.button_text == "EXPORTING..."
+    assert view.percentage == 25
+    assert view.detail == "3.0 MB / 12.0 MB · 9.0 MB left · 25%"
+
+
+def test_presenter_formats_instance_import_progress():
+    event = ProgressEvent(
+        stage=ProgressStage.IMPORTING_INSTANCE,
+        message="Importing mods/example.jar...",
+        current=6 * 1024 * 1024,
+        total=12 * 1024 * 1024,
+        unit=ProgressUnit.BYTES,
+    )
+
+    view = ProgressPresenter.present(event)
+
+    assert view.stage_text == "IMPORT"
+    assert view.button_text == "IMPORTING..."
+    assert view.percentage == 50

@@ -25,7 +25,7 @@ class AccountRepository:
         cipher_version = TokenCipher.VERSION
         updated_at = int(time())
 
-        with AccountDatabase.connect() as connection:
+        with AccountDatabase.session() as connection:
             key = AccountIntegrity.get_or_create_key(connection)
             payload = AccountRepository._integrity_payload(
                 account_id=account.account_id,
@@ -73,7 +73,7 @@ class AccountRepository:
 
     @staticmethod
     def get(account_id: str) -> Account | None:
-        with AccountDatabase.connect() as connection:
+        with AccountDatabase.session() as connection:
             row = connection.execute(AccountRepository._SELECT_COLUMNS + " WHERE account_id = ?", (account_id,)).fetchone()
             if row is None:
                 return None
@@ -81,14 +81,14 @@ class AccountRepository:
 
     @staticmethod
     def list_accounts() -> list[Account]:
-        with AccountDatabase.connect() as connection:
+        with AccountDatabase.session() as connection:
             rows = connection.execute(AccountRepository._SELECT_COLUMNS + " ORDER BY username COLLATE NOCASE ASC").fetchall()
             return [AccountRepository._row_to_account(connection, row) for row in rows]
 
     @staticmethod
     def remove(account_id: str) -> bool:
         removed = False
-        with AccountDatabase.connect() as connection:
+        with AccountDatabase.session() as connection:
             connection.execute(
                 "UPDATE accounts SET access_token = NULL, refresh_token = NULL, token_expires_at = NULL, record_integrity = NULL WHERE account_id = ?",
                 (account_id,),
@@ -111,7 +111,7 @@ class AccountRepository:
     def set_selected_account(account_id: str) -> bool:
         if AccountRepository.get(account_id) is None:
             return False
-        with AccountDatabase.connect() as connection:
+        with AccountDatabase.session() as connection:
             connection.execute(
                 "INSERT INTO account_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                 (AccountRepository.SELECTED_ACCOUNT_KEY, account_id),
@@ -120,7 +120,7 @@ class AccountRepository:
 
     @staticmethod
     def get_selected_account() -> Account | None:
-        with AccountDatabase.connect() as connection:
+        with AccountDatabase.session() as connection:
             row = connection.execute("SELECT value FROM account_state WHERE key = ?", (AccountRepository.SELECTED_ACCOUNT_KEY,)).fetchone()
         if row is None:
             return None
@@ -128,12 +128,12 @@ class AccountRepository:
 
     @staticmethod
     def raw_rows() -> list[sqlite3.Row]:
-        with AccountDatabase.connect() as connection:
+        with AccountDatabase.session() as connection:
             return connection.execute(AccountRepository._SELECT_COLUMNS + " ORDER BY username COLLATE NOCASE ASC").fetchall()
 
     @staticmethod
     def decode_raw_row(row: sqlite3.Row, verify_integrity: bool = True) -> Account:
-        with AccountDatabase.connect() as connection:
+        with AccountDatabase.session() as connection:
             return AccountRepository._row_to_account(connection, row, verify_integrity=verify_integrity)
 
     _SELECT_COLUMNS = """

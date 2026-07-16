@@ -18,6 +18,8 @@ class ProgressPresenter:
     _STAGE_LABELS = {
         "preparing": "PREPARING",
         "repairing_instance": "REPAIR",
+        "importing_instance": "IMPORT",
+        "exporting_instance": "EXPORT",
         "loading_version": "VERSION",
         "installing_mod_loader": "MOD LOADER",
         "selecting_java": "JAVA CHECK",
@@ -40,6 +42,8 @@ class ProgressPresenter:
 
     _BUTTON_TEXTS = {
         "repairing_instance": "REPAIRING...",
+        "importing_instance": "IMPORTING...",
+        "exporting_instance": "EXPORTING...",
         "installing_mod_loader": "INSTALLING MOD LOADER...",
         "selecting_java": "CHECKING JAVA...",
         "downloading_java": "DOWNLOADING JAVA...",

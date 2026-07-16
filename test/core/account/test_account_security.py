@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import base64
 import sqlite3
+from contextlib import contextmanager
+from collections.abc import Iterator
 
 import pytest
 
@@ -13,6 +15,16 @@ from src.core.security.account_security_manager import AccountSecurityManager
 from src.core.security.token_cipher import TokenCipher
 from src.models.account.account import Account
 from src.models.account.account_source import AccountSource
+
+
+@contextmanager
+def _sqlite_session() -> Iterator[sqlite3.Connection]:
+    connection = sqlite3.connect(Paths.account_database_path())
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
 
 
 class FakeDPAPI:
@@ -54,7 +66,7 @@ def test_microsoft_access_token_is_not_persisted(monkeypatch: pytest.MonkeyPatch
 
     AccountRepository.save(_account())
 
-    with sqlite3.connect(Paths.account_database_path()) as connection:
+    with _sqlite_session() as connection:
         row = connection.execute("SELECT access_token, refresh_token, token_cipher_version, record_integrity FROM accounts").fetchone()
     assert row[0] is None
     assert str(row[1]).startswith(TokenCipher.PREFIX)
@@ -71,7 +83,7 @@ def test_integrity_tampering_is_rejected(monkeypatch: pytest.MonkeyPatch, tmp_pa
     _prepare(monkeypatch, tmp_path)
     AccountRepository.save(_account())
 
-    with sqlite3.connect(Paths.account_database_path()) as connection:
+    with _sqlite_session() as connection:
         connection.execute("UPDATE accounts SET username = 'TamperedPlayer' WHERE account_id = 'account-id'")
 
     with pytest.raises(AccountIntegrityError, match="integrity"):
@@ -83,7 +95,7 @@ def test_security_migration_reprotects_legacy_refresh_token(monkeypatch: pytest.
     legacy_blob = FakeDPAPI.CryptProtectData(b"legacy-refresh", TokenCipher.LEGACY_DESCRIPTION, None, None, None, 0)
     legacy_value = base64.b64encode(legacy_blob).decode("ascii")
 
-    with sqlite3.connect(Paths.account_database_path()) as connection:
+    with _sqlite_session() as connection:
         connection.execute(
             "INSERT INTO accounts (account_id, account_type, username, uuid, refresh_token, token_expires_at, token_cipher_version) VALUES (?, ?, ?, ?, ?, ?, ?)",
             ("legacy", "microsoft", "Legacy", "a" * 32, legacy_value, 123, 1),
@@ -92,7 +104,7 @@ def test_security_migration_reprotects_legacy_refresh_token(monkeypatch: pytest.
     report = AccountSecurityManager.migrate_if_needed()
 
     assert report.migrated_account_count == 1
-    with sqlite3.connect(Paths.account_database_path()) as connection:
+    with _sqlite_session() as connection:
         row = connection.execute("SELECT refresh_token, token_cipher_version, record_integrity FROM accounts WHERE account_id = 'legacy'").fetchone()
     assert str(row[0]).startswith(TokenCipher.PREFIX)
     assert row[1] == TokenCipher.VERSION

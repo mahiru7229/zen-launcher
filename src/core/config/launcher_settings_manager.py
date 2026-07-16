@@ -13,7 +13,8 @@ from src.core.fs.paths import Paths
 
 
 class LauncherSettingsManager:
-    SCHEMA_VERSION = 5
+    SCHEMA_VERSION = 6
+    UPDATE_CHANNEL_POLICY_VERSION = 1
     DEFAULT_SETTINGS = {
         "schema_version": SCHEMA_VERSION,
         "gui": {
@@ -41,7 +42,8 @@ class LauncherSettingsManager:
         },
         "updates": {
             "auto_check": True,
-            "channel": "beta",
+            "channel": "stable",
+            "channel_policy_version": UPDATE_CHANNEL_POLICY_VERSION,
             "last_checked_at": None,
         },
     }
@@ -146,6 +148,8 @@ class LauncherSettingsManager:
         temporary_path.replace(self.path)
 
     def _normalize(self, data: dict[str, Any]) -> dict[str, Any]:
+        raw_updates = data.get("updates") if isinstance(data.get("updates"), dict) else {}
+        raw_channel_policy_version = self._as_non_negative_int(raw_updates.get("channel_policy_version"), 0)
         normalized = self._deep_merge(copy.deepcopy(self.DEFAULT_SETTINGS), data)
         normalized["schema_version"] = self.SCHEMA_VERSION
 
@@ -175,8 +179,12 @@ class LauncherSettingsManager:
 
         updates = normalized.setdefault("updates", {})
         updates["auto_check"] = self._as_bool(updates.get("auto_check"), True)
-        channel = str(updates.get("channel") or "beta").strip().lower()
-        updates["channel"] = channel if channel in {"stable", "beta"} else "beta"
+        channel = str(updates.get("channel") or "stable").strip().lower()
+        normalized_channel = channel if channel in {"stable", "beta"} else "stable"
+        if raw_channel_policy_version < self.UPDATE_CHANNEL_POLICY_VERSION:
+            normalized_channel = "stable"
+        updates["channel"] = normalized_channel
+        updates["channel_policy_version"] = self.UPDATE_CHANNEL_POLICY_VERSION
         last_checked_at = updates.get("last_checked_at")
         updates["last_checked_at"] = last_checked_at if isinstance(last_checked_at, str) and last_checked_at else None
 
@@ -191,6 +199,14 @@ class LauncherSettingsManager:
             else:
                 result[key] = copy.deepcopy(value)
         return result
+
+    @staticmethod
+    def _as_non_negative_int(value: Any, default: int) -> int:
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return default
+        return parsed if parsed >= 0 else default
 
     @staticmethod
     def _as_download_limit(value: Any) -> float:

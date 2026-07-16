@@ -1,6 +1,6 @@
 # MCW Launcher PNG Theme Asset Guide
 
-Tài liệu này liệt kê toàn bộ PNG mà một theme có thể thay thế trong **MCW Launcher v0.5.1 Beta 2**. Mọi file đều là **tùy chọn**: thiếu, hỏng, sai định dạng hoặc nằm ngoài thư mục theme thì launcher chỉ bỏ qua asset đó và quay về CSS/text mặc định.
+Tài liệu này liệt kê toàn bộ PNG mà một theme có thể thay thế trong **MCW Launcher v0.5.1 RC 1**. Mọi file đều là **tùy chọn**: thiếu, hỏng, sai định dạng hoặc nằm ngoài thư mục theme thì launcher chỉ bỏ qua asset đó và quay về CSS/text mặc định.
 
 Tổng số asset key hiện tại: **119**.
 

@@ -22,6 +22,7 @@ class InstanceController(BaseController):
     selected_instance_changed = Signal(object)
     export_finished = Signal(object)
     repair_progress = Signal(object)
+    package_progress = Signal(object)
     repair_finished = Signal(object)
 
     REPAIR_TASK_ID = "instance.repair.full"
@@ -173,13 +174,19 @@ class InstanceController(BaseController):
         self._task_runner.run("instance.delete", lambda: {"name": name, "deleted": InstanceManager.delete_instance(name)}, f"Deleting '{name}'...")
 
     def import_package(self, package_path: Path) -> None:
-        self._task_runner.run("instance.import", lambda: InstanceManager.import_instance(package_path), f"Importing '{package_path.name}'...")
+        self._task_runner.run("instance.import", lambda: InstanceManager.import_instance(package_path, self._on_package_progress), f"Importing '{package_path.name}'...")
 
     def export_package(self, name: str, output_path: Path, include_saves: bool) -> None:
         name = name.strip()
         if not name:
             return
-        self._task_runner.run("instance.export", lambda: InstanceManager.export(name, output_path, include_saves), f"Exporting '{name}'...")
+        self._task_runner.run("instance.export", lambda: InstanceManager.export(name, output_path, include_saves, self._on_package_progress), f"Exporting '{name}'...")
+
+    def _on_package_progress(self, event: object) -> None:
+        self.package_progress.emit(event)
+        stage = getattr(getattr(event, "stage", None), "value", "package")
+        message = str(getattr(event, "message", "Processing package..."))
+        self.log_created.emit(f"[{stage}] {message}")
 
     @Slot(str, object)
     def _on_task_succeeded(self, task_id: str, result: object) -> None:

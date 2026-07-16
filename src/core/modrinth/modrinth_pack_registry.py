@@ -131,7 +131,7 @@ class ModrinthPackRegistry:
 
     @staticmethod
     def _sha1(path: Path) -> str:
-        digest = hashlib.sha1()
+        digest = hashlib.sha1(usedforsecurity=False)
         with path.open("rb") as handle:
             for chunk in iter(lambda: handle.read(1024 * 1024), b""):
                 digest.update(chunk)

@@ -5,8 +5,15 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import sys
 import tempfile
 import zipfile
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.config import VERSION_ID
 
 
 DEFAULT_FILES = ("README.md", "LICENSE")
@@ -35,6 +42,13 @@ def sha256_file(path: Path) -> str:
 
 def default_output_path(project_root: Path, version: str) -> Path:
     return project_root / "release" / f"MCW-Launcher-v{version}-windows-x64.zip"
+
+
+def validate_release_version(version: str, expected_version: str = VERSION_ID) -> str:
+    normalized = str(version).strip().removeprefix("v")
+    if normalized != expected_version:
+        raise ValueError(f"Release version '{normalized}' does not match src.config.VERSION_ID '{expected_version}'.")
+    return normalized
 
 
 def build_release_zip(project_root: Path, executable: Path, version: str, output: Path) -> Path:
@@ -68,13 +82,17 @@ def build_release_zip(project_root: Path, executable: Path, version: str, output
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build an MCW Launcher ZIP that can be installed by the automatic updater.")
     parser.add_argument("--exe", type=Path, required=True, help="Path to the packaged MCW Launcher.exe")
-    parser.add_argument("--version", required=True, help="Version without a leading v, for example 0.5.1-beta.2")
+    parser.add_argument("--version", required=True, help=f"Version without a leading v; it must match {VERSION_ID}")
     parser.add_argument("--output", type=Path, help="Output ZIP path")
     args = parser.parse_args()
 
-    project_root = Path(__file__).resolve().parents[1]
-    output = args.output or default_output_path(project_root, args.version.strip())
-    result = build_release_zip(project_root, args.exe.resolve(), args.version.strip(), output.resolve())
+    project_root = PROJECT_ROOT
+    try:
+        version = validate_release_version(args.version)
+    except ValueError as error:
+        parser.error(str(error))
+    output = args.output or default_output_path(project_root, version)
+    result = build_release_zip(project_root, args.exe.resolve(), version, output.resolve())
     print(result)
     print(result.with_name(f"{result.name}.sha256"))
 

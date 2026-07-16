@@ -334,7 +334,7 @@ Do not commit runtime data, downloaded Minecraft files, account databases, or pe
 
 Near-term priorities:
 
-- Complete packaged Windows testing for v0.5.1 Beta 2, the final beta before the v0.5.1 stable release.
+- Complete packaged Windows testing for v0.5.1 RC 1 before the v0.5.1 stable release.
 - Add interactive per-file conflict resolution for modpack updates.
 - Add backup retention rules, backup size previews, and a dedicated backup browser.
 - Improve crash diagnostics and runtime history presentation.

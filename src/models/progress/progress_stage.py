@@ -4,6 +4,8 @@ from enum import Enum
 class ProgressStage(Enum):
     PREPARING = "preparing"
     REPAIRING_INSTANCE = "repairing_instance"
+    IMPORTING_INSTANCE = "importing_instance"
+    EXPORTING_INSTANCE = "exporting_instance"
     LOADING_VERSION = "loading_version"
     INSTALLING_MOD_LOADER = "installing_mod_loader"
     SELECTING_JAVA = "selecting_java"

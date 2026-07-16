@@ -114,7 +114,7 @@ class AccountSecurityManager:
 
     @staticmethod
     def _ensure_integrity_key(force_reset: bool = False) -> bool:
-        with AccountDatabase.connect() as connection:
+        with AccountDatabase.session() as connection:
             try:
                 if force_reset:
                     AccountIntegrity.reset_key(connection)
@@ -127,7 +127,7 @@ class AccountSecurityManager:
 
     @staticmethod
     def _verify_row(row) -> None:
-        with AccountDatabase.connect() as connection:
+        with AccountDatabase.session() as connection:
             key = AccountIntegrity.get_or_create_key(connection)
             payload = AccountRepository._integrity_payload_from_row(row)
             if not AccountIntegrity.verify(key, payload, row["record_integrity"]):

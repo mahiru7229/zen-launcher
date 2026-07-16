@@ -47,8 +47,8 @@ class UpdateController(BaseController):
 
     @staticmethod
     def _normalize_channel(channel: str) -> str:
-        value = str(channel or "beta").strip().lower()
-        return value if value in {"stable", "beta"} else "beta"
+        value = str(channel or "stable").strip().lower()
+        return value if value in {"stable", "beta"} else "stable"
 
     def check(self, manual: bool = False) -> None:
         task_id = self.MANUAL_CHECK_TASK_ID if manual else self.AUTO_CHECK_TASK_ID

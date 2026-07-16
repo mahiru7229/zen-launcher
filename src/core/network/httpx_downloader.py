@@ -164,7 +164,7 @@ class HttpDownloader:
     def calculate_sha1(path: Path) -> str | None:
         if not path.is_file():
             return None
-        sha1 = hashlib.sha1()
+        sha1 = hashlib.sha1(usedforsecurity=False)
         try:
             with path.open("rb") as file:
                 while chunk := file.read(1024 * 1024):

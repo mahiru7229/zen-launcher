@@ -115,7 +115,8 @@ class OAuthCallbackServer:
         if callback_error:
             if callback_error == "access_denied":
                 raise MicrosoftAuthorizationCancelledError("Microsoft sign-in was cancelled.")
-            raise RuntimeError(f"Microsoft authorization failed: {callback_error}")
+            detail = f": {error_description}" if error_description else ""
+            raise RuntimeError(f"Microsoft authorization failed: {callback_error}{detail}")
 
         if not authorization_code:
             raise TimeoutError("Microsoft authorization callback was not received.")
