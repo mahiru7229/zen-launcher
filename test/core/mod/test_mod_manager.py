@@ -96,3 +96,32 @@ def test_replace_same_mod_file_does_not_delete_source(tmp_path):
 
     assert installed.path.exists()
     assert replaced[0].mod_id == "example"
+
+
+def make_forge_mod(path: Path, mod_id="forge_example", name="Forge Example", version="1.0.0") -> Path:
+    metadata = (
+        'modLoader="javafml"\n'
+        'loaderVersion="[47,)"\n'
+        'license="MIT"\n\n'
+        '[[mods]]\n'
+        f'modId="{mod_id}"\n'
+        f'version="{version}"\n'
+        f'displayName="{name}"\n'
+        'authors="Mahiru"\n'
+        'description="A Forge test mod."\n'
+    )
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("META-INF/mods.toml", metadata)
+    return path
+
+
+def test_adds_and_reads_forge_mod(tmp_path):
+    instance = make_instance(tmp_path, loader=("forge", "47.3.0"))
+    source = make_forge_mod(tmp_path / "forge-example.jar")
+
+    added = ModManager.add_mods(instance, [source])
+
+    assert added[0].mod_id == "forge_example"
+    assert added[0].name == "Forge Example"
+    assert added[0].version == "1.0.0"
+    assert added[0].status == "Ready"

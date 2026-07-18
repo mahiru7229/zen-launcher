@@ -7,6 +7,7 @@ from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtGui import QCloseEvent, QDesktopServices
 from PySide6.QtWidgets import QApplication, QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget
 
+from src.core.config.curseforge_config_manager import CurseForgeConfigManager
 from src.core.diagnostics.diagnostics_manager import DiagnosticsManager
 from src.core.fs.paths import Paths
 from src.core.instance.instance_manager import InstanceManager
@@ -18,6 +19,7 @@ from src.core.runtime.game_runtime_manager import GameRuntimeManager
 from src.core.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
 from src.gui.config import LAUNCHER_NAME, MINIMUM_HEIGHT, MINIMUM_WIDTH, RIGHT_PANEL_WIDTH, SIDEBAR_WIDTH, VERSION_ID, WINDOW_HEIGHT, WINDOW_WIDTH
 from src.gui.controllers.account_controller import AccountController
+from src.gui.controllers.curseforge_controller import CurseForgeController
 from src.gui.controllers.backup_controller import BackupController
 from src.gui.controllers.java_controller import JavaController
 from src.gui.controllers.modpack_lifecycle_controller import ModpackLifecycleController
@@ -30,6 +32,7 @@ from src.gui.controllers.modrinth_controller import ModrinthController
 from src.gui.controllers.settings_controller import InstanceSettingsController
 from src.gui.controllers.version_controller import VersionController
 from src.gui.controllers.update_controller import UpdateController
+from src.gui.dialogs.curseforge_browser_dialog import CurseForgeBrowserDialog
 from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
 from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
 from src.gui.dialogs.update_dialog import UpdateDialog
@@ -70,6 +73,7 @@ class MainWindow(QMainWindow):
         self.mod_loader_controller = ModLoaderController(self.task_runner)
         self.mod_controller = ModController(self.task_runner)
         self.modrinth_controller = ModrinthController(self.task_runner)
+        self.curseforge_controller = CurseForgeController(self.task_runner)
         self.instance_settings_controller = InstanceSettingsController()
         self.gui_settings_controller = GuiSettingsController()
         self._startup_settings = self.gui_settings_controller.load()
@@ -80,6 +84,7 @@ class MainWindow(QMainWindow):
         self.update_controller = UpdateController(self.task_runner, channel=self._startup_settings.get("update_channel", "stable"))
         self.running_instances_timer = QTimer(self)
         self._modrinth_tasks: set[str] = set()
+        self._curseforge_tasks: set[str] = set()
         self._prompted_update_versions: set[str] = set()
         self._selected_instance: object | None = None
         self.running_instances_timer.setInterval(1000)
@@ -131,6 +136,8 @@ class MainWindow(QMainWindow):
         self.mod_manager_dialog = ModManagerDialog(self)
         self.modrinth_mod_dialog = ModrinthBrowserDialog("mod", self)
         self.modrinth_modpack_dialog = ModrinthBrowserDialog("modpack", self)
+        self.curseforge_mod_dialog = CurseForgeBrowserDialog("mod", self)
+        self.curseforge_modpack_dialog = CurseForgeBrowserDialog("modpack", self)
 
         self.pages = {
             "home": self.home_page,
@@ -175,11 +182,13 @@ class MainWindow(QMainWindow):
         self.instances_page.selected_instance_changed.connect(self.instance_controller.select)
         self.instances_page.create_requested.connect(self.instance_controller.create)
         self.instances_page.fabric_versions_requested.connect(self.mod_loader_controller.load_fabric_versions)
+        self.instances_page.forge_versions_requested.connect(self.mod_loader_controller.load_forge_versions)
         self.instances_page.loader_change_requested.connect(self.instance_controller.change_loader)
         self.instances_page.repair_loader_requested.connect(self.instance_controller.repair_loader)
         self.instances_page.repair_instance_requested.connect(self.instance_controller.repair_instance)
         self.instances_page.manage_mods_requested.connect(self._open_mod_manager)
         self.instances_page.browse_modpacks_requested.connect(self._open_modrinth_modpacks)
+        self.instances_page.browse_curseforge_modpacks_requested.connect(self._open_curseforge_modpacks)
         self.instances_page.rename_requested.connect(self.instance_controller.rename)
         self.instances_page.clone_requested.connect(self.instance_controller.clone)
         self.instances_page.delete_requested.connect(self.instance_controller.delete)
@@ -212,6 +221,7 @@ class MainWindow(QMainWindow):
         self.version_controller.versions_changed.connect(self.instances_page.set_versions)
         self.version_controller.versions_changed.connect(lambda versions: self.home_page.set_manifest_count(len(versions)))
         self.mod_loader_controller.fabric_versions_changed.connect(self.instances_page.set_fabric_versions)
+        self.mod_loader_controller.forge_versions_changed.connect(self.instances_page.set_forge_versions)
 
         self.account_controller.accounts_changed.connect(self.account_page.set_accounts)
         self.account_controller.selected_account_changed.connect(self._account_selected)
@@ -238,6 +248,7 @@ class MainWindow(QMainWindow):
         self.mod_manager_dialog.remove_requested.connect(self.mod_controller.remove)
         self.mod_manager_dialog.enabled_requested.connect(self.mod_controller.set_enabled)
         self.mod_manager_dialog.modrinth_requested.connect(self._open_modrinth_mod_browser)
+        self.mod_manager_dialog.curseforge_requested.connect(self._open_curseforge_mod_browser)
         self.mod_manager_dialog.check_updates_requested.connect(self.mod_controller.check_updates)
         self.mod_manager_dialog.update_projects_requested.connect(self.mod_controller.update_projects)
         self.mod_manager_dialog.update_all_requested.connect(self.mod_controller.update_all)
@@ -261,8 +272,22 @@ class MainWindow(QMainWindow):
         self.modrinth_controller.mod_installed.connect(self._modrinth_mod_installed)
         self.modrinth_controller.modpack_installed.connect(self._modrinth_modpack_installed)
 
+        self.curseforge_mod_dialog.search_requested.connect(self._search_curseforge_mods)
+        self.curseforge_modpack_dialog.search_requested.connect(self._search_curseforge_modpacks)
+        self.curseforge_mod_dialog.files_requested.connect(self.curseforge_controller.load_files)
+        self.curseforge_modpack_dialog.files_requested.connect(self.curseforge_controller.load_files)
+        self.curseforge_mod_dialog.install_mod_requested.connect(self._install_curseforge_mod)
+        self.curseforge_modpack_dialog.install_modpack_requested.connect(self.curseforge_controller.install_modpack)
+        self.curseforge_mod_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
+        self.curseforge_modpack_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
+        self.curseforge_controller.search_results_changed.connect(self._set_curseforge_results)
+        self.curseforge_controller.files_changed.connect(self._set_curseforge_files)
+        self.curseforge_controller.mod_installed.connect(self._curseforge_mod_installed)
+        self.curseforge_controller.modpack_installed.connect(self._curseforge_modpack_installed)
+
         self.launch_controller.progress_received.connect(self._on_progress)
         self.modrinth_controller.progress_received.connect(self._on_progress)
+        self.curseforge_controller.progress_received.connect(self._on_progress)
         self.mod_controller.progress_received.connect(self._on_progress)
         self.modpack_lifecycle_controller.progress_received.connect(self._on_progress)
         self.update_controller.progress_received.connect(self._on_progress)
@@ -272,6 +297,7 @@ class MainWindow(QMainWindow):
         self.launch_controller.pause_requested.connect(self.launch_control.set_pause_pending)
         self.launch_controller.launch_paused.connect(self._on_launch_paused)
         self.instance_controller.repair_progress.connect(self._on_progress)
+        self.instance_controller.loader_progress.connect(self._on_progress)
         self.instance_controller.package_progress.connect(self._on_progress)
         self.instance_controller.repair_finished.connect(self._on_repair_finished)
 
@@ -298,6 +324,7 @@ class MainWindow(QMainWindow):
             self.mod_loader_controller,
             self.mod_controller,
             self.modrinth_controller,
+            self.curseforge_controller,
             self.instance_settings_controller,
             self.gui_settings_controller,
             self.launch_controller,
@@ -418,6 +445,72 @@ class MainWindow(QMainWindow):
         self.instance_controller.refresh(selected_name=selected_name)
         self.modrinth_modpack_dialog.close()
         QMessageBox.information(self, tr("modrinth.modpack.install"), tr("modrinth.modpack.installed", name=selected_name))
+
+
+    def _require_curseforge_api_key(self) -> bool:
+        if CurseForgeConfigManager.is_configured():
+            return True
+        QMessageBox.information(self, tr("curseforge.title"), tr("curseforge.api_key.required"))
+        return False
+
+    def _open_curseforge_mod_browser(self) -> None:
+        if not self._require_curseforge_api_key():
+            return
+        instance = self.mod_controller.current_instance
+        if instance is None or ModLoaderManager.normalize(instance.mod_loader)[0] != ModLoaderManager.FORGE:
+            QMessageBox.information(self, tr("curseforge.title"), tr("curseforge.mod.no_instance"))
+            return
+        self.curseforge_mod_dialog.set_instance(instance)
+        self.curseforge_mod_dialog.show()
+        self.curseforge_mod_dialog.raise_()
+        self.curseforge_mod_dialog.activateWindow()
+        self.curseforge_controller.search("mod", "", "downloads", 0, game_version=instance.version_id)
+
+    def _open_curseforge_modpacks(self) -> None:
+        if not self._require_curseforge_api_key():
+            return
+        self.curseforge_modpack_dialog.set_instance(None)
+        self.curseforge_modpack_dialog.show()
+        self.curseforge_modpack_dialog.raise_()
+        self.curseforge_modpack_dialog.activateWindow()
+        self.curseforge_controller.search("modpack", "", "downloads", 0)
+
+    def _search_curseforge_mods(self, project_type: str, query: str, sort: str, index: int) -> None:
+        self.curseforge_controller.search(project_type, query, sort, index, game_version=self.curseforge_mod_dialog.game_version)
+
+    def _search_curseforge_modpacks(self, project_type: str, query: str, sort: str, index: int) -> None:
+        self.curseforge_controller.search(project_type, query, sort, index)
+
+    def _install_curseforge_mod(self, project_id: int, file_id: int, allowed_release_types: object) -> None:
+        instance = self.mod_controller.current_instance
+        if instance is None:
+            QMessageBox.information(self, tr("curseforge.title"), tr("curseforge.mod.no_instance"))
+            return
+        self.curseforge_controller.install_mod(instance.name, int(project_id), int(file_id), tuple(allowed_release_types))
+
+    def _set_curseforge_results(self, project_type: str, result: object) -> None:
+        dialog = self.curseforge_mod_dialog if project_type == "mod" else self.curseforge_modpack_dialog
+        dialog.set_search_result(result)
+
+    def _set_curseforge_files(self, project_type: str, project_id: int, files: list) -> None:
+        dialog = self.curseforge_mod_dialog if project_type == "mod" else self.curseforge_modpack_dialog
+        dialog.set_files(project_id, files)
+
+    def _curseforge_mod_installed(self, result: object) -> None:
+        self.mod_controller.refresh()
+        count = len(getattr(result, "installed_files", ()) or ())
+        warnings = tuple(getattr(result, "warnings", ()) or ())
+        message = tr("curseforge.mod.installed", count=count)
+        if warnings:
+            message += "\n\n" + "\n".join(str(item) for item in warnings)
+        QMessageBox.information(self, tr("curseforge.mod.install"), message)
+
+    def _curseforge_modpack_installed(self, result: object) -> None:
+        instance = getattr(result, "instance", None)
+        selected_name = str(getattr(instance, "name", ""))
+        self.instance_controller.refresh(selected_name=selected_name)
+        self.curseforge_modpack_dialog.close()
+        QMessageBox.information(self, tr("curseforge.modpack.install"), tr("curseforge.modpack.installed", name=selected_name))
 
 
     def _open_java_folder(self, installation: object) -> None:
@@ -597,6 +690,8 @@ class MainWindow(QMainWindow):
         include_alpha = bool(settings.get("modrinth_include_alpha", False))
         self.modrinth_mod_dialog.set_channel_preferences(include_beta, include_alpha)
         self.modrinth_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.curseforge_mod_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.curseforge_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
         self.mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
         self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(settings.get("theme", "mcw-default")), bool(settings.get("show_static_text", True)))
 
@@ -607,6 +702,8 @@ class MainWindow(QMainWindow):
     def _set_modrinth_channel_preferences(self, include_beta: bool, include_alpha: bool) -> None:
         self.modrinth_mod_dialog.set_channel_preferences(include_beta, include_alpha)
         self.modrinth_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.curseforge_mod_dialog.set_channel_preferences(include_beta, include_alpha)
+        self.curseforge_modpack_dialog.set_channel_preferences(include_beta, include_alpha)
         self.mod_manager_dialog.set_channel_preferences(include_beta, include_alpha)
         self.gui_settings_controller.set_modrinth_channels(include_beta, include_alpha)
 
@@ -627,6 +724,8 @@ class MainWindow(QMainWindow):
             self.mod_manager_dialog,
             self.modrinth_mod_dialog,
             self.modrinth_modpack_dialog,
+            self.curseforge_mod_dialog,
+            self.curseforge_modpack_dialog,
         ):
             retranslate_dynamic = getattr(widget, "retranslate_dynamic", None)
             if callable(retranslate_dynamic):
@@ -648,6 +747,10 @@ class MainWindow(QMainWindow):
             self._modrinth_tasks.add(_task_id)
             self.modrinth_mod_dialog.set_busy(True)
             self.modrinth_modpack_dialog.set_busy(True)
+        if _task_id.startswith("curseforge."):
+            self._curseforge_tasks.add(_task_id)
+            self.curseforge_mod_dialog.set_busy(True)
+            self.curseforge_modpack_dialog.set_busy(True)
         if blocking or not self.task_runner.is_busy:
             self._set_status(message)
 
@@ -660,12 +763,16 @@ class MainWindow(QMainWindow):
             self.instances_page.set_modpack_busy(False)
         if task_id.startswith("update."):
             self.launcher_settings_page.set_update_busy(False)
-        if not task_id.startswith("modrinth."):
-            return
-        self._modrinth_tasks.discard(task_id)
-        busy = bool(self._modrinth_tasks)
-        self.modrinth_mod_dialog.set_busy(busy)
-        self.modrinth_modpack_dialog.set_busy(busy)
+        if task_id.startswith("modrinth."):
+            self._modrinth_tasks.discard(task_id)
+            busy = bool(self._modrinth_tasks)
+            self.modrinth_mod_dialog.set_busy(busy)
+            self.modrinth_modpack_dialog.set_busy(busy)
+        if task_id.startswith("curseforge."):
+            self._curseforge_tasks.discard(task_id)
+            busy = bool(self._curseforge_tasks)
+            self.curseforge_mod_dialog.set_busy(busy)
+            self.curseforge_modpack_dialog.set_busy(busy)
 
     def _on_task_failed(self, task_id: str, error: Exception) -> None:
         if task_id == "mods.update.check":

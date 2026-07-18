@@ -14,6 +14,7 @@ from src.core.minecraft.download_manager import DownloadClientManager
 from src.core.minecraft.launcher_manager import LauncherManager
 from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.curseforge.curseforge_content_manager import CurseForgeContentManager
 from src.core.modrinth.modrinth_content_manager import ModrinthContentManager
 from src.core.minecraft.version_manifest_manager import VersionManifestManager
 from src.core.network.download_pause import download_pause_controller
@@ -40,11 +41,9 @@ class MinecraftExecutor:
 
             settings = SettingsManager.load(instance)
             download_pause_controller.raise_if_requested()
-            modrinth_warnings = ModrinthContentManager.ensure(
-                instance,
-                reporter,
-                block_launch_on_failure=bool(getattr(settings, "block_launch_on_modrinth_failure", True)),
-            )
+            block_managed_failure = bool(getattr(settings, "block_launch_on_modrinth_failure", True))
+            modrinth_warnings = ModrinthContentManager.ensure(instance, reporter, block_launch_on_failure=block_managed_failure)
+            curseforge_warnings = CurseForgeContentManager.ensure(instance, reporter, block_launch_on_failure=block_managed_failure)
 
             download_pause_controller.raise_if_requested()
             VersionManifestManager.get()
@@ -98,8 +97,9 @@ class MinecraftExecutor:
                 "minecraftJavaMajorVersion": java_major,
                 "minecraftVersion": version.id,
             }
-            if modrinth_warnings:
-                result["warnings"] = modrinth_warnings
+            warnings = tuple(modrinth_warnings) + tuple(curseforge_warnings)
+            if warnings:
+                result["warnings"] = warnings
             return result
         except Exception:
             if not process_started:

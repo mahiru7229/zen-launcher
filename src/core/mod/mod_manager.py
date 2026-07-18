@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Iterable
 import json
 import shutil
+import tomllib
 import zipfile
 
 from src.core.fs.paths import Paths
@@ -39,7 +40,7 @@ class ModManager:
                 raise RuntimeError(f"Mod file must be a .jar file: {source.name}")
 
             metadata = ModManager.read_mod(source)
-            if metadata.status in {"Broken JAR", "Not Fabric"}:
+            if metadata.status in {"Broken JAR", "Not Fabric", "Not a mod", "Broken metadata"}:
                 raise RuntimeError(metadata.error or f"'{source.name}' is not a Fabric mod.")
 
             destination = destination_dir / source.name
@@ -62,7 +63,7 @@ class ModManager:
             try:
                 shutil.copy2(source, temporary_path)
                 copied = ModManager.read_mod(temporary_path)
-                if copied.status in {"Broken JAR", "Not Fabric"}:
+                if copied.status in {"Broken JAR", "Not Fabric", "Not a mod", "Broken metadata"}:
                     raise RuntimeError(copied.error or f"'{source.name}' is not a Fabric mod.")
                 disabled_destination.unlink(missing_ok=True)
                 temporary_path.replace(destination)
@@ -121,57 +122,57 @@ class ModManager:
 
         try:
             with zipfile.ZipFile(path, "r") as archive:
-                try:
-                    raw_metadata = archive.read("fabric.mod.json")
-                except KeyError:
-                    return ModManager._invalid_mod(path, file_name, enabled, "Not Fabric", "fabric.mod.json is missing.")
+                if "fabric.mod.json" in archive.namelist():
+                    return ModManager._read_fabric_mod(path, file_name, enabled, archive.read("fabric.mod.json"))
+                for metadata_name in ("META-INF/mods.toml", "META-INF/neoforge.mods.toml"):
+                    if metadata_name in archive.namelist():
+                        return ModManager._read_forge_mod(path, file_name, enabled, archive.read(metadata_name))
+                return ModManager._invalid_mod(path, file_name, enabled, "Not a mod", "No fabric.mod.json or Forge META-INF/mods.toml metadata was found.")
         except (OSError, zipfile.BadZipFile) as error:
             return ModManager._invalid_mod(path, file_name, enabled, "Broken JAR", str(error))
 
+
+    @staticmethod
+    def _read_fabric_mod(path: Path, file_name: str, enabled: bool, raw_metadata: bytes) -> ModInfo:
         try:
             data = json.loads(raw_metadata.decode("utf-8-sig"))
         except (UnicodeError, json.JSONDecodeError) as error:
             return ModManager._invalid_mod(path, file_name, enabled, "Broken JAR", f"Invalid fabric.mod.json: {error}")
-
         if not isinstance(data, dict):
             return ModManager._invalid_mod(path, file_name, enabled, "Broken JAR", "fabric.mod.json must contain an object.")
-
         mod_id = str(data.get("id") or "").strip()
         version = str(data.get("version") or "Unknown").strip()
         name = str(data.get("name") or mod_id or Path(file_name).stem).strip()
         environment = str(data.get("environment") or "*").strip()
         status = "Server only" if environment == "server" else "Ready"
         error = "This mod declares a server-only environment." if environment == "server" else ""
-
         if not mod_id:
             status = "Broken metadata"
             error = "Fabric mod id is missing."
+        return ModInfo(path=path, file_name=file_name, enabled=enabled, mod_id=mod_id or "unknown", name=name, version=version, description=str(data.get("description") or "").strip(), environment=environment, authors=ModManager._parse_authors(data.get("authors")), licenses=ModManager._parse_licenses(data.get("license")), dependencies=dict(data.get("depends") or {}) if isinstance(data.get("depends"), dict) else {}, recommends=dict(data.get("recommends") or {}) if isinstance(data.get("recommends"), dict) else {}, suggests=dict(data.get("suggests") or {}) if isinstance(data.get("suggests"), dict) else {}, conflicts=dict(data.get("conflicts") or {}) if isinstance(data.get("conflicts"), dict) else {}, breaks=dict(data.get("breaks") or {}) if isinstance(data.get("breaks"), dict) else {}, status=status, error=error)
 
-        return ModInfo(
-            path=path,
-            file_name=file_name,
-            enabled=enabled,
-            mod_id=mod_id or "unknown",
-            name=name,
-            version=version,
-            description=str(data.get("description") or "").strip(),
-            environment=environment,
-            authors=ModManager._parse_authors(data.get("authors")),
-            licenses=ModManager._parse_licenses(data.get("license")),
-            dependencies=dict(data.get("depends") or {}) if isinstance(data.get("depends"), dict) else {},
-            recommends=dict(data.get("recommends") or {}) if isinstance(data.get("recommends"), dict) else {},
-            suggests=dict(data.get("suggests") or {}) if isinstance(data.get("suggests"), dict) else {},
-            conflicts=dict(data.get("conflicts") or {}) if isinstance(data.get("conflicts"), dict) else {},
-            breaks=dict(data.get("breaks") or {}) if isinstance(data.get("breaks"), dict) else {},
-            status=status,
-            error=error,
-        )
+    @staticmethod
+    def _read_forge_mod(path: Path, file_name: str, enabled: bool, raw_metadata: bytes) -> ModInfo:
+        try:
+            data = tomllib.loads(raw_metadata.decode("utf-8-sig"))
+        except (UnicodeError, tomllib.TOMLDecodeError) as error:
+            return ModManager._invalid_mod(path, file_name, enabled, "Broken JAR", f"Invalid Forge mods.toml: {error}")
+        mods = data.get("mods") if isinstance(data.get("mods"), list) else []
+        metadata = next((item for item in mods if isinstance(item, dict)), {})
+        mod_id = str(metadata.get("modId") or "").strip()
+        name = str(metadata.get("displayName") or mod_id or Path(file_name).stem).strip()
+        version = str(metadata.get("version") or "Unknown").strip()
+        authors = ModManager._parse_authors([metadata.get("authors")]) if metadata.get("authors") else ()
+        license_value = data.get("license") or metadata.get("license")
+        if not mod_id:
+            return ModManager._invalid_mod(path, file_name, enabled, "Broken metadata", "Forge mod id is missing.")
+        return ModInfo(path=path, file_name=file_name, enabled=enabled, mod_id=mod_id, name=name, version=version, description=str(metadata.get("description") or "").strip(), environment="client", authors=authors, licenses=ModManager._parse_licenses(license_value), dependencies={}, recommends={}, suggests={}, conflicts={}, breaks={}, status="Ready", error="")
 
     @staticmethod
     def _ensure_modifiable(instance: Instance) -> None:
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        if loader_name != ModLoaderManager.FABRIC:
-            raise RuntimeError("This instance does not use Fabric Loader.")
+        if loader_name not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+            raise RuntimeError("This instance does not use Fabric or Forge.")
         if InstanceRunLock.is_active(instance):
             raise InstanceModChangeBlockedError(instance.name)
 

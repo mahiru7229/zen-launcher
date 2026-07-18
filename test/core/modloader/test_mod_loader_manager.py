@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.fabric.fabric_version_manager import FabricVersionManager
+from src.core.modloader.forge.forge_version_manager import ForgeVersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 
 
@@ -63,3 +64,28 @@ def test_repair_rejects_vanilla_instance():
 
     with pytest.raises(RuntimeError, match="Only Fabric instances"):
         ModLoaderManager.repair(instance)
+
+
+
+def test_loads_forge_version(monkeypatch):
+    expected = object()
+    monkeypatch.setattr(ForgeVersionManager, "load", lambda game_version, loader_version, reporter=None: expected)
+    instance = SimpleNamespace(version_id="1.20.1", mod_loader=("forge", "47.3.0"))
+
+    assert ModLoaderManager.load(instance) is expected
+
+
+def test_resolve_forge_auto_uses_recommended_loader(monkeypatch):
+    monkeypatch.setattr(ForgeVersionManager, "recommended_loader_version", lambda game_version: "47.3.0")
+
+    assert ModLoaderManager.resolve("1.20.1", "forge", "auto") == ("forge", "47.3.0")
+
+
+def test_repairs_forge_instance(monkeypatch):
+    expected = object()
+    instance = SimpleNamespace(version_id="1.20.1", mod_loader=("forge", "47.3.0"))
+    base_version = object()
+    monkeypatch.setattr(VersionManager, "load", lambda version_id: base_version)
+    monkeypatch.setattr(ForgeVersionManager, "repair", lambda version, loader_version, reporter=None: expected)
+
+    assert ModLoaderManager.repair(instance) is expected

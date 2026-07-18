@@ -7,6 +7,7 @@ class ProgressStage(Enum):
     IMPORTING_INSTANCE = "importing_instance"
     EXPORTING_INSTANCE = "exporting_instance"
     LOADING_VERSION = "loading_version"
+    DOWNLOADING_MOD_LOADER = "downloading_mod_loader"
     INSTALLING_MOD_LOADER = "installing_mod_loader"
     SELECTING_JAVA = "selecting_java"
     DOWNLOADING_JAVA = "downloading_java"

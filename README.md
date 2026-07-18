@@ -54,9 +54,10 @@ Each instance has its own game directory, metadata, settings, saves, mods, and r
 - Fully repair an instance without touching worlds, mods, resource packs, screenshots, or instance settings.
 - Record `last_played`, accumulated play time, last exit code, and crash state in instance metadata.
 
-### Fabric and mods
+### Forge, Fabric, and mods
 
-- Create Vanilla or Fabric instances.
+- Create Vanilla, Fabric, or Forge instances.
+- Install, change, and repair Minecraft Forge from the official Forge Maven repository.
 - Automatically select a recommended stable Fabric Loader version.
 - Change or repair the Fabric Loader version from instance management.
 - Cache Fabric metadata and reuse it when possible.
@@ -69,6 +70,17 @@ Each instance has its own game directory, metadata, settings, saves, mods, and r
 - Lock individual Modrinth mods to prevent automatic dependency or bulk updates.
 
 > Fabric API is a separate mod and is not installed automatically by the Fabric Loader itself.
+
+### CurseForge (v0.6 beta)
+
+- Search and install Forge mods from CurseForge.
+- Install required dependencies and record project/file provenance for later checks.
+- Search CurseForge modpacks, create an isolated Forge instance, extract overrides safely, and defer managed file downloads until Launch.
+- Check all managed files before downloading, retry failed files for up to three rounds, and preserve manual-install guidance for files that cannot be distributed to third-party launchers.
+- Reuse the launcher-wide progress, pause/resume, bandwidth limit, SHA-1 verification, and concurrent download system.
+- CurseForge access requires an API key supplied through `MCW_CURSEFORGE_API_KEY` or local `config/curseforge.json`; the local credential file is ignored by Git.
+
+See [`docs/FORGE_CURSEFORGE.md`](docs/FORGE_CURSEFORGE.md) for setup and current Beta 1 limitations.
 
 ### Modrinth
 

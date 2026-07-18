@@ -24,3 +24,5 @@ config/launcher_settings.json
 
 /backups/
 temp.txt
+# Local CurseForge API credential (never commit)
+config/curseforge.json

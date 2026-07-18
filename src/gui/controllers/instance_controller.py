@@ -11,6 +11,7 @@ from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.minecraft.library_manager import DownloadLibraryManager
 from src.core.minecraft.version_manager import VersionManager
 from src.core.modloader.mod_loader_manager import ModLoaderManager
+from src.core.progress.progress_reporter import ProgressReporter
 from src.core.runtime.instance_repair_manager import InstanceRepairManager
 from src.gui.controllers.base_controller import BaseController
 from src.gui.task_runner import TaskRunner
@@ -22,6 +23,7 @@ class InstanceController(BaseController):
     selected_instance_changed = Signal(object)
     export_finished = Signal(object)
     repair_progress = Signal(object)
+    loader_progress = Signal(object)
     package_progress = Signal(object)
     repair_finished = Signal(object)
 
@@ -83,10 +85,12 @@ class InstanceController(BaseController):
                 self._emit_error("Create instance", "Select a Minecraft version first.")
             return
 
+        reporter = ProgressReporter(self._on_loader_progress)
+
         def task() -> Any:
             version = VersionManager.load(version_id)
             resolved_loader = ModLoaderManager.resolve(version.id, loader_name, loader_version)
-            ModLoaderManager.prepare(version, *resolved_loader)
+            ModLoaderManager.prepare(version, *resolved_loader, reporter=reporter)
             return InstanceManager.create(name=name, version=version, mod_loader=resolved_loader)
 
         self._task_runner.run("instance.create", task, f"Creating instance '{name}'...")
@@ -100,13 +104,15 @@ class InstanceController(BaseController):
             self._emit_error("Change mod loader", "Select a Fabric Loader version first.")
             return
 
+        reporter = ProgressReporter(self._on_loader_progress)
+
         def task() -> Any:
             instance = InstanceManager.load(name)
             if InstanceRunLock.is_active(instance):
                 raise RuntimeError("Close Minecraft before changing this instance's mod loader.")
             version = VersionManager.load(instance.version_id)
             resolved_loader = ModLoaderManager.resolve(version.id, loader_name, loader_version)
-            ModLoaderManager.prepare(version, *resolved_loader)
+            ModLoaderManager.prepare(version, *resolved_loader, reporter=reporter)
             return InstanceManager.set_mod_loader(name, resolved_loader)
 
         self._task_runner.run("instance.loader", task, f"Applying {loader_name.title()} to '{name}'...")
@@ -116,15 +122,17 @@ class InstanceController(BaseController):
         if not name:
             return
 
+        reporter = ProgressReporter(self._on_loader_progress)
+
         def task() -> Any:
             instance = InstanceManager.load(name)
             if InstanceRunLock.is_active(instance):
                 raise RuntimeError("Close Minecraft before repairing this instance's mod loader.")
-            version = ModLoaderManager.repair(instance)
-            DownloadLibraryManager.load(version)
+            version = ModLoaderManager.repair(instance, reporter=reporter)
+            DownloadLibraryManager.load(version, reporter=reporter)
             return instance
 
-        self._task_runner.run("instance.loader.repair", task, f"Repairing Fabric for '{name}'...")
+        self._task_runner.run("instance.loader.repair", task, f"Repairing mod loader for '{name}'...")
 
 
     def repair_instance(self, name: str) -> None:
@@ -142,6 +150,12 @@ class InstanceController(BaseController):
         self.repair_progress.emit(event)
         stage = getattr(getattr(event, "stage", None), "value", "repair")
         message = str(getattr(event, "message", "Repairing instance..."))
+        self.log_created.emit(f"[{stage}] {message}")
+
+    def _on_loader_progress(self, event: object) -> None:
+        self.loader_progress.emit(event)
+        stage = getattr(getattr(event, "stage", None), "value", "mod_loader")
+        message = str(getattr(event, "message", "Preparing mod loader..."))
         self.log_created.emit(f"[{stage}] {message}")
 
     def rename(self, source_name: str, target_name: str) -> None:
