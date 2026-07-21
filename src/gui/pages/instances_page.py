@@ -360,6 +360,8 @@ class InstancesPage(BasePage):
         current_loader_name, current_loader_version = self._instance_loader(instance)
         preferred = self._pending_manage_loader_version
         self._pending_manage_loader_version = ""
+        if not preferred and current_loader_name != "fabric":
+            preferred = next((str(version.version) for version in versions if getattr(version, "stable", False)), "")
         entries = [(version.version, version.version + (tr(" (stable)") if getattr(version, "stable", False) else "")) for version in versions]
         self._populate_loader_versions("fabric", current_loader_name, current_loader_version, preferred, entries)
 

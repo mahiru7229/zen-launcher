@@ -97,7 +97,7 @@ class ModManagerDialog(QDialog):
         root.addLayout(search_row)
 
         self.table = QTableWidget(0, 11)
-        self.table.setHorizontalHeaderLabels(["State", "Name", "Version", "Loader", "Source", "Update", "Lock", "Mod ID", "Environment", "Status", "File"])
+        self.table.setHorizontalHeaderLabels(["State", "Name", "Version", "Source", "Update", "Lock", "Loader", "Mod ID", "Environment", "Status", "File"])
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -276,7 +276,7 @@ class ModManagerDialog(QDialog):
                 errors = sum(1 for issue in mod_issues if issue.severity == "error")
                 warnings = sum(1 for issue in mod_issues if issue.severity == "warning")
                 status = f"{status} • {errors}E/{warnings}W"
-            values = [tr("Enabled" if mod.enabled else "Disabled"), mod.name, mod.version, tr(f"mod_loader.{mod.loader}", default=mod.loader.title()), source, update_text, lock_text, mod.mod_id, mod.environment, status, mod.file_name]
+            values = [tr("Enabled" if mod.enabled else "Disabled"), mod.name, mod.version, source, update_text, lock_text, tr(f"mod_loader.{mod.loader}", default=mod.loader.title()), mod.mod_id, mod.environment, status, mod.file_name]
             tooltip = "\n".join(issue.message for issue in mod_issues)
             if mod.error:
                 tooltip = "\n".join(item for item in (mod.error, tooltip) if item)
