@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, 
 
 from src.core.instance.instance_manager import InstanceManager
 from src.core.language.language_manager import tr
+from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.models.instance.instance import Instance
 from src.models.modrinth.project import ModrinthProject, ModrinthSearchResult
 from src.models.modrinth.version import ModrinthVersion
@@ -14,10 +15,10 @@ from src.gui.theme.runtime import set_theme_icon
 
 
 class ModrinthBrowserDialog(QDialog):
-    search_requested = Signal(str, str, str, int)
-    versions_requested = Signal(str, str, str)
-    install_mod_requested = Signal(str)
-    install_modpack_requested = Signal(str, str, str, bool, object)
+    search_requested = Signal(str, str, str, int, str)
+    versions_requested = Signal(str, str, str, str)
+    install_mod_requested = Signal(str, str)
+    install_modpack_requested = Signal(str, str, str, bool, object, str)
     channel_preferences_changed = Signal(bool, bool)
 
     PAGE_SIZE = 25
@@ -55,6 +56,12 @@ class ModrinthBrowserDialog(QDialog):
         search_row = QHBoxLayout()
         self.search_input = QLineEdit()
         self.search_input.returnPressed.connect(self._request_search)
+        self.loader_label = QLabel()
+        self.loader_label.setObjectName("MutedLabel")
+        self.loader_combo = QComboBox()
+        self.loader_combo.addItem("Fabric", ModLoaderManager.FABRIC)
+        self.loader_combo.addItem("Forge", ModLoaderManager.FORGE)
+        self.loader_combo.currentIndexChanged.connect(self._loader_changed)
         self.sort_combo = QComboBox()
         self.sort_combo.addItem("Relevance", "relevance")
         self.sort_combo.addItem("Downloads", "downloads")
@@ -64,6 +71,8 @@ class ModrinthBrowserDialog(QDialog):
         self.search_button.setObjectName("PrimaryButton")
         self.search_button.clicked.connect(self._request_search)
         search_row.addWidget(self.search_input, 1)
+        search_row.addWidget(self.loader_label)
+        search_row.addWidget(self.loader_combo)
         search_row.addWidget(self.sort_combo)
         search_row.addWidget(self.search_button)
         root.addLayout(search_row)
@@ -134,6 +143,11 @@ class ModrinthBrowserDialog(QDialog):
         return self._instance.version_id if self._instance is not None else ""
 
     @property
+    def selected_loader(self) -> str:
+        loader = str(self.loader_combo.currentData() or ModLoaderManager.FABRIC).strip().lower()
+        return loader if loader in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE} else ModLoaderManager.FABRIC
+
+    @property
     def allowed_version_types(self) -> tuple[str, ...]:
         values = ["release"]
         if self.include_beta_checkbox.isChecked():
@@ -151,6 +165,32 @@ class ModrinthBrowserDialog(QDialog):
         self.include_alpha_checkbox.blockSignals(False)
         self._apply_version_filter()
 
+    def set_searching(self, loader: str = "") -> None:
+        if loader and str(loader).strip().lower() != self.selected_loader:
+            return
+        self._result = None
+        self._projects = []
+        self.results_table.clearSelection()
+        self.results_table.clearContents()
+        self.results_table.setRowCount(0)
+        self.result_count_label.setText(tr("modrinth.results.searching"))
+        self.previous_button.setEnabled(False)
+        self.next_button.setEnabled(False)
+        self._clear_project_selection(tr("modrinth.results.contacting"))
+
+    def set_search_error(self, loader: str, message: str) -> None:
+        if loader and str(loader).strip().lower() != self.selected_loader:
+            return
+        self._result = None
+        self._projects = []
+        self.results_table.clearSelection()
+        self.results_table.clearContents()
+        self.results_table.setRowCount(0)
+        self.result_count_label.setText(tr("modrinth.results.failed"))
+        self.previous_button.setEnabled(False)
+        self.next_button.setEnabled(False)
+        self._clear_project_selection(tr("modrinth.results.error", error=str(message)))
+
     def set_instance(self, instance: Instance | None) -> None:
         self._instance = instance
         self._offset = 0
@@ -163,12 +203,21 @@ class ModrinthBrowserDialog(QDialog):
         self._instance_name_customized = False
         if self.project_type == "modpack":
             self.instance_name_input.clear()
+        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader) if instance is not None else (ModLoaderManager.FABRIC, "")
+        selected_loader = loader_name if loader_name in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE} else ModLoaderManager.FABRIC
+        loader_index = self.loader_combo.findData(selected_loader)
+        self.loader_combo.blockSignals(True)
+        self.loader_combo.setCurrentIndex(max(0, loader_index))
+        self.loader_combo.blockSignals(False)
         self.results_table.setRowCount(0)
         self.version_combo.clear()
         self.install_button.setEnabled(False)
+        self._clear_project_selection(tr("modrinth.results.ready"))
         self.retranslate_dynamic()
 
-    def set_search_result(self, result: ModrinthSearchResult) -> None:
+    def set_search_result(self, result: ModrinthSearchResult, loader: str = "") -> None:
+        if loader and str(loader).strip().lower() != self.selected_loader:
+            return
         self._result = result
         self._projects = list(result.projects)
         self._offset = result.offset
@@ -206,7 +255,9 @@ class ModrinthBrowserDialog(QDialog):
         else:
             self._clear_project_selection(tr("modrinth.results.empty"))
 
-    def set_versions(self, project_id: str, versions: list[ModrinthVersion]) -> None:
+    def set_versions(self, project_id: str, versions: list[ModrinthVersion], loader: str = "") -> None:
+        if loader and str(loader).strip().lower() != self.selected_loader:
+            return
         if self._selected_project is None or self._selected_project.project_id != project_id:
             return
         self._all_versions = list(versions)
@@ -216,6 +267,7 @@ class ModrinthBrowserDialog(QDialog):
         self.search_button.setEnabled(not busy)
         self.results_table.setEnabled(not busy)
         self.version_combo.setEnabled(not busy)
+        self.loader_combo.setEnabled(not busy)
         self.include_beta_checkbox.setEnabled(not busy)
         self.include_alpha_checkbox.setEnabled(not busy)
         self.install_button.setEnabled(not busy and bool(self._versions))
@@ -228,7 +280,7 @@ class ModrinthBrowserDialog(QDialog):
     def _apply_version_filter(self) -> None:
         self._update_channel_summary()
         allowed = set(self.allowed_version_types)
-        self._versions = [version for version in self._all_versions if version.version_type in allowed]
+        self._versions = [version for version in self._all_versions if version.version_type in allowed and self.selected_loader in {str(loader).strip().lower() for loader in version.loaders}]
         self.version_combo.blockSignals(True)
         self.version_combo.clear()
         for version in self._versions:
@@ -259,12 +311,23 @@ class ModrinthBrowserDialog(QDialog):
         self._apply_version_filter()
         self.channel_preferences_changed.emit(self.include_beta_checkbox.isChecked(), self.include_alpha_checkbox.isChecked())
 
+    def _loader_changed(self, _index: int) -> None:
+        self._offset = 0
+        self._result = None
+        self._projects = []
+        self.results_table.setRowCount(0)
+        self._clear_project_selection(tr("modrinth.results.ready"))
+        self.retranslate_dynamic()
+        if self.isVisible():
+            self._request_search()
+
     def _request_search(self) -> None:
         if self.project_type == "mod" and self._instance is None:
             QMessageBox.information(self, tr("modrinth.title"), tr("modrinth.mod.no_instance"))
             return
         self._offset = 0
-        self.search_requested.emit(self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset)
+        self.set_searching(self.selected_loader)
+        self.search_requested.emit(self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset, self.selected_loader)
 
     def _project_selected(self) -> None:
         rows = self.results_table.selectionModel().selectedRows()
@@ -287,7 +350,7 @@ class ModrinthBrowserDialog(QDialog):
             self._instance_name_customized = False
         game_version = self._instance.version_id if self.project_type == "mod" and self._instance is not None else ""
         self.details_label.setText(tr("modrinth.project.loading_versions", title=project.title))
-        self.versions_requested.emit(self.project_type, project.project_id, game_version)
+        self.versions_requested.emit(self.project_type, project.project_id, game_version, self.selected_loader)
 
     def _clear_project_selection(self, message: str) -> None:
         self._selected_project = None
@@ -316,10 +379,15 @@ class ModrinthBrowserDialog(QDialog):
         if version is None or project is None:
             return
         if self.project_type == "mod":
-            self.install_mod_requested.emit(version.version_id)
+            if self._instance is not None:
+                instance_loader, _ = ModLoaderManager.normalize(self._instance.mod_loader)
+                if instance_loader != self.selected_loader:
+                    QMessageBox.information(self, tr("modrinth.title"), tr("modrinth.loader.instance_mismatch", instance_loader=instance_loader.title(), selected_loader=self.selected_loader.title()))
+                    return
+            self.install_mod_requested.emit(version.version_id, self.selected_loader)
             return
         name = self.instance_name_input.text().strip()
-        self.install_modpack_requested.emit(project.project_id, version.version_id, name, self.optional_checkbox.isChecked(), self.allowed_version_types)
+        self.install_modpack_requested.emit(project.project_id, version.version_id, name, self.optional_checkbox.isChecked(), self.allowed_version_types, self.selected_loader)
 
     def _selected_version(self) -> ModrinthVersion | None:
         index = self.version_combo.currentIndex()
@@ -330,11 +398,13 @@ class ModrinthBrowserDialog(QDialog):
 
     def _previous_page(self) -> None:
         self._offset = max(0, self._offset - self.PAGE_SIZE)
-        self.search_requested.emit(self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset)
+        self.set_searching(self.selected_loader)
+        self.search_requested.emit(self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset, self.selected_loader)
 
     def _next_page(self) -> None:
         self._offset += self.PAGE_SIZE
-        self.search_requested.emit(self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset)
+        self.set_searching(self.selected_loader)
+        self.search_requested.emit(self.project_type, self.search_input.text(), str(self.sort_combo.currentData() or "relevance"), self._offset, self.selected_loader)
 
     @staticmethod
     def _safe_instance_name(value: str) -> str:
@@ -349,9 +419,9 @@ class ModrinthBrowserDialog(QDialog):
             if self._instance is None:
                 self.context_label.setText(tr("modrinth.mod.context.none"))
             else:
-                self.context_label.setText(tr("modrinth.mod.context", instance=self._instance.name, minecraft=self._instance.version_id))
+                self.context_label.setText(tr("modrinth.mod.context", instance=self._instance.name, minecraft=self._instance.version_id, loader=self.selected_loader.title()))
         else:
-            self.context_label.setText(tr("modrinth.modpack.context"))
+            self.context_label.setText(tr("modrinth.modpack.context", loader=self.selected_loader.title()))
         self._update_channel_summary()
         self.include_beta_checkbox.setText(tr("modrinth.channel.beta"))
         self.include_alpha_checkbox.setText(tr("modrinth.channel.alpha"))
@@ -362,6 +432,10 @@ class ModrinthBrowserDialog(QDialog):
         self.install_button.setText(tr("modrinth.mod.install" if is_mod else "modrinth.modpack.install"))
         self.instance_name_input.setPlaceholderText(tr("modrinth.modpack.instance_name"))
         self.optional_checkbox.setText(tr("modrinth.modpack.optional_files"))
+        self.loader_label.setText(tr("modrinth.loader.label"))
+        self.loader_combo.setItemText(0, tr("modrinth.loader.fabric"))
+        self.loader_combo.setItemText(1, tr("modrinth.loader.forge"))
+        self.loader_combo.setToolTip(tr("modrinth.loader.help"))
         self.sort_combo.setItemText(0, tr("modrinth.sort.relevance"))
         self.sort_combo.setItemText(1, tr("modrinth.sort.downloads"))
         self.sort_combo.setItemText(2, tr("modrinth.sort.updated"))

@@ -120,7 +120,7 @@ class RightPanelWidget(QFrame):
         if instance is None:
             self._instance_name = ""
             self.manage_mods_button.setEnabled(False)
-            self.manage_mods_button.setToolTip(tr("Select a Fabric instance first."))
+            self.manage_mods_button.setToolTip(tr("right_panel.mods.select_modded"))
             self.instance_name.setText(tr("No instance selected"))
             self.instance_version.setText(tr("Minecraft: -"))
             self.instance_loader.setText(tr("Loader: -"))
@@ -131,9 +131,9 @@ class RightPanelWidget(QFrame):
         loader_name = loader[0] if loader else "vanilla"
         loader_version = loader[1] if len(loader) > 1 else "-1"
         loader_text = loader_name if loader_version in {"", "-1"} else f"{loader_name} {loader_version}"
-        is_fabric = str(loader_name).casefold() == "fabric"
-        self.manage_mods_button.setEnabled(is_fabric)
-        self.manage_mods_button.setToolTip("" if is_fabric else tr("Apply Fabric Loader to manage mods."))
+        is_modded = str(loader_name).casefold() in {"fabric", "forge"}
+        self.manage_mods_button.setEnabled(is_modded)
+        self.manage_mods_button.setToolTip("" if is_modded else tr("right_panel.mods.apply_loader"))
         self.instance_name.setText(instance.name)
         self.instance_version.setText(tr("Minecraft: {version}", version=instance.version_id))
         self.instance_loader.setText(tr("Loader: {loader}", loader=loader_text))

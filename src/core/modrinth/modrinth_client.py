@@ -19,7 +19,7 @@ from src.models.modrinth.version import ModrinthDependency, ModrinthFile, Modrin
 
 class ModrinthClient:
     BASE_URL = "https://api.modrinth.com/v2"
-    CACHE_SCHEMA = 2
+    CACHE_SCHEMA = 4
     SEARCH_TTL_SECONDS = 10 * 60
     VERSIONS_TTL_SECONDS = 30 * 60
     PROJECT_TTL_SECONDS = 60 * 60
@@ -34,32 +34,103 @@ class ModrinthClient:
         if normalized_type not in {"mod", "modpack"}:
             raise ValueError("Modrinth project type must be 'mod' or 'modpack'.")
 
-        facets: list[list[str]] = [[f"project_type:{normalized_type}"]]
+        normalized_loader = str(loader).strip().lower()
+        normalized_game_version = str(game_version).strip()
+        normalized_query = str(query).strip()
+        normalized_index = index if index in {"relevance", "downloads", "follows", "newest", "updated"} else "relevance"
+        normalized_offset = max(0, int(offset))
+        normalized_limit = min(max(1, int(limit)), 100)
+
+        payload = ModrinthClient._search_payload(
+            project_type=normalized_type,
+            query=normalized_query,
+            game_version=normalized_game_version,
+            loader=normalized_loader,
+            index=normalized_index,
+            offset=normalized_offset,
+            limit=normalized_limit,
+            force_refresh=force_refresh or not normalized_query,
+            allow_stale_on_error=True,
+        )
+        projects = ModrinthClient._projects_from_search_payload(payload)
+
+        # Modrinth's loader facet occasionally returns an empty page for
+        # modpack searches even when matching projects exist. Retry without
+        # the loader facet, then keep only projects whose search metadata is
+        # compatible with the selected loader. Version loading still applies
+        # the authoritative loader filter before installation.
+        if normalized_type == "modpack" and normalized_loader and not projects:
+            fallback_payload = ModrinthClient._search_payload(
+                project_type=normalized_type,
+                query=normalized_query,
+                game_version=normalized_game_version,
+                loader="",
+                index=normalized_index,
+                offset=normalized_offset,
+                limit=normalized_limit,
+                force_refresh=True,
+                allow_stale_on_error=True,
+            )
+            fallback_projects = ModrinthClient._projects_from_search_payload(fallback_payload)
+            compatible_projects = tuple(project for project in fallback_projects if ModrinthClient._project_may_support_loader(project, normalized_loader))
+            projects = compatible_projects or fallback_projects
+            payload = dict(fallback_payload)
+            payload["total_hits"] = len(projects)
+            payload["offset"] = normalized_offset
+            payload["limit"] = normalized_limit
+
+        if normalized_type == "modpack" and not normalized_query and not projects:
+            raise RuntimeError(
+                "Modrinth returned no modpacks for the default catalog search. "
+                "The API may be unavailable, blocked, or returning an invalid cached response."
+            )
+
+        return ModrinthSearchResult(
+            projects=projects,
+            total_hits=int(payload.get("total_hits", len(projects)) or 0),
+            offset=int(payload.get("offset", normalized_offset) or 0),
+            limit=int(payload.get("limit", normalized_limit) or normalized_limit),
+        )
+
+    @staticmethod
+    def _search_payload(project_type: str, query: str, game_version: str, loader: str, index: str, offset: int, limit: int, force_refresh: bool, allow_stale_on_error: bool = True) -> dict:
+        facets: list[list[str]] = [[f"project_type:{project_type}"]]
         if loader:
-            facets.append([f"categories:{str(loader).strip().lower()}"])
+            facets.append([f"categories:{loader}"])
         if game_version:
-            facets.append([f"versions:{str(game_version).strip()}"])
+            facets.append([f"versions:{game_version}"])
 
         payload = ModrinthClient._get_json(
             "/search",
             params={
-                "query": str(query).strip(),
+                "query": query,
                 "facets": json.dumps(facets, separators=(",", ":")),
-                "index": index if index in {"relevance", "downloads", "follows", "newest", "updated"} else "relevance",
-                "offset": max(0, int(offset)),
-                "limit": min(max(1, int(limit)), 100),
+                "index": index,
+                "offset": offset,
+                "limit": limit,
             },
             ttl=ModrinthClient.SEARCH_TTL_SECONDS,
             force_refresh=force_refresh,
+            allow_stale_on_error=allow_stale_on_error,
         )
-
         if not isinstance(payload, dict):
             raise RuntimeError("Modrinth returned an invalid search response.")
+        return payload
+
+    @staticmethod
+    def _projects_from_search_payload(payload: dict) -> tuple[ModrinthProject, ...]:
         hits = payload.get("hits", [])
         if not isinstance(hits, list):
-            hits = []
-        projects = tuple(ModrinthClient._parse_project(item) for item in hits if isinstance(item, dict))
-        return ModrinthSearchResult(projects=projects, total_hits=int(payload.get("total_hits", len(projects)) or 0), offset=int(payload.get("offset", offset) or 0), limit=int(payload.get("limit", limit) or limit))
+            return ()
+        return tuple(ModrinthClient._parse_project(item) for item in hits if isinstance(item, dict))
+
+    @staticmethod
+    def _project_may_support_loader(project: ModrinthProject, loader: str) -> bool:
+        normalized_loader = str(loader).strip().lower()
+        categories = {str(item).strip().lower() for item in project.categories if str(item).strip()}
+        known_loaders = {"fabric", "forge", "neoforge", "quilt"}
+        explicit_loaders = categories & known_loaders
+        return normalized_loader in explicit_loaders or not explicit_loaders
 
     @staticmethod
     def get_project(project_id: str, force_refresh: bool = False) -> ModrinthProject:
@@ -177,33 +248,65 @@ class ModrinthClient:
         )
 
     @staticmethod
-    def _get_json(path: str, params: dict[str, object] | None = None, ttl: int = 0, force_refresh: bool = False) -> object:
+    def _get_json(path: str, params: dict[str, object] | None = None, ttl: int = 0, force_refresh: bool = False, allow_stale_on_error: bool = True) -> object:
         normalized_params = {str(key): value for key, value in (params or {}).items() if value not in {None, ""}}
         cache_key = json.dumps({"path": path, "params": normalized_params}, sort_keys=True, separators=(",", ":"))
         cache_path = Paths.modrinth_api_cache(hashlib.sha256(cache_key.encode("utf-8")).hexdigest())
 
         with ModrinthClient._get_cache_lock(cache_path):
             cached = ModrinthClient._read_cache(cache_path)
-            if cached is not None and not force_refresh:
+            cached_payload = cached.get("payload") if cached is not None else None
+            cached_is_usable = ModrinthClient._cached_payload_is_usable(path, normalized_params, cached_payload)
+            if cached is not None and cached_is_usable and not force_refresh:
                 try:
                     age = time() - float(cached.get("fetchedAt", 0) or 0)
                 except (TypeError, ValueError):
                     age = float("inf")
                 if age <= ttl:
-                    return cached.get("payload")
+                    return cached_payload
 
             client = HttpDownloader.get_client()
             try:
-                response = client.get(ModrinthClient.BASE_URL + path, params=normalized_params, headers={"User-Agent": ModrinthClient.USER_AGENT}, timeout=20.0)
+                response = client.get(
+                    ModrinthClient.BASE_URL + path,
+                    params=normalized_params,
+                    headers={"User-Agent": ModrinthClient.USER_AGENT, "Accept": "application/json"},
+                    timeout=20.0,
+                )
                 response.raise_for_status()
                 payload = response.json()
-            except (httpx.HTTPError, ValueError) as error:
-                if cached is not None:
-                    return cached.get("payload")
-                raise RuntimeError("Unable to contact Modrinth and no cached response is available.") from error
+            except httpx.HTTPStatusError as error:
+                if allow_stale_on_error and cached_is_usable:
+                    return cached_payload
+                status = int(error.response.status_code)
+                raise RuntimeError(f"Modrinth API request failed with HTTP {status}.") from error
+            except httpx.HTTPError as error:
+                if allow_stale_on_error and cached_is_usable:
+                    return cached_payload
+                raise RuntimeError(f"Unable to contact Modrinth: {error}") from error
+            except ValueError as error:
+                if allow_stale_on_error and cached_is_usable:
+                    return cached_payload
+                raise RuntimeError("Modrinth returned an invalid JSON response.") from error
 
             ModrinthClient._write_cache(cache_path, payload)
             return payload
+
+    @staticmethod
+    def _cached_payload_is_usable(path: str, params: dict[str, object], payload: object) -> bool:
+        if payload is None:
+            return False
+        if path != "/search":
+            return True
+        if not isinstance(payload, dict):
+            return False
+        hits = payload.get("hits")
+        if not isinstance(hits, list):
+            return False
+        # Empty search results are meaningful only when received live. They
+        # are never useful as an offline fallback because they make network
+        # failures look like a successful search with zero projects.
+        return bool(hits)
 
     @staticmethod
     def _get_cache_lock(path: Path) -> Lock:

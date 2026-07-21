@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from datetime import datetime, timezone
 
 from src.core.fs.paths import Paths
@@ -20,12 +19,11 @@ from src.models.progress.progress_stage import ProgressStage
 
 class ModrinthModInstaller:
     MAX_DEPENDENCIES = 64
+    SUPPORTED_LOADERS = {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}
 
     @staticmethod
     def install(instance: Instance, version_id: str, install_dependencies: bool = True, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None) -> ModrinthModInstallResult:
-        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        if loader_name != ModLoaderManager.FABRIC:
-            raise RuntimeError("Modrinth mod installation currently requires a Fabric instance.")
+        loader_name = ModrinthModInstaller._supported_loader(instance)
         if InstanceRunLock.is_active(instance):
             raise RuntimeError("Close Minecraft before installing or updating mods.")
 
@@ -36,7 +34,7 @@ class ModrinthModInstaller:
         registry = ModrinthRegistry.load(instance)
         registry_mods = registry.setdefault("mods", {})
         locked_dependencies = {project_id for project_id, entry in registry_mods.items() if project_id != root_version.project_id and isinstance(entry, dict) and bool(entry.get("locked", False))}
-        plan, projects, warnings = ModrinthModInstaller._build_plan(root_version, instance.version_id, install_dependencies, allowed_types, locked_dependencies)
+        plan, projects, warnings = ModrinthModInstaller._build_plan(root_version, instance.version_id, loader_name, install_dependencies, allowed_types, locked_dependencies)
         installed_projects: list[str] = []
         installed_files: list[str] = []
 
@@ -56,6 +54,7 @@ class ModrinthModInstaller:
                 "size": file.size,
                 "downloadUrls": [file.url],
                 "title": project.title,
+                "loader": loader_name,
                 "locked": bool(previous.get("locked", False)),
                 "source": "modrinth",
                 "datePublished": version.date_published,
@@ -96,7 +95,8 @@ class ModrinthModInstaller:
         return ModrinthModInstallResult(installed_projects=tuple(installed_projects), installed_files=tuple(installed_files), warnings=tuple(warnings))
 
     @staticmethod
-    def _build_plan(root_version: ModrinthVersion, game_version: str, install_dependencies: bool, allowed_version_types: tuple[str, ...] = ("release", "beta", "alpha"), locked_dependency_projects: set[str] | None = None) -> tuple[list[ModrinthVersion], dict[str, ModrinthProject], list[str]]:
+    def _build_plan(root_version: ModrinthVersion, game_version: str, loader_name: str, install_dependencies: bool, allowed_version_types: tuple[str, ...] = ("release", "beta", "alpha"), locked_dependency_projects: set[str] | None = None) -> tuple[list[ModrinthVersion], dict[str, ModrinthProject], list[str]]:
+        normalized_loader = ModrinthModInstaller._normalize_loader(loader_name)
         plan: list[ModrinthVersion] = []
         projects: dict[str, ModrinthProject] = {}
         warnings: list[str] = []
@@ -112,7 +112,7 @@ class ModrinthModInstaller:
                 raise RuntimeError("The Modrinth dependency graph is too large to install safely.")
             if version.version_type not in allowed_version_types:
                 raise RuntimeError(f"Required Modrinth version '{version.version_number}' uses the disabled {version.version_type} channel.")
-            ModrinthModInstaller._validate_version(version, game_version)
+            ModrinthModInstaller._validate_version(version, game_version, normalized_loader)
             selected_version = selected_projects.get(version.project_id)
             if selected_version is not None and selected_version != version.version_id:
                 warnings.append(f"Conflicting dependency versions for project {version.project_id}; keeping {selected_version} and skipping {version.version_id}.")
@@ -139,7 +139,7 @@ class ModrinthModInstaller:
                         if dependency.project_id and dependency.project_id in locked_dependency_projects:
                             warnings.append(f"Locked dependency project {dependency.project_id} was kept at its installed version.")
                             continue
-                        dependency_version = ModrinthModInstaller._resolve_dependency(dependency.version_id, dependency.project_id, game_version, allowed_version_types)
+                        dependency_version = ModrinthModInstaller._resolve_dependency(dependency.version_id, dependency.project_id, game_version, normalized_loader, allowed_version_types)
                         if dependency_version is None:
                             label = dependency.file_name or dependency.project_id or dependency.version_id or "unknown dependency"
                             warnings.append(f"Required external dependency could not be installed automatically: {label}")
@@ -155,17 +155,30 @@ class ModrinthModInstaller:
         return plan, projects, warnings
 
     @staticmethod
-    def _resolve_dependency(version_id: str, project_id: str, game_version: str, allowed_version_types: tuple[str, ...] = ("release", "beta", "alpha")) -> ModrinthVersion | None:
+    def _resolve_dependency(version_id: str, project_id: str, game_version: str, loader_name: str, allowed_version_types: tuple[str, ...] = ("release", "beta", "alpha")) -> ModrinthVersion | None:
         if version_id:
             return ModrinthClient.get_version(version_id)
         if project_id:
-            return ModrinthClient.select_version(project_id, game_version=game_version, loader="fabric", version_types=allowed_version_types)
+            return ModrinthClient.select_version(project_id, game_version=game_version, loader=loader_name, version_types=allowed_version_types)
         return None
 
     @staticmethod
-    def _validate_version(version: ModrinthVersion, game_version: str) -> None:
-        if "fabric" not in version.loaders:
-            raise RuntimeError(f"Modrinth version '{version.version_number}' does not support Fabric.")
+    def _validate_version(version: ModrinthVersion, game_version: str, loader_name: str) -> None:
+        normalized_loaders = {str(loader).strip().lower() for loader in version.loaders}
+        if loader_name not in normalized_loaders:
+            raise RuntimeError(f"Modrinth version '{version.version_number}' does not support {loader_name.title()}.")
         if game_version not in version.game_versions:
             raise RuntimeError(f"Modrinth version '{version.version_number}' does not support Minecraft {game_version}.")
         version.primary_file(".jar")
+
+    @staticmethod
+    def _supported_loader(instance: Instance) -> str:
+        loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
+        return ModrinthModInstaller._normalize_loader(loader_name)
+
+    @staticmethod
+    def _normalize_loader(loader_name: str) -> str:
+        normalized = str(loader_name or "").strip().lower()
+        if normalized not in ModrinthModInstaller.SUPPORTED_LOADERS:
+            raise RuntimeError("Modrinth mod installation requires a Fabric or Forge instance.")
+        return normalized

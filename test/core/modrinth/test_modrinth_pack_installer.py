@@ -17,7 +17,7 @@ from src.models.modrinth.project import ModrinthProject
 from src.models.modrinth.version import ModrinthFile, ModrinthVersion
 
 
-def make_pack(path: Path, file_content: bytes = b"fabric-mod") -> Path:
+def make_pack(path: Path, file_content: bytes = b"fabric-mod", loader: str = "fabric", loader_version: str = "0.16.0") -> Path:
     index = {
         "formatVersion": 1,
         "game": "minecraft",
@@ -31,7 +31,7 @@ def make_pack(path: Path, file_content: bytes = b"fabric-mod") -> Path:
             "downloads": ["https://cdn.modrinth.com/data/project/example.jar"],
             "fileSize": len(file_content),
         }],
-        "dependencies": {"minecraft": "1.20.1", "fabric-loader": "0.16.0"},
+        "dependencies": {"minecraft": "1.20.1", "fabric-loader" if loader == "fabric" else "forge": loader_version},
     }
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("modrinth.index.json", json.dumps(index))
@@ -121,3 +121,47 @@ def test_modpack_version_respects_enabled_release_channels(tmp_path, monkeypatch
 
     with pytest.raises(RuntimeError, match="disabled alpha channel"):
         ModrinthPackInstaller.install("pack-project", "pack-alpha", "Alpha Pack", True, ("release",))
+
+
+def test_installs_forge_modpack_with_declared_forge_version(tmp_path, monkeypatch):
+    configure_paths(tmp_path, monkeypatch)
+    pack_source = make_pack(tmp_path / "forge-pack.mrpack", file_content=b"forge-mod", loader="forge", loader_version="47.4.21")
+    project = ModrinthProject(project_id="forge-pack", slug="forge-pack", title="Forge Pack", description="", project_type="modpack")
+    version = ModrinthVersion(version_id="forge-version", project_id="forge-pack", name="1.0", version_number="1.0", version_type="release", game_versions=("1.20.1",), loaders=("forge",), files=(ModrinthFile(url="https://cdn.modrinth.com/forge-pack.mrpack", filename="forge-pack.mrpack", sha1="a", sha512="b", size=1, primary=True),))
+    calls = []
+    monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: project)
+    monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: version)
+    monkeypatch.setattr(ModrinthDownloader, "download_file", lambda file, destination, force=False: destination.parent.mkdir(parents=True, exist_ok=True) or destination.write_bytes(pack_source.read_bytes()) or destination)
+    base_version = SimpleNamespace(id="1.20.1")
+    monkeypatch.setattr(VersionManager, "load", lambda version_id: base_version)
+    monkeypatch.setattr(ModLoaderManager, "resolve", lambda game_version, loader_name, loader_version="auto": calls.append(("resolve", game_version, loader_name, loader_version)) or (loader_name, loader_version))
+    monkeypatch.setattr(ModLoaderManager, "prepare", lambda version, loader_name, loader_version, reporter=None: calls.append(("prepare", loader_name, loader_version)) or version)
+
+    result = ModrinthPackInstaller.install("forge-pack", "forge-version", "Forge Instance", True, expected_loader="forge")
+
+    assert result.instance.mod_loader == ("forge", "47.4.21")
+    assert ("resolve", "1.20.1", "forge", "47.4.21") in calls
+    assert ("prepare", "forge", "47.4.21") in calls
+    metadata = json.loads((tmp_path / "instances" / "Forge Instance" / ".mcw" / "modrinth-pack.json").read_text(encoding="utf-8"))
+    assert metadata["loader"] == "forge"
+    assert metadata["loaderVersion"] == "47.4.21"
+
+
+def test_rejects_modpack_when_browser_loader_filter_does_not_match_manifest(tmp_path, monkeypatch):
+    configure_paths(tmp_path, monkeypatch)
+    pack_source = make_pack(tmp_path / "forge-pack.mrpack", loader="forge", loader_version="47.4.21")
+    project = ModrinthProject(project_id="forge-pack", slug="forge-pack", title="Forge Pack", description="", project_type="modpack")
+    version = ModrinthVersion(version_id="forge-version", project_id="forge-pack", name="1.0", version_number="1.0", version_type="release", game_versions=("1.20.1",), loaders=("forge",), files=(ModrinthFile(url="https://cdn.modrinth.com/forge-pack.mrpack", filename="forge-pack.mrpack", sha1="a", sha512="b", size=1, primary=True),))
+    monkeypatch.setattr(ModrinthClient, "get_project", lambda project_id: project)
+    monkeypatch.setattr(ModrinthClient, "get_version", lambda version_id: version)
+    monkeypatch.setattr(ModrinthDownloader, "download_file", lambda file, destination, force=False: destination.parent.mkdir(parents=True, exist_ok=True) or destination.write_bytes(pack_source.read_bytes()) or destination)
+
+    with pytest.raises(RuntimeError, match="browser filter is set to Fabric"):
+        ModrinthPackInstaller.install("forge-pack", "forge-version", "Wrong Filter", True, expected_loader="fabric")
+
+
+def test_parse_dependencies_rejects_neoforge_and_ambiguous_loaders():
+    with pytest.raises(RuntimeError, match="unsupported loader"):
+        ModrinthPackInstaller._parse_dependencies({"dependencies": {"minecraft": "1.20.1", "neoforge": "20.1.1"}})
+    with pytest.raises(RuntimeError, match="more than one"):
+        ModrinthPackInstaller._parse_dependencies({"dependencies": {"minecraft": "1.20.1", "fabric-loader": "0.16.0", "forge": "47.4.21"}})

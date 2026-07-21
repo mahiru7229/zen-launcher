@@ -71,22 +71,17 @@ Each instance has its own game directory, metadata, settings, saves, mods, and r
 
 > Fabric API is a separate mod and is not installed automatically by the Fabric Loader itself.
 
-### CurseForge (v0.6 beta)
+### CurseForge (planned for v0.7)
 
-- Search and install Forge mods from CurseForge.
-- Install required dependencies and record project/file provenance for later checks.
-- Search CurseForge modpacks, create an isolated Forge instance, extract overrides safely, and defer managed file downloads until Launch.
-- Check all managed files before downloading, retry failed files for up to three rounds, and preserve manual-install guidance for files that cannot be distributed to third-party launchers.
-- Reuse the launcher-wide progress, pause/resume, bandwidth limit, SHA-1 verification, and concurrent download system.
-- CurseForge access requires an API key supplied through `MCW_CURSEFORGE_API_KEY` or local `config/curseforge.json`; the local credential file is ignored by Git.
-
-See [`docs/FORGE_CURSEFORGE.md`](docs/FORGE_CURSEFORGE.md) for setup and current Beta 3 scope and limitations.
+- CurseForge public integration is deferred to the `0.7.x` line while API-key distribution requirements are clarified with Overwolf.
+- Public `0.6.x` builds do not require or bundle a CurseForge API key.
+- The `0.6.x` line focuses on Forge itself and Forge/Fabric content distributed through Modrinth.
 
 ### Modrinth
 
-- Search and install Fabric mods from Modrinth.
+- Search and install Fabric or Forge mods from Modrinth with an explicit loader filter.
 - Install required Modrinth dependencies automatically.
-- Search `.mrpack` modpacks and create isolated instances automatically.
+- Search Fabric or Forge `.mrpack` modpacks, prepare the declared loader, and create isolated instances automatically.
 - Filter versions by Release, Beta, and Alpha channels. Release remains enabled by default; Beta and Alpha require explicit opt-in.
 - Persist channel preferences in `config/launcher_settings.json`.
 - Verify downloaded files and protect modpack extraction paths.

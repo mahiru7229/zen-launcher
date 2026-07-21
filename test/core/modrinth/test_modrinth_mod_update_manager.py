@@ -10,17 +10,17 @@ from src.models.modrinth.install_result import ModrinthModInstallResult
 from src.models.modrinth.version import ModrinthFile, ModrinthVersion
 
 
-def make_instance(tmp_path: Path) -> Instance:
+def make_instance(tmp_path: Path, loader: str = "fabric") -> Instance:
     instance_dir = tmp_path / "instance"
     (instance_dir / "mods").mkdir(parents=True)
-    instance = Instance(instance_id="id", name="Test", version_id="1.20.1", instance_dir=instance_dir, mod_loader=("fabric", "0.16.0"))
+    instance = Instance(instance_id="id", name="Test", version_id="1.20.1", instance_dir=instance_dir, mod_loader=(loader, "47.4.21" if loader == "forge" else "0.16.0"))
     (instance_dir / "mods" / "example.jar").write_bytes(b"jar")
     ModrinthRegistry.save(instance, {"mods": {"project": {"projectId": "project", "versionId": "old", "versionNumber": "1.0", "versionType": "release", "fileName": "example.jar", "title": "Example", "locked": False}}})
     return instance
 
 
-def version(version_id: str, number: str) -> ModrinthVersion:
-    return ModrinthVersion(version_id=version_id, project_id="project", name=number, version_number=number, version_type="release", game_versions=("1.20.1",), loaders=("fabric",), files=(ModrinthFile(url="https://cdn.modrinth.com/example.jar", filename="example.jar", sha1="a", sha512="b", size=1, primary=True),), date_published="2026-01-01T00:00:00Z")
+def version(version_id: str, number: str, loader: str = "fabric") -> ModrinthVersion:
+    return ModrinthVersion(version_id=version_id, project_id="project", name=number, version_number=number, version_type="release", game_versions=("1.20.1",), loaders=(loader,), files=(ModrinthFile(url="https://cdn.modrinth.com/example.jar", filename="example.jar", sha1="a", sha512="b", size=1, primary=True),), date_published="2026-01-01T00:00:00Z")
 
 
 def test_reports_compatible_update(tmp_path, monkeypatch):
@@ -56,3 +56,14 @@ def test_updates_unlocked_mod(tmp_path, monkeypatch):
 
     assert result.updated_projects == ("Example",)
     assert result.updated_files == ("example-2.jar",)
+
+
+def test_forge_update_check_uses_forge_loader_filter(tmp_path, monkeypatch):
+    instance = make_instance(tmp_path, loader="forge")
+    seen = []
+    monkeypatch.setattr(ModrinthClient, "list_project_versions", lambda project_id, loader, **kwargs: seen.append(loader) or [version("new", "2.0", loader="forge")])
+
+    report = ModrinthModUpdateManager.check(instance, ("release",))
+
+    assert report.update_count == 1
+    assert seen == ["forge"]

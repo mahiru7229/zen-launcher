@@ -6,7 +6,7 @@ from src.core.modrinth.modrinth_client import ModrinthClient
 def test_search_builds_fabric_facets_and_parses_projects(monkeypatch):
     captured = {}
 
-    def fake_get_json(path, params=None, ttl=0, force_refresh=False):
+    def fake_get_json(path, params=None, ttl=0, force_refresh=False, **_kwargs):
         captured.update(path=path, params=params, ttl=ttl)
         return {
             "hits": [{
@@ -101,3 +101,151 @@ def test_project_versions_filter_release_channels(monkeypatch):
     assert {item.version_type for item in beta_enabled} == {"release", "beta"}
     assert {item.version_type for item in all_channels} == {"release", "beta", "alpha"}
     assert ModrinthClient.normalize_version_types(()) == ("release",)
+
+
+def test_search_builds_forge_facets(monkeypatch):
+    calls = []
+
+    def fake_get_json(path, params=None, ttl=0, force_refresh=False, **_kwargs):
+        calls.append({"path": path, "params": params, "force_refresh": force_refresh})
+        return {"hits": [], "total_hits": 0, "offset": 0, "limit": 25}
+
+    monkeypatch.setattr(ModrinthClient, "_get_json", fake_get_json)
+
+    ModrinthClient.search_projects("modpack", "forge", loader="forge")
+
+    facets = json.loads(calls[0]["params"]["facets"])
+    assert ["project_type:modpack"] in facets
+    assert ["categories:forge"] in facets
+
+
+def test_modpack_search_retries_without_loader_facet_when_filtered_page_is_empty(monkeypatch):
+    calls = []
+
+    def fake_get_json(path, params=None, ttl=0, force_refresh=False, **_kwargs):
+        facets = json.loads(params["facets"])
+        calls.append((facets, force_refresh))
+        if ["categories:fabric"] in facets:
+            return {"hits": [], "total_hits": 0, "offset": 0, "limit": 25}
+        return {
+            "hits": [
+                {
+                    "project_id": "fabric-pack",
+                    "slug": "fabric-pack",
+                    "title": "Fabric Pack",
+                    "description": "Compatible",
+                    "project_type": "modpack",
+                    "author": "Author",
+                    "downloads": 10,
+                    "categories": ["fabric", "optimization"],
+                },
+                {
+                    "project_id": "neoforge-pack",
+                    "slug": "neoforge-pack",
+                    "title": "NeoForge Pack",
+                    "description": "Wrong loader",
+                    "project_type": "modpack",
+                    "author": "Author",
+                    "downloads": 5,
+                    "categories": ["neoforge"],
+                },
+            ],
+            "total_hits": 2,
+            "offset": 0,
+            "limit": 25,
+        }
+
+    monkeypatch.setattr(ModrinthClient, "_get_json", fake_get_json)
+
+    result = ModrinthClient.search_projects("modpack", "opti", loader="fabric")
+
+    assert [project.project_id for project in result.projects] == ["fabric-pack"]
+    assert result.total_hits == 1
+    assert len(calls) == 2
+    assert ["categories:fabric"] in calls[0][0]
+    assert ["categories:fabric"] not in calls[1][0]
+    assert calls[1][1] is True
+
+
+def test_modpack_search_keeps_primary_loader_filtered_result_without_fallback(monkeypatch):
+    calls = []
+
+    def fake_get_json(path, params=None, ttl=0, force_refresh=False, **_kwargs):
+        calls.append(json.loads(params["facets"]))
+        return {
+            "hits": [{
+                "project_id": "forge-pack",
+                "slug": "forge-pack",
+                "title": "Forge Pack",
+                "description": "Compatible",
+                "project_type": "modpack",
+                "author": "Author",
+                "downloads": 10,
+                "categories": ["forge"],
+            }],
+            "total_hits": 1,
+            "offset": 0,
+            "limit": 25,
+        }
+
+    monkeypatch.setattr(ModrinthClient, "_get_json", fake_get_json)
+
+    result = ModrinthClient.search_projects("modpack", "opti", loader="forge")
+
+    assert [project.project_id for project in result.projects] == ["forge-pack"]
+    assert len(calls) == 1
+
+
+def test_default_modpack_catalog_does_not_silently_accept_two_empty_responses(monkeypatch):
+    monkeypatch.setattr(
+        ModrinthClient,
+        "_get_json",
+        lambda *args, **kwargs: {"hits": [], "total_hits": 0, "offset": 0, "limit": 25},
+    )
+
+    import pytest
+
+    with pytest.raises(RuntimeError, match="returned no modpacks"):
+        ModrinthClient.search_projects("modpack", "", loader="fabric")
+
+
+def test_empty_default_search_cache_is_not_a_usable_network_fallback():
+    payload = {"hits": [], "total_hits": 0, "offset": 0, "limit": 25}
+
+    assert not ModrinthClient._cached_payload_is_usable("/search", {"facets": "[]"}, payload)
+    assert not ModrinthClient._cached_payload_is_usable("/search", {"query": "no-such-pack"}, payload)
+
+
+def test_search_network_error_does_not_return_empty_default_cache(monkeypatch, tmp_path):
+    import httpx
+    import pytest
+
+    cache_path = tmp_path / "search.json"
+    cache_path.write_text(
+        json.dumps(
+            {
+                "schemaVersion": ModrinthClient.CACHE_SCHEMA,
+                "fetchedAt": 0,
+                "payload": {"hits": [], "total_hits": 0, "offset": 0, "limit": 25},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class FailingClient:
+        def get(self, *args, **kwargs):
+            raise httpx.ConnectError("offline", request=httpx.Request("GET", "https://api.modrinth.com/v2/search"))
+
+    from src.core.fs.paths import Paths
+    from src.core.network.httpx_downloader import HttpDownloader
+
+    monkeypatch.setattr(Paths, "modrinth_api_cache", staticmethod(lambda _key: cache_path))
+    monkeypatch.setattr(HttpDownloader, "get_client", classmethod(lambda cls: FailingClient()))
+
+    with pytest.raises(RuntimeError, match="Unable to contact Modrinth"):
+        ModrinthClient._get_json(
+            "/search",
+            params={"facets": '[["project_type:modpack"]]', "index": "downloads", "offset": 0, "limit": 25},
+            ttl=600,
+            force_refresh=True,
+        )

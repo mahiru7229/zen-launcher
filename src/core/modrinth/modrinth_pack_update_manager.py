@@ -38,7 +38,8 @@ class ModrinthPackUpdateManager:
             current_number = current_version.version_number
         except RuntimeError:
             current_timestamp = 0.0
-        versions = ModrinthClient.list_project_versions(project_id, loader="fabric", version_types=allowed_version_types, force_refresh=force_refresh)
+        loader_name = ModrinthPackUpdateManager._registry_loader(registry)
+        versions = ModrinthClient.list_project_versions(project_id, loader=loader_name, game_version=str(registry.get("minecraftVersion") or instance.version_id), version_types=allowed_version_types, force_refresh=force_refresh)
         candidate = next((version for version in versions if version.version_id != current_version_id and ModrinthClient._published_timestamp(version.date_published) > current_timestamp), None)
         if candidate is None:
             return ModrinthPackUpdateInfo(project_id=project_id, pack_name=project.title, current_version_id=current_version_id, current_version_number=current_number, target_version_id="", target_version_number="", target_version_type="", target_date_published="")
@@ -83,7 +84,7 @@ class ModrinthPackUpdateManager:
         try:
             with zipfile.ZipFile(pack_path, "r") as archive:
                 index = ModrinthPackInstaller._read_index(archive)
-                minecraft_version, loader_version = ModrinthPackInstaller._parse_dependencies(index)
+                minecraft_version, loader_name, loader_version = ModrinthPackInstaller._parse_dependencies(index)
                 selected_files, _, _ = ModrinthPackInstaller._selected_files(index, bool(registry.get("installOptionalFiles", True)))
                 managed_files = {entry["path"].casefold(): entry for entry in ModrinthPackInstaller._managed_download_entries(selected_files)}
                 if reporter is None:
@@ -95,8 +96,11 @@ class ModrinthPackUpdateManager:
                 for entry in ModrinthPackInstaller._extract_layer(archive, "client-overrides", staging):
                     managed_files[entry["path"].casefold()] = entry
 
+            current_loader = ModrinthPackUpdateManager._registry_loader(registry)
+            if loader_name != current_loader:
+                raise RuntimeError(f"This update changes the modpack loader from {current_loader.title()} to {loader_name.title()}, which is not supported automatically.")
             base_version = VersionManager.load(minecraft_version)
-            resolved_loader = ModLoaderManager.resolve(minecraft_version, ModLoaderManager.FABRIC, loader_version)
+            resolved_loader = ModLoaderManager.resolve(minecraft_version, loader_name, loader_version)
             ModLoaderManager.prepare(base_version, *resolved_loader, reporter=reporter)
 
             old_files = {str(item.get("path") or "").casefold(): item for item in registry.get("managedFiles", []) if isinstance(item, dict) and str(item.get("path") or "").strip()}
@@ -155,7 +159,7 @@ class ModrinthPackUpdateManager:
                 "versionType": target_version.version_type,
                 "datePublished": target_version.date_published,
                 "minecraftVersion": minecraft_version,
-                "loader": "fabric",
+                "loader": loader_name,
                 "loaderVersion": loader_version,
                 "installOptionalFiles": bool(registry.get("installOptionalFiles", True)),
                 "managedFiles": applied_managed,
@@ -175,6 +179,13 @@ class ModrinthPackUpdateManager:
             raise
         finally:
             shutil.rmtree(staging, ignore_errors=True)
+
+    @staticmethod
+    def _registry_loader(registry: dict) -> str:
+        loader_name = str(registry.get("loader") or ModLoaderManager.FABRIC).strip().lower()
+        if loader_name not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+            raise RuntimeError(f"Unsupported Modrinth modpack loader: {loader_name or 'unknown'}")
+        return loader_name
 
     @staticmethod
     def _relative(value: str):

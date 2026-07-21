@@ -13,7 +13,7 @@ from src.models.modrinth.update import ModrinthModUpdateEntry, ModrinthModUpdate
 class ModrinthModUpdateManager:
     @staticmethod
     def check(instance: Instance, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, force_refresh: bool = False) -> ModrinthModUpdateReport:
-        ModrinthModUpdateManager._ensure_fabric(instance)
+        loader_name = ModrinthModUpdateManager._supported_loader(instance)
         allowed_types = ModrinthClient.normalize_version_types(allowed_version_types)
         registry = ModrinthRegistry.load(instance)
         entries: list[ModrinthModUpdateEntry] = []
@@ -21,7 +21,7 @@ class ModrinthModUpdateManager:
         for project_id, raw_entry in registry.get("mods", {}).items():
             if not isinstance(raw_entry, dict):
                 continue
-            entry = ModrinthModUpdateManager._check_entry(instance, str(project_id), raw_entry, allowed_types, force_refresh)
+            entry = ModrinthModUpdateManager._check_entry(instance, str(project_id), raw_entry, loader_name, allowed_types, force_refresh)
             entries.append(entry)
 
         entries.sort(key=lambda item: (not item.update_available, item.locked, item.title.casefold()))
@@ -29,7 +29,7 @@ class ModrinthModUpdateManager:
 
     @staticmethod
     def update(instance: Instance, project_ids: list[str] | tuple[str, ...] | set[str], allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None) -> ModrinthModUpdateResult:
-        ModrinthModUpdateManager._ensure_fabric(instance)
+        loader_name = ModrinthModUpdateManager._supported_loader(instance)
         if InstanceRunLock.is_active(instance):
             raise RuntimeError("Close Minecraft before updating mods.")
 
@@ -52,7 +52,7 @@ class ModrinthModUpdateManager:
                 skipped_locked.append(title)
                 continue
             try:
-                latest = ModrinthClient.select_version(project_id, game_version=instance.version_id, loader="fabric", version_types=allowed_types)
+                latest = ModrinthClient.select_version(project_id, game_version=instance.version_id, loader=loader_name, version_types=allowed_types)
                 current = ModrinthModUpdateManager._current_version(raw_entry, allowed_types=allowed_types)
             except RuntimeError as error:
                 warnings.append(f"{title}: {error}")
@@ -75,13 +75,13 @@ class ModrinthModUpdateManager:
 
     @staticmethod
     def set_locked(instance: Instance, project_ids: list[str] | tuple[str, ...] | set[str], locked: bool) -> tuple[str, ...]:
-        ModrinthModUpdateManager._ensure_fabric(instance)
+        ModrinthModUpdateManager._supported_loader(instance)
         if InstanceRunLock.is_active(instance):
             raise RuntimeError("Close Minecraft before changing mod version locks.")
         return ModrinthRegistry.set_locked(instance, project_ids, locked)
 
     @staticmethod
-    def _check_entry(instance: Instance, project_id: str, raw_entry: dict, allowed_types: tuple[str, ...], force_refresh: bool) -> ModrinthModUpdateEntry:
+    def _check_entry(instance: Instance, project_id: str, raw_entry: dict, loader_name: str, allowed_types: tuple[str, ...], force_refresh: bool) -> ModrinthModUpdateEntry:
         title = str(raw_entry.get("title") or project_id)
         file_name = str(raw_entry.get("fileName") or "")
         current_version_id = str(raw_entry.get("versionId") or "")
@@ -90,10 +90,10 @@ class ModrinthModUpdateManager:
         file_missing = tracked_path is None or (not tracked_path.exists() and not tracked_path.with_name(tracked_path.name + ".disabled").exists())
 
         try:
-            versions = ModrinthClient.list_project_versions(project_id, loader="fabric", game_version=instance.version_id, version_types=allowed_types, force_refresh=force_refresh)
+            versions = ModrinthClient.list_project_versions(project_id, loader=loader_name, game_version=instance.version_id, version_types=allowed_types, force_refresh=force_refresh)
             latest = versions[0] if versions else None
             if latest is None:
-                raise RuntimeError(f"No allowed Fabric version supports Minecraft {instance.version_id}.")
+                raise RuntimeError(f"No allowed {loader_name.title()} version supports Minecraft {instance.version_id}.")
             current = ModrinthModUpdateManager._current_version(raw_entry, versions=versions, allowed_types=allowed_types)
             if not ModrinthModUpdateManager._is_newer(latest, current):
                 latest = current or latest
@@ -138,7 +138,8 @@ class ModrinthModUpdateManager:
         return True
 
     @staticmethod
-    def _ensure_fabric(instance: Instance) -> None:
+    def _supported_loader(instance: Instance) -> str:
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        if loader_name != ModLoaderManager.FABRIC:
-            raise RuntimeError("Mod updates currently require a Fabric instance.")
+        if loader_name not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+            raise RuntimeError("Mod updates require a Fabric or Forge instance.")
+        return loader_name

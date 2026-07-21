@@ -272,6 +272,7 @@ class MainWindow(QMainWindow):
         self.modrinth_mod_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
         self.modrinth_modpack_dialog.channel_preferences_changed.connect(self._set_modrinth_channel_preferences)
         self.modrinth_controller.search_results_changed.connect(self._set_modrinth_results)
+        self.modrinth_controller.search_failed.connect(self._set_modrinth_search_error)
         self.modrinth_controller.versions_changed.connect(self._set_modrinth_versions)
         self.modrinth_controller.mod_installed.connect(self._modrinth_mod_installed)
         self.modrinth_controller.modpack_installed.connect(self._modrinth_modpack_installed)
@@ -391,7 +392,7 @@ class MainWindow(QMainWindow):
         self.mod_manager_dialog.raise_()
         self.mod_manager_dialog.activateWindow()
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        if loader_name == ModLoaderManager.FABRIC and not self.task_runner.is_task_active("mods.update.check"):
+        if loader_name in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE} and not self.task_runner.is_task_active("mods.update.check"):
             QTimer.singleShot(0, lambda: self.mod_controller.check_updates(self.mod_manager_dialog.allowed_version_types, force_refresh=False))
 
     def _open_modrinth_mod_browser(self) -> None:
@@ -403,35 +404,45 @@ class MainWindow(QMainWindow):
         self.modrinth_mod_dialog.show()
         self.modrinth_mod_dialog.raise_()
         self.modrinth_mod_dialog.activateWindow()
-        self.modrinth_controller.search("mod", "", "downloads", 0, game_version=instance.version_id)
+        self.modrinth_mod_dialog.set_searching(self.modrinth_mod_dialog.selected_loader)
+        self.modrinth_controller.search("mod", "", "downloads", 0, game_version=instance.version_id, loader=self.modrinth_mod_dialog.selected_loader)
 
     def _open_modrinth_modpacks(self) -> None:
         self.modrinth_modpack_dialog.set_instance(None)
         self.modrinth_modpack_dialog.show()
         self.modrinth_modpack_dialog.raise_()
         self.modrinth_modpack_dialog.activateWindow()
-        self.modrinth_controller.search("modpack", "", "downloads", 0)
+        self.modrinth_modpack_dialog.set_searching(self.modrinth_modpack_dialog.selected_loader)
+        self.modrinth_controller.search("modpack", "", "downloads", 0, loader=self.modrinth_modpack_dialog.selected_loader)
 
-    def _search_modrinth_mods(self, project_type: str, query: str, index: str, offset: int) -> None:
-        self.modrinth_controller.search(project_type, query, index, offset, game_version=self.modrinth_mod_dialog.game_version)
+    def _search_modrinth_mods(self, project_type: str, query: str, index: str, offset: int, loader: str) -> None:
+        self.modrinth_controller.search(project_type, query, index, offset, game_version=self.modrinth_mod_dialog.game_version, loader=loader)
 
-    def _search_modrinth_modpacks(self, project_type: str, query: str, index: str, offset: int) -> None:
-        self.modrinth_controller.search(project_type, query, index, offset)
+    def _search_modrinth_modpacks(self, project_type: str, query: str, index: str, offset: int, loader: str) -> None:
+        self.modrinth_controller.search(project_type, query, index, offset, loader=loader)
 
-    def _install_modrinth_mod(self, version_id: str) -> None:
+    def _install_modrinth_mod(self, version_id: str, loader: str) -> None:
         instance = self.mod_controller.current_instance
         if instance is None:
             QMessageBox.information(self, tr("modrinth.title"), tr("modrinth.mod.no_instance"))
             return
+        instance_loader, _ = ModLoaderManager.normalize(instance.mod_loader)
+        if instance_loader != loader:
+            QMessageBox.information(self, tr("modrinth.title"), tr("modrinth.loader.instance_mismatch", instance_loader=instance_loader.title(), selected_loader=loader.title()))
+            return
         self.modrinth_controller.install_mod(instance.name, version_id, self.modrinth_mod_dialog.allowed_version_types)
 
-    def _set_modrinth_results(self, project_type: str, result: object) -> None:
+    def _set_modrinth_results(self, project_type: str, loader: str, result: object) -> None:
         dialog = self.modrinth_mod_dialog if project_type == "mod" else self.modrinth_modpack_dialog
-        dialog.set_search_result(result)
+        dialog.set_search_result(result, loader)
 
-    def _set_modrinth_versions(self, project_type: str, project_id: str, versions: list) -> None:
+    def _set_modrinth_search_error(self, project_type: str, loader: str, message: str) -> None:
         dialog = self.modrinth_mod_dialog if project_type == "mod" else self.modrinth_modpack_dialog
-        dialog.set_versions(project_id, versions)
+        dialog.set_search_error(loader, message)
+
+    def _set_modrinth_versions(self, project_type: str, project_id: str, loader: str, versions: list) -> None:
+        dialog = self.modrinth_mod_dialog if project_type == "mod" else self.modrinth_modpack_dialog
+        dialog.set_versions(project_id, versions, loader)
 
     def _modrinth_mod_installed(self, result: object) -> None:
         self.mod_controller.refresh()

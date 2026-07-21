@@ -109,7 +109,7 @@ class ModController(BaseController):
         if instance is None:
             return
         loader_name, _ = ModLoaderManager.normalize(instance.mod_loader)
-        if loader_name != ModLoaderManager.FABRIC:
+        if loader_name not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
             self.updates_changed.emit(ModrinthModUpdateReport(entries=()))
             return
         instance_id = instance.instance_id
@@ -120,8 +120,8 @@ class ModController(BaseController):
         instance = self._require_instance()
         if instance is None or not project_ids:
             return
-        if ModLoaderManager.normalize(instance.mod_loader)[0] != ModLoaderManager.FABRIC:
-            self._emit_error("Manage mods", "Modrinth update actions are available only for Fabric instances in this beta.")
+        if ModLoaderManager.normalize(instance.mod_loader)[0] not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+            self._emit_error("Manage mods", "Modrinth update actions require a Fabric or Forge instance.")
             return
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)
@@ -132,8 +132,8 @@ class ModController(BaseController):
         instance = self._require_instance()
         if instance is None:
             return
-        if ModLoaderManager.normalize(instance.mod_loader)[0] != ModLoaderManager.FABRIC:
-            self._emit_error("Manage mods", "Modrinth update actions are available only for Fabric instances in this beta.")
+        if ModLoaderManager.normalize(instance.mod_loader)[0] not in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE}:
+            self._emit_error("Manage mods", "Modrinth update actions require a Fabric or Forge instance.")
             return
         instance_id = instance.instance_id
         self._last_allowed_types = tuple(allowed_version_types)

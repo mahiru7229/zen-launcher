@@ -186,7 +186,7 @@ class ModManagerDialog(QDialog):
             loader_title = "Fabric Loader" if loader_name == ModLoaderManager.FABRIC else "Minecraft Forge"
             self.summary_label.setText(tr("Minecraft {version} • {loader} {loader_version} • Drop .jar files into this window to add them.", version=instance.version_id, loader=loader_title, loader_version=loader_version))
             for widget in (self.check_updates_button, self.update_selected_button, self.update_all_button, self.lock_button, self.unlock_button):
-                widget.setVisible(loader_name == ModLoaderManager.FABRIC)
+                widget.setVisible(loader_name in {ModLoaderManager.FABRIC, ModLoaderManager.FORGE})
             self._set_actions_enabled(not self._busy)
         else:
             self.summary_label.setText(tr("This instance is Vanilla. Apply Fabric or Forge from the Instances page before adding mods."))
@@ -491,13 +491,13 @@ class ModManagerDialog(QDialog):
     def _set_actions_enabled(self, enabled: bool) -> None:
         for button in (self.refresh_button, self.analyze_button, self.open_folder_button, self.add_button, self.enable_button, self.disable_button, self.remove_button):
             button.setEnabled(enabled)
-        self.modrinth_button.setEnabled(enabled and self._is_fabric_instance())
+        self.modrinth_button.setEnabled(enabled and self._is_modded_instance())
         self.curseforge_button.setEnabled(enabled and self._is_forge_instance() and CurseForgeConfigManager.is_configured())
         self.check_updates_button.setEnabled(enabled and not self._update_checking)
         self._update_action_state()
 
     def _update_action_state(self) -> None:
-        enabled = not self._busy and self._is_fabric_instance()
+        enabled = not self._busy and self._is_modded_instance()
         selected = self._selected_update_entries()
         self.update_selected_button.setEnabled(enabled and any(entry.update_available and not entry.locked and not entry.warning and not entry.file_missing for entry in selected))
         self.update_all_button.setEnabled(enabled and self._updates.update_count > 0)

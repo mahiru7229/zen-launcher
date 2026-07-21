@@ -35,7 +35,7 @@ class ModrinthPackInstaller:
     INSTANCE_NAME_PATTERN = re.compile(r'^[^<>:"/\\|?*\x00-\x1F]{1,80}$')
 
     @staticmethod
-    def install(project_id: str, version_id: str, instance_name: str, install_optional_files: bool = True, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None) -> ModrinthModpackInstallResult:
+    def install(project_id: str, version_id: str, instance_name: str, install_optional_files: bool = True, allowed_version_types: tuple[str, ...] | list[str] | set[str] | None = None, reporter: ProgressReporter | None = None, expected_loader: str = "") -> ModrinthModpackInstallResult:
         project = ModrinthClient.get_project(project_id)
         requested_name = str(instance_name or "").strip()
         base_name = ModrinthPackInstaller._validated_instance_name(requested_name or project.title)
@@ -64,7 +64,7 @@ class ModrinthPackInstaller:
         try:
             with zipfile.ZipFile(pack_path, "r") as archive:
                 index = ModrinthPackInstaller._read_index(archive)
-                minecraft_version, loader_version = ModrinthPackInstaller._parse_dependencies(index)
+                minecraft_version, loader_name, loader_version = ModrinthPackInstaller._parse_dependencies(index)
                 selected_files, skipped_optional, skipped_server = ModrinthPackInstaller._selected_files(index, install_optional_files)
                 managed_files = {entry["path"].casefold(): entry for entry in ModrinthPackInstaller._managed_download_entries(selected_files)}
                 for entry in ModrinthPackInstaller._extract_layer(archive, "overrides", staging):
@@ -72,11 +72,15 @@ class ModrinthPackInstaller:
                 for entry in ModrinthPackInstaller._extract_layer(archive, "client-overrides", staging):
                     managed_files[entry["path"].casefold()] = entry
 
+            selected_loader = str(expected_loader or "").strip().lower()
+            if selected_loader and selected_loader != loader_name:
+                raise RuntimeError(f"This modpack uses {loader_name.title()}, but the browser filter is set to {selected_loader.title()}.")
             base_version = VersionManager.load(minecraft_version)
-            resolved_loader = ModLoaderManager.resolve(minecraft_version, ModLoaderManager.FABRIC, loader_version)
+            resolved_loader = ModLoaderManager.resolve(minecraft_version, loader_name, loader_version)
+            ModLoaderManager.prepare(base_version, *resolved_loader, reporter=reporter)
             created_instance = InstanceManager.create(name=normalized_name, version=base_version, mod_loader=resolved_loader)
             shutil.copytree(staging, created_instance.instance_dir, dirs_exist_ok=True)
-            ModrinthPackInstaller._write_metadata(created_instance.instance_dir, project.project_id, version.version_id, project.title, version.version_number, minecraft_version, loader_version, list(managed_files.values()), install_optional_files)
+            ModrinthPackInstaller._write_metadata(created_instance.instance_dir, project.project_id, version.version_id, project.title, version.version_number, minecraft_version, loader_name, loader_version, list(managed_files.values()), install_optional_files)
             return ModrinthModpackInstallResult(instance=created_instance, pack_name=project.title, pack_version=version.version_number, installed_files=len(selected_files), skipped_optional_files=skipped_optional, skipped_server_files=skipped_server)
         except Exception:
             if created_instance is not None:
@@ -89,8 +93,8 @@ class ModrinthPackInstaller:
     def inspect(pack_path: Path) -> dict:
         with zipfile.ZipFile(pack_path, "r") as archive:
             index = ModrinthPackInstaller._read_index(archive)
-            minecraft_version, loader_version = ModrinthPackInstaller._parse_dependencies(index)
-        return {"name": str(index.get("name") or ""), "summary": str(index.get("summary") or ""), "minecraft": minecraft_version, "fabric_loader": loader_version, "files": len(index.get("files", []))}
+            minecraft_version, loader_name, loader_version = ModrinthPackInstaller._parse_dependencies(index)
+        return {"name": str(index.get("name") or ""), "summary": str(index.get("summary") or ""), "minecraft": minecraft_version, "loader": loader_name, "loader_version": loader_version, "fabric_loader": loader_version if loader_name == ModLoaderManager.FABRIC else "", "forge": loader_version if loader_name == ModLoaderManager.FORGE else "", "files": len(index.get("files", []))}
 
     @staticmethod
     def _read_index(archive: zipfile.ZipFile) -> dict:
@@ -115,18 +119,24 @@ class ModrinthPackInstaller:
         return index
 
     @staticmethod
-    def _parse_dependencies(index: dict) -> tuple[str, str]:
+    def _parse_dependencies(index: dict) -> tuple[str, str, str]:
         dependencies = index.get("dependencies", {})
         minecraft_version = str(dependencies.get("minecraft") or "").strip()
         fabric_loader = str(dependencies.get("fabric-loader") or "").strip()
-        unsupported_loaders = [key for key in ("forge", "neoforge", "quilt-loader") if dependencies.get(key)]
+        forge_loader = str(dependencies.get("forge") or "").strip()
+        unsupported_loaders = [key for key in ("neoforge", "quilt-loader") if dependencies.get(key)]
         if unsupported_loaders:
             raise RuntimeError(f"This modpack uses an unsupported loader: {', '.join(unsupported_loaders)}")
         if not minecraft_version:
             raise RuntimeError("The modpack does not declare a Minecraft version.")
-        if not fabric_loader:
-            raise RuntimeError("Only Fabric Modrinth modpacks are supported in this release.")
-        return minecraft_version, fabric_loader
+        declared = [(ModLoaderManager.FABRIC, fabric_loader), (ModLoaderManager.FORGE, forge_loader)]
+        selected = [(name, version) for name, version in declared if version]
+        if not selected:
+            raise RuntimeError("The modpack does not declare a supported Fabric or Forge loader.")
+        if len(selected) != 1:
+            raise RuntimeError("The modpack declares more than one supported loader and cannot be installed safely.")
+        loader_name, loader_version = selected[0]
+        return minecraft_version, loader_name, loader_version
 
     @staticmethod
     def _selected_files(index: dict, install_optional_files: bool) -> tuple[list[dict], int, int]:
@@ -246,5 +256,5 @@ class ModrinthPackInstaller:
         return name
 
     @staticmethod
-    def _write_metadata(instance_dir: Path, project_id: str, version_id: str, title: str, version_number: str, minecraft_version: str, loader_version: str, managed_files: list[dict], install_optional_files: bool) -> None:
-        ModrinthPackRegistry.save(instance_dir, {"projectId": project_id, "versionId": version_id, "name": title, "versionNumber": version_number, "minecraftVersion": minecraft_version, "loader": "fabric", "loaderVersion": loader_version, "installOptionalFiles": bool(install_optional_files), "managedFiles": managed_files, "preservedFiles": []})
+    def _write_metadata(instance_dir: Path, project_id: str, version_id: str, title: str, version_number: str, minecraft_version: str, loader_name: str, loader_version: str, managed_files: list[dict], install_optional_files: bool) -> None:
+        ModrinthPackRegistry.save(instance_dir, {"projectId": project_id, "versionId": version_id, "name": title, "versionNumber": version_number, "minecraftVersion": minecraft_version, "loader": loader_name, "loaderVersion": loader_version, "installOptionalFiles": bool(install_optional_files), "managedFiles": managed_files, "preservedFiles": []})

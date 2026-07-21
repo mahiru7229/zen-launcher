@@ -136,3 +136,17 @@ def test_update_preserves_modified_files_and_replaces_managed_pack_files(monkeyp
     updated_registry = ModrinthPackRegistry.load_from_dir(instance_dir)
     assert updated_registry["versionId"] == "v2"
     assert updated_registry["preservedFiles"][0]["path"] == "config/user.cfg"
+
+
+def test_check_uses_loader_saved_by_forge_modpack(monkeypatch, tmp_path: Path) -> None:
+    instance = Instance(instance_id="id", name="Forge Pack", version_id="1.20.1", instance_dir=tmp_path, mod_loader=("forge", "47.4.21"))
+    monkeypatch.setattr(ModrinthPackRegistry, "load", lambda _instance: {"projectId": "pack", "versionId": "v1", "versionNumber": "1.0", "minecraftVersion": "1.20.1", "loader": "forge"})
+    monkeypatch.setattr(ModrinthClient, "get_project", lambda *args, **kwargs: ModrinthProject(project_id="pack", slug="pack", title="Forge Pack", description="", project_type="modpack"))
+    monkeypatch.setattr(ModrinthClient, "get_version", lambda *args, **kwargs: make_version("v1", "1.0", "2026-01-01T00:00:00Z"))
+    seen = []
+    monkeypatch.setattr(ModrinthClient, "list_project_versions", lambda project_id, loader, **kwargs: seen.append((loader, kwargs.get("game_version"))) or [])
+
+    info = ModrinthPackUpdateManager.check(instance, ("release",))
+
+    assert info is not None
+    assert seen == [("forge", "1.20.1")]

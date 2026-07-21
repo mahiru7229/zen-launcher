@@ -69,3 +69,22 @@ def test_dialog_keeps_update_check_status_inside_manage_mods(gui_app, tmp_path):
         dialog.close()
         dialog.deleteLater()
         gui_app.processEvents()
+
+
+def test_forge_instance_enables_modrinth_browse_and_update_actions(gui_app, tmp_path):
+    from src.models.modrinth.update import ModrinthModUpdateEntry, ModrinthModUpdateReport
+
+    instance = Instance(instance_id="id", name="Forge", version_id="1.20.1", instance_dir=tmp_path, mod_loader=("forge", "47.4.21"))
+    dialog = ModManagerDialog()
+
+    try:
+        dialog.set_instance(instance)
+        dialog.set_mods([ModInfo(path=tmp_path / "example.jar", file_name="example.jar", enabled=True, mod_id="example", name="Example", version="1.0", loader="forge")])
+        dialog.set_update_report(ModrinthModUpdateReport(entries=(ModrinthModUpdateEntry(project_id="project", title="Example", file_name="example.jar", current_version_id="old", current_version_number="1.0", latest_version_id="new", latest_version_number="2.0", latest_version_type="release", locked=False),)))
+
+        assert dialog.modrinth_button.isEnabled()
+        assert dialog.update_all_button.isEnabled()
+    finally:
+        dialog.close()
+        dialog.deleteLater()
+        gui_app.processEvents()
