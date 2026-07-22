@@ -1,4 +1,5 @@
 from src.models.modrinth.pack_state import ModrinthManagedFileChange, ModrinthPackStateReport
+from src.models.modrinth.pack_repair import ModrinthPackRepairResult
 from src.models.modrinth.install_result import ModrinthModInstallResult, ModrinthModpackInstallResult
 from src.models.modrinth.project import ModrinthProject, ModrinthSearchResult
 from src.models.modrinth.update import ModrinthModUpdateEntry, ModrinthModUpdateReport, ModrinthModUpdateResult
@@ -14,6 +15,7 @@ __all__ = [
     "ModrinthModUpdateResult",
     "ModrinthModpackInstallResult",
     "ModrinthPackStateReport",
+    "ModrinthPackRepairResult",
     "ModrinthProject",
     "ModrinthSearchResult",
     "ModrinthVersion",

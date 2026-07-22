@@ -50,7 +50,7 @@ class ModrinthContentManager:
 
         for round_number in range(1, ModrinthContentManager.MAX_DOWNLOAD_ROUNDS + 1):
             check_suffix = "" if round_number == 1 else f" after download round {round_number - 1}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS}"
-            missing_pack = ModrinthContentManager._check_pack_files(instance, pack_entries, warnings, reporter, check_suffix)
+            missing_pack = ModrinthContentManager._check_pack_files(instance, pack_registry, pack_entries, warnings, reporter, check_suffix)
             missing_mods, mod_changed = ModrinthContentManager._check_mod_files(instance, mod_entries, warnings, reporter, check_suffix)
             if mod_changed:
                 ModrinthRegistry.save(instance, mod_registry)
@@ -69,7 +69,7 @@ class ModrinthContentManager:
             if mod_entries:
                 ModrinthRegistry.save(instance, mod_registry)
 
-        missing_pack = ModrinthContentManager._check_pack_files(instance, pack_entries, warnings, reporter, f" after download round {ModrinthContentManager.MAX_DOWNLOAD_ROUNDS}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS}")
+        missing_pack = ModrinthContentManager._check_pack_files(instance, pack_registry, pack_entries, warnings, reporter, f" after download round {ModrinthContentManager.MAX_DOWNLOAD_ROUNDS}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS}")
         missing_mods, mod_changed = ModrinthContentManager._check_mod_files(instance, mod_entries, warnings, reporter, f" after download round {ModrinthContentManager.MAX_DOWNLOAD_ROUNDS}/{ModrinthContentManager.MAX_DOWNLOAD_ROUNDS}")
         if mod_changed or mod_entries:
             ModrinthRegistry.save(instance, mod_registry)
@@ -129,12 +129,14 @@ class ModrinthContentManager:
         return [entry for entry in mods.values() if isinstance(entry, dict)]
 
     @staticmethod
-    def _check_pack_files(instance: Instance, entries: list[dict], warnings: list[str], reporter: ProgressReporter | None, suffix: str) -> list[dict]:
+    def _check_pack_files(instance: Instance, registry: dict, entries: list[dict], warnings: list[str], reporter: ProgressReporter | None, suffix: str) -> list[dict]:
         total = len(entries)
         message = f"Checking Modrinth modpack files{suffix}..."
         ModrinthContentManager._report_files(reporter, ProgressStage.CHECKING_MODPACK, message, 0, total)
         missing: list[dict] = []
         root = Path(instance.instance_dir)
+        cache = ModrinthPackRegistry._normalize_verification_cache(registry.get("verificationCache", {}), registry.get("managedFiles", []))
+        registry["verificationCache"] = cache
 
         for completed, entry in enumerate(entries, start=1):
             relative = ModrinthPackRegistry._safe_relative(str(entry.get("path") or ""))
@@ -144,10 +146,8 @@ class ModrinthContentManager:
                 continue
 
             target = root.joinpath(*relative.parts)
-            sha1 = str(entry.get("sha1") or "")
-            sha512 = str(entry.get("sha512") or "")
-            size = int(entry.get("size", 0) or 0)
-            if ModrinthDownloader.verify(target, sha1=sha1, sha512=sha512, expected_size=size):
+            verified, _, _ = ModrinthPackRegistry.verify_entry(root, entry, cache=cache)
+            if verified:
                 ModrinthContentManager._report_files(reporter, ProgressStage.CHECKING_MODPACK, message, completed, total)
                 continue
 

@@ -36,6 +36,7 @@ class InstancesPage(BasePage):
     restore_backup_requested = Signal(str, object)
     open_backups_requested = Signal(str)
     scan_modpack_requested = Signal(str)
+    repair_modpack_requested = Signal(str)
     check_modpack_update_requested = Signal(str)
     apply_modpack_update_requested = Signal(str)
 
@@ -48,6 +49,7 @@ class InstancesPage(BasePage):
         self._pending_manage_loader_version = ""
         self._synchronizing = False
         self._modpack_update_info: object | None = None
+        self._modpack_managed = False
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -195,14 +197,17 @@ class InstancesPage(BasePage):
         self.modpack_status.setObjectName("MutedLabel")
         self.modpack_status.setWordWrap(True)
         self.scan_modpack_button = set_theme_icon(QPushButton("Scan managed pack files"), "icon.action.search")
+        self.repair_modpack_button = set_theme_icon(QPushButton("Repair modpack"), "icon.action.repair")
         self.check_modpack_update_button = set_theme_icon(QPushButton("Check modpack update"), "icon.action.update")
         self.apply_modpack_update_button = set_theme_icon(QPushButton("Update modpack"), "icon.action.download")
         self.apply_modpack_update_button.setObjectName("PrimaryButton")
         self.scan_modpack_button.clicked.connect(lambda: self.scan_modpack_requested.emit(self.current_instance_name()))
+        self.repair_modpack_button.clicked.connect(self._confirm_modpack_repair)
         self.check_modpack_update_button.clicked.connect(lambda: self.check_modpack_update_requested.emit(self.current_instance_name()))
         self.apply_modpack_update_button.clicked.connect(self._confirm_modpack_update)
         lifecycle_card.layout.addWidget(self.modpack_status)
         lifecycle_card.layout.addWidget(self.scan_modpack_button)
+        lifecycle_card.layout.addWidget(self.repair_modpack_button)
         lifecycle_card.layout.addWidget(self.check_modpack_update_button)
         lifecycle_card.layout.addWidget(self.apply_modpack_update_button)
         self.root_layout.addWidget(lifecycle_card)
@@ -295,9 +300,11 @@ class InstancesPage(BasePage):
             self.restore_backup_button.setEnabled(False)
             self.open_backups_button.setEnabled(False)
             self.scan_modpack_button.setEnabled(False)
+            self.repair_modpack_button.setEnabled(False)
             self.check_modpack_update_button.setEnabled(False)
             self.apply_modpack_update_button.setEnabled(False)
             self.modpack_status.setText(tr("Select a Modrinth modpack instance to check its managed files and updates."))
+            self._modpack_managed = False
             return
 
         loader_name, loader_version = self._instance_loader(instance)
@@ -323,7 +330,9 @@ class InstancesPage(BasePage):
         self.open_backups_button.setEnabled(True)
         pack_registry = Path(instance.instance_dir) / ".mcw" / "modrinth-pack.json"
         is_managed_pack = pack_registry.is_file()
+        self._modpack_managed = is_managed_pack
         self.scan_modpack_button.setEnabled(is_managed_pack)
+        self.repair_modpack_button.setEnabled(is_managed_pack)
         self.check_modpack_update_button.setEnabled(is_managed_pack)
         self.apply_modpack_update_button.setEnabled(False)
         self._modpack_update_info = None
@@ -448,9 +457,10 @@ class InstancesPage(BasePage):
         missing = int(getattr(report, "missing_count", 0))
         managed = int(getattr(report, "managed_files", 0))
         if not changes:
-            self.modpack_status.setText(tr("Managed pack files are healthy: {count} file(s) verified.", count=managed))
+            cache_hits = int(getattr(report, "cache_hits", 0))
+            self.modpack_status.setText(tr("Managed pack files are healthy: {count} file(s) verified, {cached} reused from verification cache.", count=managed, cached=cache_hits))
         else:
-            self.modpack_status.setText(tr("Managed pack changes detected: {modified} modified, {missing} missing. User changes will be preserved during update.", modified=modified, missing=missing))
+            self.modpack_status.setText(tr("Managed pack changes detected: {modified} modified, {missing} missing. Repair restores the current pack version; update still preserves user changes.", modified=modified, missing=missing))
 
     def set_modpack_update_info(self, info: object | None) -> None:
         self._modpack_update_info = info
@@ -464,8 +474,9 @@ class InstancesPage(BasePage):
             self.modpack_status.setText(tr("This Modrinth modpack is up to date."))
 
     def set_modpack_busy(self, busy: bool) -> None:
-        managed = self.scan_modpack_button.isEnabled() or self.check_modpack_update_button.isEnabled() or self._modpack_update_info is not None
+        managed = self._modpack_managed
         self.scan_modpack_button.setEnabled(managed and not busy)
+        self.repair_modpack_button.setEnabled(managed and not busy)
         self.check_modpack_update_button.setEnabled(managed and not busy)
         self.apply_modpack_update_button.setEnabled(bool(self._modpack_update_info is not None and getattr(self._modpack_update_info, "available", False)) and not busy)
 
@@ -488,6 +499,14 @@ class InstancesPage(BasePage):
         answer = QMessageBox.question(self, tr("Update Modrinth modpack"), tr("Update '{name}' from {current} to {target}? A full safety backup will be created and user-modified files will be preserved.", name=name, current=getattr(info, "current_version_number", "?"), target=getattr(info, "target_version_number", "?")), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if answer == QMessageBox.StandardButton.Yes:
             self.apply_modpack_update_requested.emit(name)
+
+    def _confirm_modpack_repair(self) -> None:
+        name = self.current_instance_name()
+        if not name or not self._modpack_managed:
+            return
+        answer = QMessageBox.question(self, tr("Repair Modrinth modpack"), tr("Repair all missing or modified managed files in '{name}' using its current Modrinth version? A full safety backup will be created before any file is replaced. Worlds and unmanaged files are kept.", name=name), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if answer == QMessageBox.StandardButton.Yes:
+            self.repair_modpack_requested.emit(name)
 
     def _request_create(self) -> None:
         self.create_requested.emit(self.create_name_input.text(), self.version_combo.currentText(), self.selected_create_loader())

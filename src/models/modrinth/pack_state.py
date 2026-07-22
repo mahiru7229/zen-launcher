@@ -16,6 +16,9 @@ class ModrinthPackStateReport:
     version_id: str
     managed_files: int
     changes: tuple[ModrinthManagedFileChange, ...]
+    verified_files: int = 0
+    cache_hits: int = 0
+    hashed_files: int = 0
 
     @property
     def modified_count(self) -> int:

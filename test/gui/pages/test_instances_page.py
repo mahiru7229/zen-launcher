@@ -6,7 +6,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from src.gui.pages.instances_page import InstancesPage
 from src.models.modloader.fabric_loader_version import FabricLoaderVersion
@@ -99,3 +99,25 @@ def test_repair_fabric_is_only_available_for_fabric_instances(app):
     vanilla = make_instance(name="Vanilla", mod_loader=("vanilla", "-1"))
     page.set_instances([vanilla], vanilla.name)
     assert page.repair_loader_button.isEnabled() is False
+
+
+def test_modpack_repair_button_emits_and_recovers_after_busy(app, monkeypatch, tmp_path):
+    instance_dir = tmp_path / "Pack"
+    registry = instance_dir / ".mcw" / "modrinth-pack.json"
+    registry.parent.mkdir(parents=True)
+    registry.write_text("{}", encoding="utf-8")
+    instance = SimpleNamespace(name="Pack", version_id="1.21.1", instance_dir=instance_dir, mod_loader=("fabric", "0.18.6"))
+    page = InstancesPage()
+    page.set_instances([instance], instance.name)
+    emitted = []
+    page.repair_modpack_requested.connect(emitted.append)
+    monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes)
+
+    assert page.repair_modpack_button.isEnabled() is True
+    page.set_modpack_busy(True)
+    assert page.repair_modpack_button.isEnabled() is False
+    page.set_modpack_busy(False)
+    assert page.repair_modpack_button.isEnabled() is True
+
+    page._confirm_modpack_repair()
+    assert emitted == ["Pack"]

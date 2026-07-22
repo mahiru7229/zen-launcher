@@ -201,6 +201,7 @@ class MainWindow(QMainWindow):
         self.instances_page.restore_backup_requested.connect(self.backup_controller.restore)
         self.instances_page.open_backups_requested.connect(self._open_backups_folder)
         self.instances_page.scan_modpack_requested.connect(self.modpack_lifecycle_controller.scan)
+        self.instances_page.repair_modpack_requested.connect(self.modpack_lifecycle_controller.repair)
         self.instances_page.check_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.check_update(name, self.modrinth_modpack_dialog.allowed_version_types, force_refresh=True))
         self.instances_page.apply_modpack_update_requested.connect(lambda name: self.modpack_lifecycle_controller.update(name, self.modrinth_modpack_dialog.allowed_version_types))
 
@@ -236,6 +237,7 @@ class MainWindow(QMainWindow):
         self.modpack_lifecycle_controller.state_changed.connect(self.instances_page.set_modpack_state)
         self.modpack_lifecycle_controller.update_checked.connect(self._on_modpack_update_checked)
         self.modpack_lifecycle_controller.update_finished.connect(self._on_modpack_updated)
+        self.modpack_lifecycle_controller.repair_finished.connect(self._on_modpack_repaired)
 
         self.instance_controller.instances_changed.connect(self.instances_page.set_instances)
         self.instance_controller.instances_changed.connect(self.instance_settings_page.set_instances)
@@ -579,6 +581,18 @@ class MainWindow(QMainWindow):
             message += tr("\n{count} user-modified file(s) were preserved.", count=len(preserved))
         message += tr("\nSafety backup: {path}", path=getattr(result, "backup_path", ""))
         QMessageBox.information(self, tr("Update Modrinth modpack"), message)
+
+    def _on_modpack_repaired(self, result: object) -> None:
+        name = str(getattr(result, "instance_name", ""))
+        self.instance_controller.refresh(selected_name=name)
+        repaired = int(getattr(result, "repaired_files", 0))
+        message = tr("Repaired '{name}' using modpack version {version}. Restored {count} managed file(s).", name=name, version=getattr(result, "pack_version", "?"), count=repaired)
+        backup_path = getattr(result, "backup_path", None)
+        if backup_path:
+            message += tr("\nSafety backup: {path}", path=backup_path)
+        else:
+            message += tr("\nNo damaged managed files were found, so no backup was needed.")
+        QMessageBox.information(self, tr("Repair Modrinth modpack"), message)
 
     def _on_game_exited(self, result: object) -> None:
         selected_name = str(getattr(self._selected_instance, "name", ""))

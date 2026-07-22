@@ -1,6 +1,6 @@
 # Forge + Modrinth workflow
 
-MCW Launcher `v0.6.0-beta.4` supports Modrinth mods and `.mrpack` modpacks for both Fabric and Forge.
+MCW Launcher `v0.6.0-beta.5` supports Modrinth mods and `.mrpack` modpacks for both Fabric and Forge.
 
 ## Browse Mods
 
@@ -66,3 +66,19 @@ Valid files are checked and skipped. Pause/Resume, HTTP Range, aggregate speed, 
 ## Updating
 
 Mod and modpack updates use the loader saved in the instance/registry. A managed modpack update may change Minecraft or loader version within the same family, but it cannot automatically change from Fabric to Forge or from Forge to Fabric.
+
+The updater creates a full safety backup, preserves user-modified conflicts, removes obsolete unmodified managed files, and rolls back the instance when applying the target version fails.
+
+Beta 5 avoids downloading or copying files that already match the target manifest. Preserved files remain in the managed registry so later scans and repairs can still explain their state.
+
+## Repairing
+
+Use **Instances → Backup and Modrinth pack lifecycle → Repair modpack** to restore the currently installed pack version.
+
+Repair performs a forced checksum verification, downloads the current `.mrpack` manifest, restores missing or modified managed files, prepares the declared Fabric/Forge runtime, and writes a fresh verification cache. A full backup is created before the first instance file is replaced. Worlds and files not managed by the pack are not removed.
+
+If repair fails after local changes begin, MCW Launcher restores the backup, runtime profile, and previous registry metadata.
+
+## Verification cache
+
+The managed-pack registry schema is now version 4. Successful checks store each file's expected hashes, size, and modification timestamp. Later scans and launch checks can accept unchanged files without reading their full contents again. A changed size or timestamp invalidates the cache and triggers normal checksum verification.

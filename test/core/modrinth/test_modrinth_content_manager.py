@@ -108,6 +108,11 @@ def test_all_modrinth_files_are_checked_before_any_download(tmp_path, monkeypatc
 
     operations = []
     original_verify = ModrinthDownloader.verify
+    original_pack_verify = ModrinthPackRegistry.verify_entry
+
+    def tracked_pack_verify(instance_dir, entry, **kwargs):
+        operations.append(("check", Path(str(entry.get("path") or "")).name))
+        return original_pack_verify(instance_dir, entry, **kwargs)
 
     def tracked_verify(path, **kwargs):
         operations.append(("check", Path(path).name))
@@ -121,6 +126,7 @@ def test_all_modrinth_files_are_checked_before_any_download(tmp_path, monkeypatc
         return destination
 
     monkeypatch.setattr(ModrinthDownloader, "verify", tracked_verify)
+    monkeypatch.setattr(ModrinthPackRegistry, "verify_entry", tracked_pack_verify)
     monkeypatch.setattr(ModrinthDownloader, "download_urls", fake_download_urls)
 
     assert ModrinthContentManager.ensure(instance) == ()

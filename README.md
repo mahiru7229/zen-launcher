@@ -90,10 +90,13 @@ Each instance has its own game directory, metadata, settings, saves, mods, and r
 - Allow each instance to continue with manual Modrinth file installation when the user explicitly disables launch blocking.
 - Track Modrinth mod provenance, installed versions, update locks, and managed modpack files.
 - Detect missing or locally modified files that originally came from an installed `.mrpack`.
+- Repair missing or modified managed pack files from the current `.mrpack` version with a full safety backup and automatic rollback.
 - Check and install newer modpack versions.
 - Create a full safety backup before changing a managed modpack.
 - Preserve user-modified and unmanaged conflicting files instead of overwriting them silently.
 - Roll back instance files, runtime profile, and registry metadata when an update fails.
+- Cache successful file verification by size and modification timestamp so unchanged managed files do not need to be hashed again on every scan or launch.
+- Skip downloads and disk copies for files that already match the target modpack update.
 
 ### PNG themes
 

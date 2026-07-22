@@ -82,15 +82,12 @@ class ModrinthPackUpdateManager:
         previous_profile = (instance.version_id, tuple(instance.mod_loader))
         backup_path: Path | None = None
         try:
+            root = Path(instance.instance_dir)
             with zipfile.ZipFile(pack_path, "r") as archive:
                 index = ModrinthPackInstaller._read_index(archive)
                 minecraft_version, loader_name, loader_version = ModrinthPackInstaller._parse_dependencies(index)
                 selected_files, _, _ = ModrinthPackInstaller._selected_files(index, bool(registry.get("installOptionalFiles", True)))
                 managed_files = {entry["path"].casefold(): entry for entry in ModrinthPackInstaller._managed_download_entries(selected_files)}
-                if reporter is None:
-                    ModrinthPackInstaller._download_files(selected_files, staging)
-                else:
-                    ModrinthPackInstaller._download_files(selected_files, staging, reporter)
                 for entry in ModrinthPackInstaller._extract_layer(archive, "overrides", staging):
                     managed_files[entry["path"].casefold()] = entry
                 for entry in ModrinthPackInstaller._extract_layer(archive, "client-overrides", staging):
@@ -104,13 +101,14 @@ class ModrinthPackUpdateManager:
             ModLoaderManager.prepare(base_version, *resolved_loader, reporter=reporter)
 
             old_files = {str(item.get("path") or "").casefold(): item for item in registry.get("managedFiles", []) if isinstance(item, dict) and str(item.get("path") or "").strip()}
-            root = Path(instance.instance_dir)
+            verification_cache = ModrinthPackRegistry._normalize_verification_cache(registry.get("verificationCache", {}), registry.get("managedFiles", []))
             preserved: dict[str, dict] = {}
             old_unmodified: set[str] = set()
             for key, entry in old_files.items():
                 path = ModrinthPackUpdateManager._target(root, str(entry.get("path") or ""))
                 expected = str(entry.get("sha1") or "").lower()
-                if path.is_file() and expected and ModrinthPackUpdateManager._sha1(path) == expected:
+                verified, _, _ = ModrinthPackRegistry.verify_entry(root, entry, cache=verification_cache)
+                if verified:
                     old_unmodified.add(key)
                 elif path.exists():
                     preserved[key] = {"path": str(entry.get("path") or ""), "reason": "modified-by-user", "previousSha1": expected, "targetSha1": str(managed_files.get(key, {}).get("sha1") or "")}
@@ -118,14 +116,30 @@ class ModrinthPackUpdateManager:
             for key, entry in managed_files.items():
                 target = ModrinthPackUpdateManager._target(root, str(entry["path"]))
                 if key not in old_files and target.exists():
-                    current_hash = ModrinthPackUpdateManager._sha1(target) if target.is_file() else ""
-                    if current_hash != str(entry.get("sha1") or "").lower():
+                    verified, _, _ = ModrinthPackRegistry.verify_entry(root, entry, cache=verification_cache)
+                    current_hash = ModrinthPackUpdateManager._sha1(target) if target.is_file() and not verified else str(entry.get("sha1") or "").lower()
+                    if not verified:
                         preserved[key] = {"path": entry["path"], "reason": "unmanaged-existing-file", "previousSha1": current_hash, "targetSha1": str(entry.get("sha1") or "")}
+
+            selected_by_path = {str(item.get("path") or "").replace("\\", "/").casefold(): item for item in selected_files}
+            pending_downloads: list[dict] = []
+            for key, item in selected_by_path.items():
+                entry = managed_files.get(key)
+                if entry is None or key in preserved:
+                    continue
+                verified, _, _ = ModrinthPackRegistry.verify_entry(root, entry, cache=verification_cache)
+                if not verified:
+                    pending_downloads.append(item)
+            if reporter is None:
+                ModrinthPackInstaller._download_files(pending_downloads, staging)
+            else:
+                ModrinthPackInstaller._download_files(pending_downloads, staging, reporter)
 
             backup_path = InstanceBackupManager.create(instance, InstanceBackupManager.SCOPE_FULL, reason="pre-modpack-update").backup.path
             removed = 0
             replaced = 0
             added = 0
+            unchanged = 0
             applied_managed: list[dict] = []
 
             for key, entry in old_files.items():
@@ -139,11 +153,19 @@ class ModrinthPackUpdateManager:
 
             for key, entry in managed_files.items():
                 if key in preserved:
+                    applied_managed.append(entry)
                     continue
                 relative = ModrinthPackUpdateManager._relative(str(entry["path"]))
                 source = staging.joinpath(*relative.parts)
                 target = root.joinpath(*relative.parts)
+                verified, _, _ = ModrinthPackRegistry.verify_entry(root, entry, cache=verification_cache)
+                if verified:
+                    unchanged += 1
+                    applied_managed.append(entry)
+                    continue
                 existed = target.exists()
+                if not source.is_file():
+                    raise RuntimeError(f"The staged modpack file is missing: {relative.as_posix()}")
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source, target)
                 replaced += int(existed)
@@ -151,6 +173,7 @@ class ModrinthPackUpdateManager:
                 applied_managed.append(entry)
 
             updated = InstanceManager.set_runtime_profile(instance.name, base_version, resolved_loader)
+            verification_cache = ModrinthPackRegistry.build_verification_cache(updated.instance_dir, applied_managed)
             ModrinthPackRegistry.save(updated.instance_dir, {
                 "projectId": project_id,
                 "versionId": target_version.version_id,
@@ -164,9 +187,10 @@ class ModrinthPackUpdateManager:
                 "installOptionalFiles": bool(registry.get("installOptionalFiles", True)),
                 "managedFiles": applied_managed,
                 "preservedFiles": list(preserved.values()),
+                "verificationCache": verification_cache,
                 "lastBackup": str(backup_path),
             })
-            return ModrinthPackUpdateResult(instance_name=instance.name, pack_name=project.title, previous_version=str(registry.get("versionNumber") or current_version_id), target_version=target_version.version_number, added_files=added, replaced_files=replaced, removed_files=removed, preserved_files=tuple(sorted(item["path"] for item in preserved.values())), backup_path=backup_path)
+            return ModrinthPackUpdateResult(instance_name=instance.name, pack_name=project.title, previous_version=str(registry.get("versionNumber") or current_version_id), target_version=target_version.version_number, added_files=added, replaced_files=replaced, removed_files=removed, preserved_files=tuple(sorted(item["path"] for item in preserved.values())), backup_path=backup_path, unchanged_files=unchanged)
         except Exception as error:
             if backup_path is not None:
                 try:

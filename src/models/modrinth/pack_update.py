@@ -31,3 +31,4 @@ class ModrinthPackUpdateResult:
     removed_files: int
     preserved_files: tuple[str, ...]
     backup_path: Path
+    unchanged_files: int = 0

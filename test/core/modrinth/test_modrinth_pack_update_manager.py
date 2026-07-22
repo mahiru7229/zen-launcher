@@ -29,10 +29,10 @@ def test_check_returns_only_newer_pack_version(monkeypatch, tmp_path: Path) -> N
     assert info.target_version_number == "2.0"
 
 
-def test_pack_registry_schema_three_preserves_conflict_metadata(tmp_path: Path) -> None:
+def test_pack_registry_schema_four_preserves_conflict_metadata(tmp_path: Path) -> None:
     ModrinthPackRegistry.save(tmp_path, {"projectId": "pack", "managedFiles": [], "preservedFiles": [{"path": "config/demo.json", "reason": "modified-by-user", "previousSha1": "AA", "targetSha1": "BB"}]})
     data = ModrinthPackRegistry.load_from_dir(tmp_path)
-    assert data["schemaVersion"] == 3
+    assert data["schemaVersion"] == 4
     assert data["preservedFiles"] == [{"path": "config/demo.json", "reason": "modified-by-user", "previousSha1": "aa", "targetSha1": "bb"}]
 
 
@@ -59,10 +59,13 @@ def test_update_preserves_modified_files_and_replaces_managed_pack_files(monkeyp
     (instance_dir / "instance.json").write_text('{"id":"id"}', encoding="utf-8")
     (instance_dir / "config" / "user.cfg").write_bytes(b"USER-MODIFIED")
     (instance_dir / "mods" / "remove.jar").write_bytes(b"REMOVE")
+    (instance_dir / "mods" / "unchanged.jar").write_bytes(b"UNCHANGED")
     instance = Instance(instance_id="id", name="Pack", version_id="1.20.1", instance_dir=instance_dir, mod_loader=("fabric", "0.15"))
 
     old_config_hash = hashlib.sha1(b"OLD-CONFIG").hexdigest()
     remove_hash = hashlib.sha1(b"REMOVE").hexdigest()
+    unchanged_sha1 = hashlib.sha1(b"UNCHANGED").hexdigest()
+    unchanged_sha512 = hashlib.sha512(b"UNCHANGED").hexdigest()
     ModrinthPackRegistry.save(instance_dir, {
         "projectId": "pack",
         "versionId": "v1",
@@ -71,6 +74,7 @@ def test_update_preserves_modified_files_and_replaces_managed_pack_files(monkeyp
         "managedFiles": [
             {"path": "config/user.cfg", "sha1": old_config_hash, "sha512": "", "size": 10, "source": "overrides"},
             {"path": "mods/remove.jar", "sha1": remove_hash, "sha512": "", "size": 6, "source": "download"},
+            {"path": "mods/unchanged.jar", "sha1": unchanged_sha1, "sha512": unchanged_sha512, "size": 9, "source": "download", "downloads": ["https://cdn.modrinth.com/data/pack/versions/v2/unchanged.jar"]},
         ],
     })
 
@@ -83,13 +87,22 @@ def test_update_preserves_modified_files_and_replaces_managed_pack_files(monkeyp
         "game": "minecraft",
         "versionId": "v2",
         "name": "Pack",
-        "files": [{
-            "path": "mods/new.jar",
-            "hashes": {"sha1": new_sha1, "sha512": new_sha512},
-            "downloads": ["https://cdn.modrinth.com/data/pack/versions/v2/new.jar"],
-            "fileSize": len(new_bytes),
-            "env": {"client": "required", "server": "required"},
-        }],
+        "files": [
+            {
+                "path": "mods/new.jar",
+                "hashes": {"sha1": new_sha1, "sha512": new_sha512},
+                "downloads": ["https://cdn.modrinth.com/data/pack/versions/v2/new.jar"],
+                "fileSize": len(new_bytes),
+                "env": {"client": "required", "server": "required"},
+            },
+            {
+                "path": "mods/unchanged.jar",
+                "hashes": {"sha1": unchanged_sha1, "sha512": unchanged_sha512},
+                "downloads": ["https://cdn.modrinth.com/data/pack/versions/v2/unchanged.jar"],
+                "fileSize": 9,
+                "env": {"client": "required", "server": "required"},
+            },
+        ],
         "dependencies": {"minecraft": "1.21.1", "fabric-loader": "0.16.0"},
     }
     with zipfile.ZipFile(pack_source, "w") as archive:
@@ -107,6 +120,7 @@ def test_update_preserves_modified_files_and_replaces_managed_pack_files(monkeyp
     monkeypatch.setattr(ModrinthDownloader, "download_file", lambda _file, destination, force=False: destination.parent.mkdir(parents=True, exist_ok=True) or shutil.copy2(pack_source, destination))
 
     def fake_download_files(files, staging):
+        assert [item["path"] for item in files] == ["mods/new.jar"]
         path = staging / "mods" / "new.jar"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(new_bytes)
@@ -130,9 +144,11 @@ def test_update_preserves_modified_files_and_replaces_managed_pack_files(monkeyp
     assert (instance_dir / "config" / "user.cfg").read_bytes() == b"USER-MODIFIED"
     assert not (instance_dir / "mods" / "remove.jar").exists()
     assert (instance_dir / "mods" / "new.jar").read_bytes() == new_bytes
+    assert (instance_dir / "mods" / "unchanged.jar").read_bytes() == b"UNCHANGED"
     assert result.target_version == "2.0"
     assert result.preserved_files == ("config/user.cfg",)
     assert result.backup_path.is_file()
+    assert result.unchanged_files == 1
     updated_registry = ModrinthPackRegistry.load_from_dir(instance_dir)
     assert updated_registry["versionId"] == "v2"
     assert updated_registry["preservedFiles"][0]["path"] == "config/user.cfg"

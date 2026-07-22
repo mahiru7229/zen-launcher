@@ -502,8 +502,8 @@
     "modpack.lifecycle.update": "Update modpack",
     "modpack.lifecycle.detected": "Managed Modrinth pack detected. Scan files or check for a newer pack version.",
     "modpack.lifecycle.not_managed": "This instance is not managed by a Modrinth modpack.",
-    "modpack.lifecycle.healthy": "Managed pack files are healthy: {count} file(s) verified.",
-    "modpack.lifecycle.changed": "Managed pack changes detected: {modified} modified, {missing} missing. User changes will be preserved during update.",
+    "modpack.lifecycle.healthy": "Managed pack files are healthy: {count} file(s) verified, {cached} reused from verification cache.",
+    "modpack.lifecycle.changed": "Managed pack changes detected: {modified} modified, {missing} missing. Repair restores the current pack version; update still preserves user changes.",
     "modpack.lifecycle.available": "Modpack update available: {current} → {target} ({channel}).",
     "modpack.lifecycle.available_short": "Modpack update available: {current} → {target}",
     "modpack.lifecycle.latest": "This Modrinth modpack is up to date.",
@@ -641,7 +641,17 @@
     "modrinth.results.searching": "Searching Modrinth...",
     "modrinth.results.contacting": "Contacting Modrinth and loading projects...",
     "modrinth.results.failed": "Search failed",
-    "modrinth.results.error": "Modrinth search failed: {error}"
+    "modrinth.results.error": "Modrinth search failed: {error}",
+    "modpack.lifecycle.repair": "Repair modpack",
+    "modpack.lifecycle.repair_confirm_title": "Repair Modrinth modpack",
+    "modpack.lifecycle.repair_confirm": "Repair all missing or modified managed files in '{name}' using its current Modrinth version? A full safety backup will be created before any file is replaced. Worlds and unmanaged files are kept.",
+    "modpack.lifecycle.repair_progress": "Repairing Modrinth modpack for '{name}'...",
+    "modpack.lifecycle.repaired": "Modrinth modpack repaired",
+    "modpack.lifecycle.repaired_log": "Modrinth modpack repaired: {count} file(s) restored",
+    "modpack.lifecycle.repaired_message": "Repaired '{name}' using modpack version {version}. Restored {count} managed file(s).",
+    "modpack.lifecycle.no_backup_needed": "\nNo damaged managed files were found, so no backup was needed.",
+    "modpack.lifecycle.verify_repair": "Verifying managed modpack files for repair...",
+    "modpack.lifecycle.restore_repair": "Restoring managed modpack files..."
   },
   "aliases": {
     "MCW Launcher": "app.name",
@@ -1114,6 +1124,18 @@
     "Forge diagnostics exported to: {path}": "forge.diagnostics.success",
     "Export Forge profile, logs, mod metadata, and pre-launch results without accounts, tokens, worlds, or mod JAR contents.": "forge.diagnostics.tooltip",
     "Restore previous loader": "forge.restore_previous",
-    "Restore the mod-loader installation recorded before the last Forge change.": "forge.restore.tooltip"
+    "Restore the mod-loader installation recorded before the last Forge change.": "forge.restore.tooltip",
+    "Repair modpack": "modpack.lifecycle.repair",
+    "Managed pack files are healthy: {count} file(s) verified, {cached} reused from verification cache.": "modpack.lifecycle.healthy",
+    "Managed pack changes detected: {modified} modified, {missing} missing. Repair restores the current pack version; update still preserves user changes.": "modpack.lifecycle.changed",
+    "Repair Modrinth modpack": "modpack.lifecycle.repair_confirm_title",
+    "Repair all missing or modified managed files in '{name}' using its current Modrinth version? A full safety backup will be created before any file is replaced. Worlds and unmanaged files are kept.": "modpack.lifecycle.repair_confirm",
+    "Repairing Modrinth modpack for '{name}'...": "modpack.lifecycle.repair_progress",
+    "Modrinth modpack repaired": "modpack.lifecycle.repaired",
+    "Modrinth modpack repaired: {count} file(s) restored": "modpack.lifecycle.repaired_log",
+    "Repaired '{name}' using modpack version {version}. Restored {count} managed file(s).": "modpack.lifecycle.repaired_message",
+    "\nNo damaged managed files were found, so no backup was needed.": "modpack.lifecycle.no_backup_needed",
+    "Verifying managed modpack files for repair...": "modpack.lifecycle.verify_repair",
+    "Restoring managed modpack files...": "modpack.lifecycle.restore_repair"
   }
 }

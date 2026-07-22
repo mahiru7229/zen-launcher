@@ -11,4 +11,4 @@ The `0.6.x` line focuses on:
 - Fabric and Forge mods from Modrinth;
 - Fabric and Forge `.mrpack` modpacks from Modrinth.
 
-See [`FORGE_MODRINTH.md`](FORGE_MODRINTH.md) for the supported Beta 4 workflow.
+See [`FORGE_MODRINTH.md`](FORGE_MODRINTH.md) for the supported Beta 5 workflow.
