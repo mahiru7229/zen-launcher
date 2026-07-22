@@ -212,6 +212,7 @@
     "progress.status.running": "RUNNING",
     "progress.status.failed": "FAILED",
     "launch.error.generic": "Minecraft could not be started.",
+    "launch.error.logs_hint": "Open Logs to see the full error details.",
     "launcher_settings.saved": "Launcher settings saved",
     "launcher_settings.gui_saved": "GUI preferences saved",
     "launcher.refreshing": "Refreshing launcher data...",

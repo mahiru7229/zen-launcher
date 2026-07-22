@@ -15,13 +15,13 @@ from src.gui.main_window_2 import MainWindow
 class _LaunchControl:
     def __init__(self) -> None:
         self.reset_calls = 0
-        self.failed_messages: list[str] = []
+        self.failed_messages: list[tuple[str, str | None]] = []
 
     def reset_progress(self) -> None:
         self.reset_calls += 1
 
-    def set_failed(self, message: str) -> None:
-        self.failed_messages.append(message)
+    def set_failed(self, status: str, detail: str | None = None) -> None:
+        self.failed_messages.append((status, detail))
 
 
 class _StatusTarget:
@@ -66,6 +66,6 @@ def test_failed_forge_repair_leaves_terminal_failed_progress_state():
 
     MainWindow._on_task_failed(window, "instance.loader.repair", RuntimeError("repair failed"))
 
-    assert window.launch_control.failed_messages == ["repair failed"]
+    assert window.launch_control.failed_messages == [("Repair failed", "Open Logs to see the full error details.")]
     assert window.home_page.messages
     assert window.right_panel.messages

@@ -58,3 +58,21 @@ def test_paused_task_emits_paused_signal_without_error_dialog() -> None:
 
     assert paused == [True]
     assert errors == []
+
+
+def test_failed_launch_logs_full_error_without_opening_error_dialog() -> None:
+    runner = FakeTaskRunner()
+    controller = LaunchController(runner)
+    errors: list[tuple[str, str]] = []
+    logs: list[str] = []
+    statuses: list[str] = []
+    controller.error_created.connect(lambda title, message: errors.append((title, message)))
+    controller.log_created.connect(logs.append)
+    controller.status_changed.connect(statuses.append)
+    error = RuntimeError("Forge pre-launch check failed:\n- Example mod uses the wrong loader")
+
+    controller._on_task_failed(LaunchController.TASK_ID, error)
+
+    assert errors == []
+    assert statuses == ["Launch failed"]
+    assert logs == ["RuntimeError: Forge pre-launch check failed:\n- Example mod uses the wrong loader"]

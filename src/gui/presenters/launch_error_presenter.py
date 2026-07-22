@@ -11,6 +11,7 @@ class LaunchErrorView:
     title: str
     message: str
     status: str
+    progress_detail: str
 
 
 class LaunchErrorPresenter:
@@ -96,4 +97,5 @@ class LaunchErrorPresenter:
             title=tr(title),
             message=f"{tr(summary)}\n\n{tr('Details:\n{details}', details=technical_message)}",
             status=tr(status),
+            progress_detail=tr("launch.error.logs_hint"),
         )

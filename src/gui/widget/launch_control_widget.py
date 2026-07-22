@@ -20,7 +20,8 @@ class LaunchControlWidget(QFrame):
         self._mode = "idle"
         self._last_event: object | None = None
         self._last_result: dict | None = None
-        self._last_error = ""
+        self._last_error_status = "Launch failed"
+        self._last_error_detail = "launch.error.logs_hint"
         self._last_exit_result: object | None = None
         self._busy = False
         self._launch_active = False
@@ -156,14 +157,17 @@ class LaunchControlWidget(QFrame):
             self._set_stage_state("success")
         self._refresh_launch_button()
 
-    def set_failed(self, message: str) -> None:
+    def set_failed(self, status: str = "Launch failed", detail: str | None = None) -> None:
         self._mode = "failed"
-        self._last_error = message
+        self._last_error_status = status or "Launch failed"
+        self._last_error_detail = detail or "launch.error.logs_hint"
+        status_text = self._compact_failure_text(self._last_error_status, "Launch failed", 120)
+        detail_text = self._compact_failure_text(self._last_error_detail, "launch.error.logs_hint", 180)
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat(tr("FAILED"))
-        self.status_label.setText(tr("Launch failed"))
-        self.detail_label.setText(message or tr("Minecraft could not be started."))
+        self.status_label.setText(status_text)
+        self.detail_label.setText(detail_text)
         self.stage_label.setText(tr("FAILED"))
         self._set_stage_state("error")
         self._refresh_launch_button()
@@ -241,7 +245,7 @@ class LaunchControlWidget(QFrame):
         elif self._mode == "result" and self._last_result is not None:
             self.set_result(self._last_result)
         elif self._mode == "failed":
-            self.set_failed(self._last_error)
+            self.set_failed(self._last_error_status, self._last_error_detail)
         elif self._mode == "paused":
             self.set_paused()
         elif self._mode == "exit" and self._last_exit_result is not None:
@@ -251,6 +255,14 @@ class LaunchControlWidget(QFrame):
             self.detail_label.setText(tr(self._detail_message))
             self.stage_label.setText(tr("READY"))
             self._refresh_launch_button()
+
+    @staticmethod
+    def _compact_failure_text(value: str, fallback: str, max_length: int) -> str:
+        translated = tr(value or fallback)
+        compact = " ".join(str(translated).split())
+        if not compact or len(compact) > max_length:
+            return tr(fallback)
+        return compact
 
     def _set_stage_state(self, state: str) -> None:
         icon_state = "ready" if state == "success" and self._mode == "idle" else state

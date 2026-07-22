@@ -45,6 +45,7 @@ from src.gui.pages.instance_settings_page import InstanceSettingsPage
 from src.gui.pages.instances_page import InstancesPage
 from src.gui.pages.launcher_settings_page import LauncherSettingsPage
 from src.gui.pages.logs_page import LogsPage
+from src.gui.presenters.launch_error_presenter import LaunchErrorPresenter
 from src.gui.style import APP_STYLE
 from src.gui.task_runner import TaskRunner
 from src.gui.theme.runtime import ThemeRuntime
@@ -822,9 +823,10 @@ class MainWindow(QMainWindow):
                 self._on_launch_paused()
                 self.instance_controller.refresh_running(force=True)
                 return
-            self.launch_control.set_failed(str(error))
-            self.home_page.set_status("Launch failed")
-            self.right_panel.set_status("Launch failed")
+            view = LaunchErrorPresenter.present(error)
+            self.launch_control.set_failed(view.status, view.progress_detail)
+            self.home_page.set_status(view.status)
+            self.right_panel.set_status(view.status)
             self.instance_controller.refresh_running(force=True)
             return
         if task_id in {
@@ -833,7 +835,7 @@ class MainWindow(QMainWindow):
             self.instance_controller.LOADER_REPAIR_TASK_ID,
             self.instance_controller.FORGE_RESTORE_TASK_ID,
         }:
-            self.launch_control.set_failed(str(error))
+            self.launch_control.set_failed(tr("Repair failed"), tr("launch.error.logs_hint"))
             self.home_page.set_status(tr("Repair failed"))
             self.right_panel.set_status(tr("Repair failed"))
 

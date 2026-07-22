@@ -158,7 +158,6 @@ class LaunchController(BaseController):
 
         self.status_changed.emit(view.status)
         self.log_created.emit(f"{type(error).__name__}: {error}")
-        self.error_created.emit(view.title, view.message)
 
     @staticmethod
     def _format_progress(event: ProgressEvent) -> str:

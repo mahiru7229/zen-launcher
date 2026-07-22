@@ -212,6 +212,7 @@
     "progress.status.running": "ĐANG CHẠY",
     "progress.status.failed": "THẤT BẠI",
     "launch.error.generic": "Không thể khởi chạy Minecraft.",
+    "launch.error.logs_hint": "Hãy mở mục Nhật ký để xem đầy đủ chi tiết lỗi.",
     "launcher_settings.saved": "Đã lưu cài đặt launcher",
     "launcher_settings.gui_saved": "Đã lưu tùy chọn giao diện",
     "launcher.refreshing": "Đang làm mới dữ liệu launcher...",

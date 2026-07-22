@@ -22,6 +22,8 @@ def test_presents_generic_launch_error():
 
     assert view.title == "Minecraft launch failed"
     assert view.status == "Launch failed"
+    assert view.progress_detail == "Open Logs to see the full error details."
+    assert "Unexpected command builder failure" not in view.progress_detail
 
 
 def test_presents_instance_already_running_error():
