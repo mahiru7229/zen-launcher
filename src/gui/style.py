@@ -9,6 +9,34 @@ QMainWindow, QWidget#Root {
     background: #171817;
 }
 
+QDialog {
+    background: #252823;
+    color: #f5f1e8;
+}
+
+QMessageBox {
+    background: #f2f3ef;
+    color: #171817;
+}
+
+QMessageBox QLabel {
+    background: transparent;
+    color: #171817;
+    font-family: "Segoe UI";
+}
+
+QMessageBox QPushButton {
+    min-width: 88px;
+    background: #dfe3da;
+    color: #171817;
+    border-color: #747a6e;
+}
+
+QMessageBox QPushButton:hover {
+    background: #cbd7bf;
+    color: #10120e;
+}
+
 QFrame#Sidebar {
     background: #20221f;
     border-right: 3px solid #11120f;
@@ -318,5 +346,39 @@ QToolTip {
     color: #f5f1e8;
     border: 2px solid #11120f;
     padding: 5px;
+}
+
+QFrame#Sidebar[compactLayout="true"] QLabel#BrandLabel {
+    font-size: 20px;
+}
+
+QPushButton#NavButton[compactLayout="true"] {
+    padding: 6px 8px;
+    font-size: 10.5pt;
+}
+
+QWidget#PageViewport[compactLayout="true"] QLabel#PageTitle,
+QFrame#RightPanel[compactLayout="true"] QLabel#PageTitle {
+    font-size: 22px;
+}
+
+QWidget#PageViewport[compactLayout="true"] QLabel#PageSubtitle {
+    font-size: 10pt;
+}
+
+QFrame#RightPanel[compactLayout="true"] QLabel#ValueLabel {
+    font-size: 10.5pt;
+}
+
+QFrame#RightPanel[compactLayout="true"] QLabel#CardTitle {
+    font-size: 12px;
+}
+
+QFrame#RightPanel[compactLayout="true"] QPushButton {
+    padding: 6px 8px;
+}
+
+QFrame#LaunchControl[compactLayout="true"] QLabel#ValueLabel {
+    font-size: 10.5pt;
 }
 """

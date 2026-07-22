@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QPlainTextEdit,
 from src.core.language.language_manager import tr
 from src.models.update.update_info import UpdateInfo
 from src.gui.theme.runtime import set_theme_icon
+from src.gui.window_sizing import resize_dialog_to_screen
 
 
 class UpdateDialog(QDialog):
@@ -21,7 +22,7 @@ class UpdateDialog(QDialog):
         self.decision = self.LATER
         self.setWindowTitle(tr("update.dialog.title"))
         self.setModal(True)
-        self.resize(640, 500)
+        resize_dialog_to_screen(self, 640, 500, 520, 400)
 
         layout = QVBoxLayout(self)
         title = QLabel(tr("update.dialog.heading", version=info.version))

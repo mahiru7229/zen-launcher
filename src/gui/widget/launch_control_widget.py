@@ -14,9 +14,11 @@ class LaunchControlWidget(QFrame):
     LAUNCH_TEXT = "launch.button"
     CANCEL_TEXT = "launch.cancel_button"
 
-    def __init__(self) -> None:
+    def __init__(self, compact: bool = False) -> None:
         super().__init__()
         self.setObjectName("LaunchControl")
+        self._compact = bool(compact)
+        self.setProperty("compactLayout", self._compact)
         self._mode = "idle"
         self._last_event: object | None = None
         self._last_result: dict | None = None
@@ -33,8 +35,12 @@ class LaunchControlWidget(QFrame):
 
     def _build_ui(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(20, 14, 20, 14)
-        layout.setSpacing(18)
+        if self._compact:
+            layout.setContentsMargins(14, 9, 14, 9)
+            layout.setSpacing(12)
+        else:
+            layout.setContentsMargins(20, 14, 20, 14)
+            layout.setSpacing(18)
 
         progress_layout = QVBoxLayout()
         progress_layout.setContentsMargins(0, 0, 0, 0)
@@ -44,7 +50,8 @@ class LaunchControlWidget(QFrame):
         status_row.setContentsMargins(0, 0, 0, 0)
         status_row.setSpacing(10)
 
-        self.stage_icon = set_theme_pixmap(QLabel(), "icon.state.ready", 32, 32)
+        stage_icon_size = 26 if self._compact else 32
+        self.stage_icon = set_theme_pixmap(QLabel(), "icon.state.ready", stage_icon_size, stage_icon_size)
 
         self.status_label = QLabel("Ready")
         self.status_label.setObjectName("ValueLabel")
@@ -70,11 +77,14 @@ class LaunchControlWidget(QFrame):
         progress_layout.addWidget(self.detail_label)
         progress_layout.addWidget(self.progress_bar)
 
-        self.launch_button = set_theme_icon(QPushButton(tr(self.LAUNCH_TEXT)), "icon.action.launch", 40)
+        self.launch_button = set_theme_icon(QPushButton(tr(self.LAUNCH_TEXT)), "icon.action.launch", 32 if self._compact else 40)
         set_theme_static_text(self.launch_button, "control.launch", tr(self.LAUNCH_TEXT))
         self.launch_button.setObjectName("PrimaryButton")
         self.launch_button.setProperty("themeRole", "launch")
-        self.launch_button.setFixedSize(230, 72)
+        if self._compact:
+            self.launch_button.setFixedSize(190, 60)
+        else:
+            self.launch_button.setFixedSize(230, 72)
         self.launch_button.clicked.connect(self.launch_clicked.emit)
 
         layout.addLayout(progress_layout, 1)

@@ -11,6 +11,7 @@ from src.core.curseforge.curseforge_registry import CurseForgeRegistry
 from src.core.language.language_manager import tr
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.gui.theme.runtime import set_theme_icon
+from src.gui.window_sizing import resize_dialog_to_screen
 from src.models.instance.instance import Instance
 from src.models.mod.mod_info import ModInfo
 from src.models.mod.mod_issue import ModHealthReport, ModIssue
@@ -44,7 +45,7 @@ class ModManagerDialog(QDialog):
         self._update_error = ""
         self.setWindowTitle("Mod Manager")
         self.setObjectName("ModManagerDialog")
-        self.resize(1260, 760)
+        resize_dialog_to_screen(self, 1260, 760, 900, 560)
         self.setAcceptDrops(True)
         self._build_ui()
 

@@ -3,8 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QTimer, QUrl
-from PySide6.QtGui import QCloseEvent, QDesktopServices
+from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtGui import QCloseEvent, QDesktopServices, QGuiApplication, QScreen
 from PySide6.QtWidgets import QApplication, QFileDialog, QHBoxLayout, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget
 
 from src.core.config.curseforge_config_manager import CurseForgeConfigManager
@@ -17,7 +17,7 @@ from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.core.network.download_pause import is_download_paused
 from src.core.runtime.game_runtime_manager import GameRuntimeManager
 from src.core.update.windows_update_installer import AutomaticUpdateUnsupportedError, WindowsUpdateInstaller
-from src.gui.config import LAUNCHER_NAME, MINIMUM_HEIGHT, MINIMUM_WIDTH, RIGHT_PANEL_WIDTH, SIDEBAR_WIDTH, VERSION_ID, WINDOW_HEIGHT, WINDOW_WIDTH
+from src.gui.config import LAUNCHER_NAME, VERSION_ID
 from src.gui.controllers.account_controller import AccountController
 from src.gui.controllers.curseforge_controller import CurseForgeController
 from src.gui.controllers.backup_controller import BackupController
@@ -35,7 +35,9 @@ from src.gui.controllers.update_controller import UpdateController
 from src.gui.dialogs.curseforge_browser_dialog import CurseForgeBrowserDialog
 from src.gui.dialogs.mod_manager_dialog import ModManagerDialog
 from src.gui.dialogs.modrinth_browser_dialog import ModrinthBrowserDialog
+from src.gui.dialogs.message_box_compat import install_message_box_compatibility
 from src.gui.dialogs.update_dialog import UpdateDialog
+from src.gui.display_profile import DisplayProfile, select_display_profile
 from src.gui.input_guard import install_combo_box_wheel_guard
 from src.gui.localization import retranslate_widget_tree
 from src.gui.pages.about_page import AboutPage
@@ -61,8 +63,9 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle(LAUNCHER_NAME)
-        self.resize(WINDOW_WIDTH, WINDOW_HEIGHT)
-        self.setMinimumSize(MINIMUM_WIDTH, MINIMUM_HEIGHT)
+        self._display_profile = self._detect_display_profile()
+        self.resize(self._display_profile.window_width, self._display_profile.window_height)
+        self.setMinimumSize(self._display_profile.minimum_width, self._display_profile.minimum_height)
 
         self.task_runner = TaskRunner(self)
         self.version_controller = VersionController(self.task_runner)
@@ -97,17 +100,52 @@ class MainWindow(QMainWindow):
         self.theme_runtime.apply(self, APP_STYLE + "\n" + LAUNCH_CONTROL_STYLE, str(self._startup_settings.get("theme", "mcw-default")))
         self._initialize_data()
 
+    @staticmethod
+    def _primary_screen() -> QScreen | None:
+        return QGuiApplication.primaryScreen()
+
+    def _detect_display_profile(self) -> DisplayProfile:
+        screen = self._primary_screen()
+        if screen is None:
+            return select_display_profile(1920, 1080)
+        geometry = screen.geometry()
+        return select_display_profile(geometry.width(), geometry.height())
+
+    def _apply_display_profile_geometry(self, preserve_position: bool) -> None:
+        screen = self.screen() or self._primary_screen()
+        self.setWindowState(Qt.WindowState.WindowNoState)
+        self.resize(self._display_profile.window_width, self._display_profile.window_height)
+        if screen is None:
+            return
+
+        available = screen.availableGeometry()
+        width = min(self.width(), available.width())
+        height = min(self.height(), available.height())
+        if width != self.width() or height != self.height():
+            self.resize(width, height)
+
+        max_x = available.right() - self.width() + 1
+        max_y = available.bottom() - self.height() + 1
+        if preserve_position:
+            x = min(max(self.x(), available.left()), max(available.left(), max_x))
+            y = min(max(self.y(), available.top()), max(available.top(), max_y))
+        else:
+            x = available.left() + max(0, (available.width() - self.width()) // 2)
+            y = available.top() + max(0, (available.height() - self.height()) // 2)
+        self.move(x, y)
+
     def _build_ui(self) -> None:
         root = QWidget()
         root.setObjectName("Root")
+        root.setProperty("compactLayout", self._display_profile.compact)
         self.setCentralWidget(root)
 
         root_layout = QHBoxLayout(root)
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
-        self.sidebar = SidebarWidget()
-        self.sidebar.setFixedWidth(SIDEBAR_WIDTH)
+        self.sidebar = SidebarWidget(compact=self._display_profile.compact)
+        self.sidebar.setFixedWidth(self._display_profile.sidebar_width)
 
         center = QWidget()
         center.setObjectName("CenterArea")
@@ -119,13 +157,13 @@ class MainWindow(QMainWindow):
         self.content_stack = QStackedWidget()
         self.content_stack.setObjectName("ContentStack")
 
-        self.launch_control = LaunchControlWidget()
+        self.launch_control = LaunchControlWidget(compact=self._display_profile.compact)
 
         center_layout.addWidget(self.content_stack, 1)
         center_layout.addWidget(self.launch_control)
 
-        self.right_panel = RightPanelWidget()
-        self.right_panel.setFixedWidth(RIGHT_PANEL_WIDTH)
+        self.right_panel = RightPanelWidget(compact=self._display_profile.compact)
+        self.right_panel.setFixedWidth(self._display_profile.right_panel_width)
 
         self.home_page = HomePage()
         self.account_page = AccountPage()
@@ -151,6 +189,7 @@ class MainWindow(QMainWindow):
         }
 
         for page in self.pages.values():
+            page.set_compact_mode(self._display_profile.compact)
             self.content_stack.addWidget(page)
 
         root_layout.addWidget(self.sidebar)
@@ -349,11 +388,14 @@ class MainWindow(QMainWindow):
         settings = dict(self._startup_settings)
         self._apply_gui_settings(settings)
 
+        restored_geometry = False
         if settings.get("remember_window_size", True):
             geometry = self.gui_settings_controller.saved_geometry()
-
             if geometry is not None:
-                self.restoreGeometry(geometry)
+                restored_geometry = bool(self.restoreGeometry(geometry))
+
+        self._apply_display_profile_geometry(preserve_position=restored_geometry)
+        QTimer.singleShot(0, lambda: self._apply_display_profile_geometry(preserve_position=True))
 
         self.show_page(settings.get("start_page", "home"))
         self.account_controller.refresh()
@@ -970,7 +1012,9 @@ class MainWindow(QMainWindow):
 def run() -> None:
     app = QApplication(sys.argv)
     app.setApplicationName("MCW Launcher")
+    app.setStyle("Fusion")
     app._combo_box_wheel_guard = install_combo_box_wheel_guard(app)
+    app._message_box_compatibility_filter = install_message_box_compatibility(app)
 
     window = MainWindow()
     window.show()

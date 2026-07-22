@@ -18,9 +18,11 @@ class RightPanelWidget(QFrame):
 
     MAX_RUNNING_INSTANCES = 4
 
-    def __init__(self) -> None:
+    def __init__(self, compact: bool = False) -> None:
         super().__init__()
         self.setObjectName("RightPanel")
+        self._compact = bool(compact)
+        self.setProperty("compactLayout", self._compact)
         self._instance_name = ""
         self._account: object | None = None
         self._instance: object | None = None
@@ -31,11 +33,16 @@ class RightPanelWidget(QFrame):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 22, 18, 18)
-        layout.setSpacing(14)
+        if self._compact:
+            layout.setContentsMargins(12, 12, 12, 10)
+            layout.setSpacing(8)
+        else:
+            layout.setContentsMargins(18, 22, 18, 18)
+            layout.setSpacing(14)
 
         title = QLabel("SESSION")
         title.setObjectName("PageTitle")
+        title.setProperty("compactLayout", self._compact)
         layout.addWidget(title)
 
         self.account_card = CardWidget("Active account")
@@ -52,6 +59,8 @@ class RightPanelWidget(QFrame):
         self.account_card.layout.addWidget(self.account_type)
         self.account_card.layout.addWidget(self.account_uuid)
         self.account_card.layout.addWidget(account_button)
+        self.account_card.set_compact_mode(self._compact)
+        self.account_uuid.setVisible(not self._compact)
         layout.addWidget(self.account_card)
 
         self.instance_card = CardWidget("Active instance")
@@ -75,6 +84,8 @@ class RightPanelWidget(QFrame):
         self.instance_card.layout.addWidget(self.instance_path)
         self.instance_card.layout.addWidget(instance_button)
         self.instance_card.layout.addWidget(self.manage_mods_button)
+        self.instance_card.set_compact_mode(self._compact)
+        self.instance_path.setVisible(not self._compact)
         layout.addWidget(self.instance_card)
 
         self.running_card = CardWidget("Running instances")
@@ -85,9 +96,11 @@ class RightPanelWidget(QFrame):
         self.running_list.setWordWrap(True)
         self.running_card.layout.addWidget(self.running_count)
         self.running_card.layout.addWidget(self.running_list)
+        self.running_card.set_compact_mode(self._compact)
         layout.addWidget(self.running_card)
 
         status_card = CardWidget("Launcher state")
+        self.status_card = status_card
         self.status_icon = set_theme_pixmap(QLabel(), "icon.state.ready", 32, 32)
         self.status_badge = QLabel("READY")
         self.status_badge.setObjectName("StatusBadge")
@@ -100,6 +113,8 @@ class RightPanelWidget(QFrame):
         status_card.layout.addWidget(self.status_badge)
         status_card.layout.addWidget(self.status_text)
         status_card.layout.addWidget(refresh_button)
+        status_card.set_compact_mode(self._compact)
+        self.status_icon.setVisible(not self._compact)
         layout.addWidget(status_card)
         layout.addStretch()
 
@@ -152,13 +167,14 @@ class RightPanelWidget(QFrame):
         self.running_count.setText(tr(count_key, count=count))
 
         lines = []
-        for running_instance in running_instances[:self.MAX_RUNNING_INSTANCES]:
+        visible_limit = 2 if self._compact else self.MAX_RUNNING_INSTANCES
+        for running_instance in running_instances[:visible_limit]:
             name = str(getattr(running_instance, "name", tr("Unknown instance")))
             state_key = str(getattr(running_instance, "state", "running")).replace("_", " ")
             state = tr(state_key).title()
             lines.append(f"• {name} — {state}")
 
-        hidden_count = count - self.MAX_RUNNING_INSTANCES
+        hidden_count = count - visible_limit
         if hidden_count > 0:
             lines.append(tr("+ {count} more", count=hidden_count))
 

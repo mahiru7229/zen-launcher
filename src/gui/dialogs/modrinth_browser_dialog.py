@@ -12,6 +12,7 @@ from src.models.instance.instance import Instance
 from src.models.modrinth.project import ModrinthProject, ModrinthSearchResult
 from src.models.modrinth.version import ModrinthVersion
 from src.gui.theme.runtime import set_theme_icon
+from src.gui.window_sizing import resize_dialog_to_screen
 
 
 class ModrinthBrowserDialog(QDialog):
@@ -40,7 +41,7 @@ class ModrinthBrowserDialog(QDialog):
         self.retranslate_dynamic()
 
     def _build_ui(self) -> None:
-        self.resize(1120, 720)
+        resize_dialog_to_screen(self, 1120, 720, 900, 560)
         root = QVBoxLayout(self)
         root.setContentsMargins(18, 18, 18, 18)
         root.setSpacing(12)

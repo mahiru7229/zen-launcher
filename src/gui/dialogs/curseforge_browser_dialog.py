@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QDialog, 
 from src.core.instance.instance_manager import InstanceManager
 from src.core.language.language_manager import tr
 from src.gui.theme.runtime import set_theme_icon
+from src.gui.window_sizing import resize_dialog_to_screen
 from src.models.curseforge.file import CurseForgeFile
 from src.models.curseforge.project import CurseForgeProject, CurseForgeSearchResult
 from src.models.instance.instance import Instance
@@ -38,7 +39,7 @@ class CurseForgeBrowserDialog(QDialog):
         self.retranslate_dynamic()
 
     def _build_ui(self) -> None:
-        self.resize(1120, 720)
+        resize_dialog_to_screen(self, 1120, 720, 900, 560)
         root = QVBoxLayout(self)
         root.setContentsMargins(18, 18, 18, 18)
         root.setSpacing(12)
