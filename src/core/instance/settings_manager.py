@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from src.core.fs.paths import Paths
+from src.core.system.memory import MemoryAllocationPolicy
 from src.models.instance.instance import Instance
 from src.models.instance.settings import InstanceSettings
 
@@ -41,6 +42,7 @@ class SettingsManager:
 
     @staticmethod
     def save(instance: Instance, settings: InstanceSettings) -> None:
+        settings.min_memory, settings.max_memory = MemoryAllocationPolicy.normalize(settings.min_memory, settings.max_memory)
         SettingsManager._write(Paths.instance_settings_path(instance), SettingsManager._settings_to_dict(settings))
 
     @staticmethod
@@ -109,8 +111,7 @@ class SettingsManager:
 
         min_memory = SettingsManager._as_positive_int(java.get("min_memory"), 1024)
         max_memory = SettingsManager._as_positive_int(java.get("max_memory"), 2048)
-        if max_memory < min_memory:
-            max_memory = max(2048, min_memory)
+        min_memory, max_memory = MemoryAllocationPolicy.normalize(min_memory, max_memory)
 
         return InstanceSettings(
             java_path=str(java.get("path") or ""),

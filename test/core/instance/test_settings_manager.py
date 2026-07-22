@@ -79,3 +79,36 @@ def test_save_uses_atomic_temporary_file(tmp_path: Path) -> None:
 
     assert json.loads((instance.instance_dir / "settings.json").read_text(encoding="utf-8"))["java"]["max_memory"] == 4096
     assert not (instance.instance_dir / "settings.json.tmp").exists()
+
+
+def test_loaded_memory_is_clamped_to_physical_ram(tmp_path: Path, monkeypatch) -> None:
+    from src.core.system.memory import SystemMemory
+
+    monkeypatch.setattr(SystemMemory, "total_physical_memory_mb", classmethod(lambda cls: 4096))
+    instance = make_instance(tmp_path)
+    (instance.instance_dir / "settings.json").write_text(json.dumps({
+        "java": {"path": "", "min_memory": 8192, "max_memory": 16384, "arguments": []},
+        "window": {"width": 1280, "height": 720, "fullscreen": False},
+        "launch": {"game_arguments": [], "offline_multiplayer_enabled": False},
+    }), encoding="utf-8")
+
+    settings = SettingsManager.load(instance)
+
+    assert settings.min_memory == 4096
+    assert settings.max_memory == 4096
+
+
+def test_saved_memory_is_clamped_to_physical_ram(tmp_path: Path, monkeypatch) -> None:
+    from src.core.system.memory import SystemMemory
+
+    monkeypatch.setattr(SystemMemory, "total_physical_memory_mb", classmethod(lambda cls: 4096))
+    instance = make_instance(tmp_path)
+    settings = SettingsManager.load(instance)
+    settings.min_memory = 6144
+    settings.max_memory = 8192
+
+    SettingsManager.save(instance, settings)
+
+    saved = json.loads((instance.instance_dir / "settings.json").read_text(encoding="utf-8"))
+    assert saved["java"]["min_memory"] == 4096
+    assert saved["java"]["max_memory"] == 4096

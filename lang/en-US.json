@@ -652,7 +652,12 @@
     "modpack.lifecycle.repaired_message": "Repaired '{name}' using modpack version {version}. Restored {count} managed file(s).",
     "modpack.lifecycle.no_backup_needed": "\nNo damaged managed files were found, so no backup was needed.",
     "modpack.lifecycle.verify_repair": "Verifying managed modpack files for repair...",
-    "modpack.lifecycle.restore_repair": "Restoring managed modpack files..."
+    "modpack.lifecycle.restore_repair": "Restoring managed modpack files...",
+    "instance_settings.memory.detected": "Detected physical memory: {memory}. Java maximum is limited to {limit}.",
+    "instance_settings.memory.detection_failed": "Physical memory could not be detected. Java maximum uses the safe limit: {limit}.",
+    "instance_settings.memory.minimum_tooltip": "Minimum memory cannot be higher than maximum memory.",
+    "instance_settings.memory.maximum_tooltip": "Maximum memory cannot be higher than detected physical memory.",
+    "instance_settings.memory.exceeds_physical": "Maximum memory cannot exceed detected physical memory ({memory})."
   },
   "aliases": {
     "MCW Launcher": "app.name",
@@ -1137,6 +1142,11 @@
     "Repaired '{name}' using modpack version {version}. Restored {count} managed file(s).": "modpack.lifecycle.repaired_message",
     "\nNo damaged managed files were found, so no backup was needed.": "modpack.lifecycle.no_backup_needed",
     "Verifying managed modpack files for repair...": "modpack.lifecycle.verify_repair",
-    "Restoring managed modpack files...": "modpack.lifecycle.restore_repair"
+    "Restoring managed modpack files...": "modpack.lifecycle.restore_repair",
+    "Detected physical memory: {memory}. Java maximum is limited to {limit}.": "instance_settings.memory.detected",
+    "Physical memory could not be detected. Java maximum uses the safe limit: {limit}.": "instance_settings.memory.detection_failed",
+    "Minimum memory cannot be higher than maximum memory.": "instance_settings.memory.minimum_tooltip",
+    "Maximum memory cannot be higher than detected physical memory.": "instance_settings.memory.maximum_tooltip",
+    "Maximum memory cannot exceed detected physical memory ({memory}).": "instance_settings.memory.exceeds_physical"
   }
 }

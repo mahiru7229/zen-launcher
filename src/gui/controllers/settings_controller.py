@@ -5,6 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import Signal
 
 from src.core.language.language_manager import tr
+from src.core.system.memory import MemoryAllocationPolicy
 from src.core.instance.instance_manager import InstanceManager
 from src.core.instance.settings_manager import SettingsManager
 from src.gui.controllers.base_controller import BaseController
@@ -38,8 +39,11 @@ class InstanceSettingsController(BaseController):
             width = int(data["width"])
             height = int(data["height"])
             java_path = str(data["java_path"]).strip()
-            if min_memory <= 0 or max_memory < min_memory:
+            if min_memory < MemoryAllocationPolicy.MIN_MEMORY_MB or max_memory < min_memory:
                 raise ValueError(tr("Maximum memory must be greater than or equal to minimum memory."))
+            physical_limit = MemoryAllocationPolicy.physical_limit_mb()
+            if max_memory > physical_limit:
+                raise ValueError(tr("Maximum memory cannot exceed detected physical memory ({memory}).", memory=MemoryAllocationPolicy.format_mb(physical_limit)))
             if width <= 0 or height <= 0:
                 raise ValueError(tr("Window dimensions must be positive."))
             if java_path and not Path(java_path).exists():

@@ -1,19 +1,25 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QLabel, QLineEdit, QPushButton, QSpinBox, QTextEdit
+from PySide6.QtCore import QSignalBlocker, Qt, Signal
+from PySide6.QtWidgets import QCheckBox, QComboBox, QFileDialog, QGridLayout, QLabel, QLineEdit, QPushButton, QSlider, QSpinBox, QTextEdit
 
+from src.core.language.language_manager import tr
+from src.core.system.memory import MemoryAllocationPolicy, SystemMemory
 from src.gui.pages.base_page import BasePage
-from src.gui.widget.card_widget import CardWidget
 from src.gui.theme.runtime import set_theme_icon
+from src.gui.widget.card_widget import CardWidget
 
 
 class InstanceSettingsPage(BasePage):
     load_requested = Signal(str)
     save_requested = Signal(str, dict)
 
-    def __init__(self) -> None:
+    def __init__(self, total_memory_mb: int | None = None) -> None:
         super().__init__("Instance Settings", "Settings are loaded and saved through the public SettingsManager API.", "instance_settings")
+        detected_memory_mb = int(total_memory_mb) if total_memory_mb is not None else SystemMemory.total_physical_memory_mb()
+        self._memory_detection_failed = detected_memory_mb <= 0
+        self._physical_memory_mb = detected_memory_mb if detected_memory_mb > 0 else MemoryAllocationPolicy.FALLBACK_PHYSICAL_LIMIT_MB
+        self._memory_limit_mb = max(MemoryAllocationPolicy.MIN_MEMORY_MB, self._physical_memory_mb)
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -31,21 +37,48 @@ class InstanceSettingsPage(BasePage):
         self.java_path_input.setPlaceholderText("Leave empty for automatic Java selection")
         browse_button = set_theme_icon(QPushButton("Browse Java executable"), "icon.action.folder")
         browse_button.clicked.connect(self._browse_java)
+        self.memory_info_label = QLabel()
+        self.memory_info_label.setObjectName("CardSubtitle")
+        self.memory_info_label.setWordWrap(True)
+        self.min_memory = self._create_memory_slider()
+        self.max_memory = self._create_memory_slider()
+        self.min_memory_input = self._create_memory_input()
+        self.max_memory_input = self._create_memory_input()
+        self.max_memory.setRange(MemoryAllocationPolicy.MIN_MEMORY_MB, self._memory_limit_mb)
+        self.max_memory_input.setRange(MemoryAllocationPolicy.MIN_MEMORY_MB, self._memory_limit_mb)
+        self.min_memory_value = QLabel()
+        self.max_memory_value = QLabel()
+        self.min_memory_value.setObjectName("MemoryValueLabel")
+        self.max_memory_value.setObjectName("MemoryValueLabel")
+        minimum_tooltip = "Minimum memory cannot be higher than maximum memory."
+        maximum_tooltip = "Maximum memory cannot be higher than detected physical memory."
+        self.min_memory.setToolTip(minimum_tooltip)
+        self.min_memory_input.setToolTip(minimum_tooltip)
+        self.max_memory.setToolTip(maximum_tooltip)
+        self.max_memory_input.setToolTip(maximum_tooltip)
+        self.max_memory.valueChanged.connect(self._on_max_memory_slider_changed)
+        self.min_memory.valueChanged.connect(self._on_min_memory_slider_changed)
+        self.max_memory_input.valueChanged.connect(self._on_max_memory_input_changed)
+        self.min_memory_input.valueChanged.connect(self._on_min_memory_input_changed)
+
         memory_grid = QGridLayout()
-        self.min_memory = QSpinBox()
-        self.max_memory = QSpinBox()
-        for spin_box in (self.min_memory, self.max_memory):
-            spin_box.setRange(256, 65536)
-            spin_box.setSingleStep(256)
-            spin_box.setSuffix(" MB")
-        memory_grid.addWidget(QLabel("Minimum memory"), 0, 0)
-        memory_grid.addWidget(self.min_memory, 1, 0)
-        memory_grid.addWidget(QLabel("Maximum memory"), 0, 1)
-        memory_grid.addWidget(self.max_memory, 1, 1)
+        memory_grid.setHorizontalSpacing(14)
+        memory_grid.setVerticalSpacing(8)
+        memory_grid.setColumnStretch(0, 1)
+        memory_grid.addWidget(self.memory_info_label, 0, 0, 1, 3)
+        memory_grid.addWidget(QLabel("Minimum memory"), 1, 0)
+        memory_grid.addWidget(self.min_memory_value, 1, 1, alignment=Qt.AlignmentFlag.AlignRight)
+        memory_grid.addWidget(self.min_memory_input, 1, 2)
+        memory_grid.addWidget(self.min_memory, 2, 0, 1, 3)
+        memory_grid.addWidget(QLabel("Maximum memory"), 3, 0)
+        memory_grid.addWidget(self.max_memory_value, 3, 1, alignment=Qt.AlignmentFlag.AlignRight)
+        memory_grid.addWidget(self.max_memory_input, 3, 2)
+        memory_grid.addWidget(self.max_memory, 4, 0, 1, 3)
         java_card.layout.addWidget(self.java_path_input)
         java_card.layout.addWidget(browse_button)
         java_card.layout.addLayout(memory_grid)
         self.root_layout.addWidget(java_card)
+        self._apply_memory_values(MemoryAllocationPolicy.DEFAULT_MIN_MEMORY_MB, MemoryAllocationPolicy.DEFAULT_MAX_MEMORY_MB)
 
         window_card = CardWidget("Game window")
         window_grid = QGridLayout()
@@ -98,6 +131,14 @@ class InstanceSettingsPage(BasePage):
         self.root_layout.addWidget(save_button)
         self.root_layout.addStretch()
 
+    @property
+    def physical_memory_mb(self) -> int:
+        return self._physical_memory_mb
+
+    @property
+    def memory_limit_mb(self) -> int:
+        return self._memory_limit_mb
+
     def set_instances(self, instances: list, selected_name: str) -> None:
         self.instance_combo.blockSignals(True)
         self.instance_combo.clear()
@@ -123,8 +164,7 @@ class InstanceSettingsPage(BasePage):
             self.instance_combo.setCurrentText(instance_name)
             self.instance_combo.blockSignals(False)
         self.java_path_input.setText(str(getattr(settings, "java_path", "") or ""))
-        self.min_memory.setValue(int(getattr(settings, "min_memory", 1024)))
-        self.max_memory.setValue(int(getattr(settings, "max_memory", 2048)))
+        self._apply_memory_values(getattr(settings, "min_memory", 1024), getattr(settings, "max_memory", 2048))
         self.window_width.setValue(int(getattr(settings, "width", 1280)))
         self.window_height.setValue(int(getattr(settings, "height", 720)))
         self.fullscreen.setChecked(bool(getattr(settings, "fullscreen", False)))
@@ -136,8 +176,8 @@ class InstanceSettingsPage(BasePage):
     def form_data(self) -> dict:
         return {
             "java_path": self.java_path_input.text(),
-            "min_memory": self.min_memory.value(),
-            "max_memory": self.max_memory.value(),
+            "min_memory": self.min_memory_input.value(),
+            "max_memory": self.max_memory_input.value(),
             "width": self.window_width.value(),
             "height": self.window_height.value(),
             "fullscreen": self.fullscreen.isChecked(),
@@ -150,6 +190,9 @@ class InstanceSettingsPage(BasePage):
     def set_busy(self, busy: bool) -> None:
         self.setEnabled(not busy)
 
+    def retranslate_dynamic(self) -> None:
+        self._update_memory_labels()
+
     def _browse_java(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Choose Java executable", "", "Java executable (java.exe javaw.exe);;All files (*)")
         if path:
@@ -157,8 +200,7 @@ class InstanceSettingsPage(BasePage):
 
     def _clear_form(self) -> None:
         self.java_path_input.clear()
-        self.min_memory.setValue(1024)
-        self.max_memory.setValue(2048)
+        self._apply_memory_values(MemoryAllocationPolicy.DEFAULT_MIN_MEMORY_MB, MemoryAllocationPolicy.DEFAULT_MAX_MEMORY_MB)
         self.window_width.setValue(1280)
         self.window_height.setValue(720)
         self.fullscreen.setChecked(False)
@@ -166,6 +208,74 @@ class InstanceSettingsPage(BasePage):
         self.block_modrinth_failure.setChecked(True)
         self.jvm_arguments.clear()
         self.game_arguments.clear()
+
+    def _apply_memory_values(self, min_memory_mb: object, max_memory_mb: object) -> None:
+        minimum, maximum = MemoryAllocationPolicy.normalize(min_memory_mb, max_memory_mb, self._memory_limit_mb)
+        self._set_memory_controls(minimum, maximum)
+
+    def _on_max_memory_slider_changed(self, maximum: int) -> None:
+        snapped = MemoryAllocationPolicy.snap_mb(maximum, self._memory_limit_mb)
+        minimum = min(self.min_memory_input.value(), snapped)
+        self._set_memory_controls(minimum, snapped)
+
+    def _on_min_memory_slider_changed(self, minimum: int) -> None:
+        snapped = MemoryAllocationPolicy.snap_mb(minimum, self.max_memory_input.value())
+        self._set_memory_controls(snapped, self.max_memory_input.value())
+
+    def _on_max_memory_input_changed(self, maximum: int) -> None:
+        maximum = min(max(int(maximum), MemoryAllocationPolicy.MIN_MEMORY_MB), self._memory_limit_mb)
+        minimum = min(self.min_memory_input.value(), maximum)
+        self._set_memory_controls(minimum, maximum)
+
+    def _on_min_memory_input_changed(self, minimum: int) -> None:
+        maximum = self.max_memory_input.value()
+        minimum = min(max(int(minimum), MemoryAllocationPolicy.MIN_MEMORY_MB), maximum)
+        self._set_memory_controls(minimum, maximum)
+
+    def _set_memory_controls(self, minimum: int, maximum: int) -> None:
+        minimum, maximum = MemoryAllocationPolicy.normalize(minimum, maximum, self._memory_limit_mb)
+        blockers = [QSignalBlocker(widget) for widget in (self.min_memory, self.max_memory, self.min_memory_input, self.max_memory_input)]
+        self.max_memory.setValue(maximum)
+        self.max_memory_input.setValue(maximum)
+        self.min_memory.setMaximum(maximum)
+        self.min_memory_input.setMaximum(maximum)
+        self.min_memory.setValue(minimum)
+        self.min_memory_input.setValue(minimum)
+        del blockers
+        self._update_memory_labels()
+
+    def _update_memory_labels(self) -> None:
+        physical = MemoryAllocationPolicy.format_mb(self._physical_memory_mb)
+        limit = MemoryAllocationPolicy.format_mb(self._memory_limit_mb)
+        if self._memory_detection_failed:
+            self.memory_info_label.setText(tr("Physical memory could not be detected. Java maximum uses the safe limit: {limit}.", limit=limit))
+        else:
+            self.memory_info_label.setText(tr("Detected physical memory: {memory}. Java maximum is limited to {limit}.", memory=physical, limit=limit))
+        self.min_memory_value.setText(MemoryAllocationPolicy.format_mb(self.min_memory_input.value()))
+        self.max_memory_value.setText(MemoryAllocationPolicy.format_mb(self.max_memory_input.value()))
+
+    @staticmethod
+    def _create_memory_input() -> QSpinBox:
+        spin_box = QSpinBox()
+        spin_box.setMinimum(MemoryAllocationPolicy.MIN_MEMORY_MB)
+        spin_box.setSingleStep(MemoryAllocationPolicy.SLIDER_STEP_MB)
+        spin_box.setSuffix(" MB")
+        spin_box.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        spin_box.setKeyboardTracking(False)
+        spin_box.setAccelerated(True)
+        spin_box.setMinimumWidth(132)
+        return spin_box
+
+    @staticmethod
+    def _create_memory_slider() -> QSlider:
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setMinimum(MemoryAllocationPolicy.MIN_MEMORY_MB)
+        slider.setSingleStep(MemoryAllocationPolicy.SLIDER_STEP_MB)
+        slider.setPageStep(1024)
+        slider.setTickInterval(1024)
+        slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        slider.setMinimumHeight(34)
+        return slider
 
     @staticmethod
     def _lines(text: str) -> list[str]:

@@ -221,6 +221,42 @@ QCheckBox::indicator:checked {
     border: 3px solid #10110f;
 }
 
+QLabel#MemoryValueLabel {
+    color: #c9f49a;
+    font-weight: 800;
+}
+
+QSlider::groove:horizontal {
+    height: 10px;
+    background: #171915;
+    border: 2px solid #0d0e0c;
+}
+
+QSlider::sub-page:horizontal {
+    background: #6f9f52;
+    border: 2px solid #0d0e0c;
+}
+
+QSlider::add-page:horizontal {
+    background: #292c27;
+    border: 2px solid #0d0e0c;
+}
+
+QSlider::handle:horizontal {
+    width: 20px;
+    margin: -7px 0;
+    background: #b7e784;
+    border: 3px solid #11130f;
+}
+
+QSlider::handle:horizontal:hover {
+    background: #d0f4a8;
+}
+
+QSlider::tick-mark:horizontal {
+    background: #8b8d84;
+}
+
 QProgressBar {
     background: #11120f;
     color: #f5f1e8;

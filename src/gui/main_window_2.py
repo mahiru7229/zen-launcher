@@ -750,6 +750,7 @@ class MainWindow(QMainWindow):
             self.home_page,
             self.account_page,
             self.instances_page,
+            self.instance_settings_page,
             self.launch_control,
             self.right_panel,
             self.mod_manager_dialog,

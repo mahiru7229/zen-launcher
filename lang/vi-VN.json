@@ -652,7 +652,12 @@
     "modpack.lifecycle.repaired_message": "Đã sửa chữa '{name}' theo modpack phiên bản {version}. Đã khôi phục {count} file được quản lý.",
     "modpack.lifecycle.no_backup_needed": "\nKhông phát hiện file được quản lý bị hỏng, nên không cần tạo bản sao lưu.",
     "modpack.lifecycle.verify_repair": "Đang xác minh file modpack được quản lý để sửa chữa...",
-    "modpack.lifecycle.restore_repair": "Đang khôi phục file modpack được quản lý..."
+    "modpack.lifecycle.restore_repair": "Đang khôi phục file modpack được quản lý...",
+    "instance_settings.memory.detected": "RAM vật lý đã phát hiện: {memory}. RAM Java tối đa được giới hạn ở {limit}.",
+    "instance_settings.memory.detection_failed": "Không thể phát hiện RAM vật lý. RAM Java tối đa dùng giới hạn an toàn: {limit}.",
+    "instance_settings.memory.minimum_tooltip": "RAM tối thiểu không thể cao hơn RAM tối đa.",
+    "instance_settings.memory.maximum_tooltip": "RAM tối đa không thể cao hơn RAM vật lý đã phát hiện.",
+    "instance_settings.memory.exceeds_physical": "RAM tối đa không thể vượt quá RAM vật lý đã phát hiện ({memory})."
   },
   "aliases": {
     "Show static text over themed controls": "launcher_settings.theme.show_static_text",
@@ -669,6 +674,11 @@
     "Modrinth files missing": "launch_error.modrinth_missing.status",
     "Stable updates are used by default. Join the tester program only when you want to receive experimental builds.": "launcher_settings.update.subtitle",
     "Join tester program and receive experimental updates": "launcher_settings.update.tester_mode",
-    "Experimental updates may contain unfinished features, bugs, crashes, or compatibility issues. Back up important instances and worlds before joining.": "launcher_settings.update.tester_warning"
+    "Experimental updates may contain unfinished features, bugs, crashes, or compatibility issues. Back up important instances and worlds before joining.": "launcher_settings.update.tester_warning",
+    "Detected physical memory: {memory}. Java maximum is limited to {limit}.": "instance_settings.memory.detected",
+    "Physical memory could not be detected. Java maximum uses the safe limit: {limit}.": "instance_settings.memory.detection_failed",
+    "Minimum memory cannot be higher than maximum memory.": "instance_settings.memory.minimum_tooltip",
+    "Maximum memory cannot be higher than detected physical memory.": "instance_settings.memory.maximum_tooltip",
+    "Maximum memory cannot exceed detected physical memory ({memory}).": "instance_settings.memory.exceeds_physical"
   }
 }
