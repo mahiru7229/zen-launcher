@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mahiru7229/mcw-launcher/releases/latest">
-    <img src="https://img.shields.io/badge/Current-v0.6.0--rc.1-blue" alt="Current version">
+  <a href="https://github.com/mahiru7229/mcw-launcher/releases">
+    <img src="https://img.shields.io/badge/Current-v0.7.0--beta.1-orange" alt="Current version">
   </a>
   <a href="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml">
     <img src="https://github.com/mahiru7229/mcw-launcher/actions/workflows/tests.yml/badge.svg" alt="Tests">
@@ -22,11 +22,11 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v0.6.0-rc.2.md">RC 2 release notes</a>
+  <a href="docs/RELEASE-v0.7.0-beta.1.md">Beta 1 release notes</a>
 </p>
 
 > [!WARNING]
-> `v0.6.0-rc.2` là Release Candidate thứ hai của dòng 0.6 và vẫn dành cho tester trước khi lên Stable. Hãy sao lưu world quan trọng trước khi cập nhật modpack, sửa chữa instance hoặc thử Forge trên các phiên bản Minecraft cũ.
+> `v0.7.0-beta.1` mở dòng thử nghiệm 0.7 với CurseForge Gateway và cache provider mới. Đây không phải bản Stable; hãy sao lưu world/instance quan trọng và giữ `v0.6.0-rc.2` nếu cần ưu tiên độ ổn định.
 
 ---
 
@@ -38,8 +38,14 @@ MCW Launcher là launcher Minecraft mã nguồn mở, ưu tiên **instance độ
 
 Mỗi instance có thư mục game, phiên bản Minecraft, mod loader, mods, saves, cấu hình Java, RAM và trạng thái runtime riêng. Launcher hiện tập trung cho Windows 10/11 64-bit.
 
-### Điểm nổi bật của dòng 0.6
+### Điểm nổi bật của `v0.7.0-beta.1`
 
+- Tích hợp **CurseForge Gateway**: launcher không chứa CurseForge API key và chỉ gọi API trung gian qua HTTPS.
+- Tìm kiếm, chọn phiên bản và cài **CurseForge mods** cho Fabric/Forge từ Manage Mods hoặc trang Mods độc lập.
+- Tự tải file khi tác giả cho phép phân phối qua bên thứ ba; nếu không, launcher hướng dẫn tải thủ công rồi xác minh size/SHA-1 trước khi import.
+- Cache JSON CurseForge tối đa **10 MB**, dọn theo LRU, hỗ trợ dữ liệu stale khi gateway tạm lỗi.
+- Hiển thị **lần cập nhật gần nhất**, dung lượng cache, nguồn dữ liệu và lỗi refresh gần nhất.
+- Cooldown refresh, backoff sau lỗi và request deduplication để hạn chế gọi API trùng hoặc spam gateway.
 - Tạo và chạy instance **Vanilla, Fabric hoặc Forge**.
 - Cài đặt, thay đổi và repair Fabric Loader hoặc Minecraft Forge.
 - Tìm, cài và cập nhật mod từ **Modrinth** với bộ lọc loader/version/channel.
@@ -66,7 +72,8 @@ Bản đóng gói dành cho Windows được phát hành tại trang **Releases*
 
 - [Mở trang phát hành](https://github.com/mahiru7229/mcw-launcher/releases)
 - Stable dành cho người dùng thông thường vẫn thuộc dòng `0.5.1`.
-- Dòng `0.6.x` sử dụng kênh `beta` và dành cho người chủ động tham gia tester program.
+- `v0.6.0-rc.2` là nhánh ổn định hơn để regression trước Stable.
+- Dòng `0.7.x` dùng kênh `beta` và dành cho người chủ động thử CurseForge cùng các provider mới.
 
 Yêu cầu cơ bản:
 
@@ -83,7 +90,7 @@ Python `3.12` được khuyến nghị.
 ```powershell
 git clone https://github.com/mahiru7229/mcw-launcher.git
 cd mcw-launcher
-git switch beta/0.6
+git switch beta/0.7
 
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -104,14 +111,14 @@ Quy tắc release của dự án: chỉ build khi test không có `failed` hoặ
 
 ```powershell
 python -m PyInstaller --clean mcw_launcher.spec
-python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.6.0-rc.2"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0-beta.1"
 ```
 
 Kết quả updater package:
 
 ```text
-MCW-Launcher-v0.6.0-rc.2-windows-x64.zip
-MCW-Launcher-v0.6.0-rc.2-windows-x64.zip.sha256
+MCW-Launcher-v0.7.0-beta.1-windows-x64.zip
+MCW-Launcher-v0.7.0-beta.1-windows-x64.zip.sha256
 ```
 
 Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -126,8 +133,14 @@ MCW Launcher is an open-source Minecraft launcher centered around **isolated ins
 
 Each instance owns its game directory, Minecraft version, mod loader, mods, saves, Java configuration, memory allocation, and runtime state. The project currently targets 64-bit Windows 10 and Windows 11.
 
-### v0.6 highlights
+### `v0.7.0-beta.1` highlights
 
+- Integrate a **CurseForge Gateway** so no CurseForge API key is embedded in the public launcher.
+- Search, select versions, and install **CurseForge mods** for Fabric/Forge from Manage Mods or the standalone Mods page.
+- Download automatically when third-party distribution is allowed; otherwise guide the user through a manual download verified by size and SHA-1.
+- Keep a local CurseForge JSON cache capped at **10 MB**, with LRU eviction and stale-data fallback during gateway outages.
+- Display the **last successful refresh**, cache size, data source, cooldown, and latest refresh error.
+- Coalesce identical requests and apply refresh cooldown/backoff to reduce unnecessary API traffic.
 - Create and launch **Vanilla, Fabric, and Forge** instances.
 - Install, change, and repair Fabric Loader or Minecraft Forge.
 - Search, install, and update **Modrinth** mods with loader, version, and release-channel filtering.
@@ -153,7 +166,8 @@ Packaged Windows builds are published on the **Releases** page:
 
 - [Open releases](https://github.com/mahiru7229/mcw-launcher/releases)
 - The regular-user stable channel remains on the `0.5.1` line.
-- `0.6.x` uses the opt-in `beta` tester channel.
+- `v0.6.0-rc.2` remains the safer regression candidate before Stable.
+- `0.7.x` uses the opt-in `beta` channel for CurseForge and provider experiments.
 
 Requirements:
 
@@ -170,7 +184,7 @@ Python `3.12` is recommended.
 ```powershell
 git clone https://github.com/mahiru7229/mcw-launcher.git
 cd mcw-launcher
-git switch beta/0.6
+git switch beta/0.7
 
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -191,14 +205,14 @@ The release flow requires zero failed tests and zero collection/runtime errors b
 
 ```powershell
 python -m PyInstaller --clean mcw_launcher.spec
-python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.6.0-rc.2"
+python -m tools.build_release_zip --exe ".\dist\MCW Launcher.exe" --version "0.7.0-beta.1"
 ```
 
 Expected updater assets:
 
 ```text
-MCW-Launcher-v0.6.0-rc.2-windows-x64.zip
-MCW-Launcher-v0.6.0-rc.2-windows-x64.zip.sha256
+MCW-Launcher-v0.7.0-beta.1-windows-x64.zip
+MCW-Launcher-v0.7.0-beta.1-windows-x64.zip.sha256
 ```
 
 See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -229,6 +243,7 @@ See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
 - Fabric and Forge mod metadata parsing.
 - Enable/disable, drag-and-drop, dependency analysis, duplicate-ID detection, and loader mismatch checks.
 - Modrinth dependency installation, update checks, update locks, retry/resume, and fallback URLs.
+- CurseForge Gateway search, compatible file selection, dependency installation, automatic/manual distribution handling, local JSON caching, refresh cooldown, and stale fallback.
 - Managed modpack registry with update, repair, conflict preservation, backup, rollback, and verification cache.
 
 ### Accounts and privacy
@@ -268,6 +283,7 @@ mcw-launcher/
 │   │   ├── mod/
 │   │   ├── modloader/
 │   │   ├── modrinth/
+│   │   ├── curseforge/
 │   │   ├── network/
 │   │   ├── progress/
 │   │   ├── runtime/
@@ -288,7 +304,8 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
-| [`docs/RELEASE-v0.6.0-rc.2.md`](docs/RELEASE-v0.6.0-rc.2.md) | Complete RC 2 release notes |
+| [`docs/RELEASE-v0.7.0-beta.1.md`](docs/RELEASE-v0.7.0-beta.1.md) | Complete 0.7 Beta 1 release notes |
+| [`docs/FORGE_CURSEFORGE.md`](docs/FORGE_CURSEFORGE.md) | CurseForge Gateway, cache and manual fallback |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Core architecture |
 | [`docs/INSTANCE_SYSTEM.md`](docs/INSTANCE_SYSTEM.md) | Instance metadata and lifecycle |
 | [`docs/MODRINTH_INTEGRATION.md`](docs/MODRINTH_INTEGRATION.md) | Modrinth integration |
@@ -301,7 +318,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-| Component | Status in v0.6.0-rc.2 |
+| Component | Status in v0.7.0-beta.1 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |
@@ -312,7 +329,8 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 | English / Vietnamese | Available |
 | PNG themes | Beta |
 | NeoForge / Quilt | Not supported |
-| CurseForge public integration | Deferred to `0.7.x` |
+| CurseForge Gateway mods | Beta — Fabric/Forge, cache and manual fallback |
+| CurseForge modpacks | Experimental — Forge flow through gateway |
 
 ## Contributing and bug reports
 

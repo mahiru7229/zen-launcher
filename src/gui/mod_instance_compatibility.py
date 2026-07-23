@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Protocol
 
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.models.instance.instance import Instance
-from src.models.modrinth.version import ModrinthVersion
 
 
-def compatible_instances(instances: Iterable[Instance], version: ModrinthVersion, loader: str) -> list[Instance]:
+class CompatibleModVersion(Protocol):
+    version_number: str
+    game_versions: tuple[str, ...]
+
+
+def compatible_instances(instances: Iterable[Instance], version: CompatibleModVersion, loader: str) -> list[Instance]:
     normalized_loader = normalize_supported_loader(loader)
     supported_versions = {str(item).strip() for item in version.game_versions if str(item).strip()}
     compatible: list[Instance] = []

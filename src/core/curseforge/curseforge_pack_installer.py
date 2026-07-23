@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path, PurePosixPath
 import json
 import re
@@ -40,7 +39,7 @@ class CurseForgePackInstaller:
         if file.release_type not in allowed:
             raise RuntimeError(f"CurseForge modpack file '{file.display_name}' uses the disabled {file.release_type} channel.")
         pack_path = Paths.curseforge_pack_cache(project_id, file_id, file.file_name)
-        CurseForgeDownloader.download_file(file, pack_path, reporter=reporter, stage=ProgressStage.DOWNLOADING_MODPACK, message=f"Downloading {project.name} manifest...")
+        CurseForgeDownloader.download_file(file, pack_path, reporter=reporter, stage=ProgressStage.DOWNLOADING_MODPACK, message=f"Downloading {project.name} manifest...", project_name=project.name)
 
         with zipfile.ZipFile(pack_path, "r") as archive:
             manifest = CurseForgePackInstaller._read_manifest(archive)
@@ -98,7 +97,7 @@ class CurseForgePackInstaller:
         if not game_version:
             raise RuntimeError("The CurseForge modpack does not declare a Minecraft version.")
         if selected is None:
-            raise RuntimeError("Only Forge CurseForge modpacks are supported in v0.6.0 Beta 1.")
+            raise RuntimeError("Only Forge CurseForge modpacks are supported in v0.7.0 Beta 1.")
         loader_id = str(selected.get("id") or "")
         forge_version = loader_id.split("-", 1)[1].strip() if "-" in loader_id else ""
         if not forge_version:
@@ -110,19 +109,25 @@ class CurseForgePackInstaller:
         raw_files = manifest.get("files", [])
         selected = [item for item in raw_files if isinstance(item, dict) and (bool(item.get("required", True)) or install_optional_files)]
         skipped = len(raw_files) - len(selected)
-        results: list[dict] = []
-        if reporter is not None:
-            reporter.files(stage=ProgressStage.CHECKING_MODPACK, message="Reading CurseForge modpack file metadata...", current=0, total=len(selected))
-
-        def load(item: dict) -> dict:
+        normalized: list[tuple[int, int, bool]] = []
+        for item in selected:
             project_id = int(item.get("projectID") or item.get("projectId") or 0)
             file_id = int(item.get("fileID") or item.get("fileId") or 0)
             if project_id <= 0 or file_id <= 0:
                 raise RuntimeError("The CurseForge modpack contains an invalid project or file ID.")
-            file = CurseForgeClient.get_file(project_id, file_id)
+            normalized.append((project_id, file_id, bool(item.get("required", True))))
+        if reporter is not None:
+            reporter.files(stage=ProgressStage.CHECKING_MODPACK, message="Reading CurseForge modpack file metadata...", current=0, total=len(normalized))
+
+        files = CurseForgeClient.get_files_batch([file_id for _project_id, file_id, _required in normalized])
+        results: list[dict] = []
+        for completed, (project_id, file_id, required) in enumerate(normalized, start=1):
+            file = files.get(file_id)
+            if file is None or file.project_id != project_id:
+                file = CurseForgeClient.get_file(project_id, file_id)
             if game_version and game_version not in file.game_versions:
                 raise RuntimeError(f"CurseForge file '{file.file_name}' does not support Minecraft {game_version}.")
-            return {
+            results.append({
                 "projectId": project_id,
                 "fileId": file_id,
                 "fileName": file.file_name,
@@ -131,17 +136,10 @@ class CurseForgePackInstaller:
                 "sha1": file.sha1,
                 "size": file.file_length,
                 "downloadUrl": file.download_url,
-                "required": bool(item.get("required", True)),
-            }
-
-        completed = 0
-        with ThreadPoolExecutor(max_workers=min(CurseForgePackInstaller.MAX_WORKERS, max(1, len(selected)))) as executor:
-            futures = [executor.submit(load, item) for item in selected]
-            for future in as_completed(futures):
-                results.append(future.result())
-                completed += 1
-                if reporter is not None:
-                    reporter.files(stage=ProgressStage.CHECKING_MODPACK, message="Reading CurseForge modpack file metadata...", current=completed, total=len(selected))
+                "required": required,
+            })
+            if reporter is not None:
+                reporter.files(stage=ProgressStage.CHECKING_MODPACK, message="Reading CurseForge modpack file metadata...", current=completed, total=len(normalized))
         return sorted(results, key=lambda item: (item["projectId"], item["fileId"])), skipped
 
     @staticmethod

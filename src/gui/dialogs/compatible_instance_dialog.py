@@ -7,16 +7,15 @@ from src.core.instance.instance_run_lock import InstanceRunLock
 from src.core.language.language_manager import tr
 from src.core.modloader.mod_loader_manager import ModLoaderManager
 from src.gui.dialogs.create_compatible_instance_dialog import CreateCompatibleInstanceDialog
-from src.gui.mod_instance_compatibility import compatible_instances, normalize_supported_loader
+from src.gui.mod_instance_compatibility import CompatibleModVersion, compatible_instances, normalize_supported_loader
 from src.gui.window_sizing import resize_dialog_to_screen
 from src.models.instance.instance import Instance
-from src.models.modrinth.version import ModrinthVersion
 
 
 class CompatibleInstanceDialog(QDialog):
     RUNNING_ROLE = int(Qt.ItemDataRole.UserRole) + 1
 
-    def __init__(self, version: ModrinthVersion, loader: str, instances: list[Instance], parent=None) -> None:
+    def __init__(self, version: CompatibleModVersion, loader: str, instances: list[Instance], parent=None) -> None:
         super().__init__(parent)
         self._version = version
         self._loader = normalize_supported_loader(loader)

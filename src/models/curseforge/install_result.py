@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.models.curseforge.manual_download import CurseForgeManualDownload
 from src.models.instance.instance import Instance
 
 
@@ -10,6 +11,8 @@ class CurseForgeModInstallResult:
     installed_projects: tuple[str, ...]
     installed_files: tuple[str, ...]
     warnings: tuple[str, ...] = ()
+    manual_downloads: tuple[CurseForgeManualDownload, ...] = ()
+    instance_name: str = ""
 
 
 @dataclass(frozen=True, slots=True)

@@ -4,19 +4,23 @@ from src.core.minecraft.classpath_builder import ClasspathBuilder
 from src.models.instance.instance import Instance
 from src.models.auth.authentication import Authentication
 from pathlib import Path
+import os
 
 
 class ContextBuilder:
 
     @staticmethod
     def build(instance:Instance,version:Version, player_data:Authentication):
+        libraries_directory = Paths.libraries()
         classpath = ClasspathBuilder.build(
             version,
             Paths.client(version),
-            Paths.libraries()
+            libraries_directory
         )
         return {
             "classpath": classpath,
+            "library_directory": str(libraries_directory),
+            "classpath_separator": os.pathsep,
             "natives_directory": str(Paths.natives(version)),
             "launcher_name": "mcw-launcher",
             "launcher_version": "1.0",

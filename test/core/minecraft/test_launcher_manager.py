@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -12,10 +13,12 @@ from src.core.minecraft.launcher_manager import LauncherManager
 def make_version(
     *,
     main_class: str = "net.minecraft.client.main.Main",
+    raw_json: dict | None = None,
 ):
     return SimpleNamespace(
         id="1.20.1",
         main_class=main_class,
+        raw_json=raw_json or {},
     )
 
 
@@ -554,3 +557,134 @@ def test_build_does_not_modify_argument_lists(
 
     assert jvm_args == original_jvm
     assert game_args == original_game
+
+
+def test_build_does_not_add_duplicate_classpath_when_profile_provides_one(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    monkeypatch.setattr(Paths, "client", lambda version: tmp_path / "client.jar")
+    monkeypatch.setattr(Paths, "libraries", lambda: tmp_path / "libraries")
+    monkeypatch.setattr(ClasspathBuilder, "build", lambda *args: "profile-classpath")
+    monkeypatch.setattr(
+        ArgumentBuilder,
+        "build",
+        lambda *args: (["-cp", "profile-classpath"], []),
+    )
+
+    result = LauncherManager.build(
+        version=make_version(),
+        context={},
+        settings=make_settings(),
+        account=make_account(),
+    )
+
+    assert result.count("-cp") == 1
+    assert result == [
+        "-cp",
+        "profile-classpath",
+        "net.minecraft.client.main.Main",
+    ]
+
+
+def test_build_prepares_modern_forge_module_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    bootstrap = tmp_path / "bootstraplauncher.jar"
+    securejarhandler = tmp_path / "securejarhandler.jar"
+    bootstrap.write_bytes(b"bootstrap")
+    securejarhandler.write_bytes(b"secure")
+    module_path = f"{bootstrap}{os.pathsep}{securejarhandler}"
+
+    monkeypatch.setattr(Paths, "client", lambda version: tmp_path / "client.jar")
+    monkeypatch.setattr(Paths, "libraries", lambda: tmp_path / "libraries")
+    monkeypatch.setattr(ClasspathBuilder, "build", lambda *args: "minecraft-classpath")
+    monkeypatch.setattr(
+        ArgumentBuilder,
+        "build",
+        lambda *args: (
+            [
+                "-p",
+                module_path,
+                "--add-opens",
+                "java.base/java.lang.invoke=cpw.mods.securejarhandler",
+                "-cp",
+                "minecraft-classpath",
+            ],
+            ["--launchTarget", "forgeclient"],
+        ),
+    )
+
+    result = LauncherManager.build(
+        version=make_version(
+            main_class="cpw.mods.bootstraplauncher.BootstrapLauncher",
+            raw_json={"forge": {"loaderVersion": "47.4.21"}},
+        ),
+        context={},
+        settings=make_settings(),
+        account=make_account(),
+    )
+
+    assert result[:4] == [
+        "--module-path",
+        module_path,
+        "--add-modules",
+        "ALL-MODULE-PATH",
+    ]
+    assert result.count("-cp") == 1
+    assert result[-3:] == [
+        "cpw.mods.bootstraplauncher.BootstrapLauncher",
+        "--launchTarget",
+        "forgeclient",
+    ]
+
+
+def test_build_keeps_minecraft_client_out_of_forge_module_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    libraries = tmp_path / "libraries"
+    client = tmp_path / "versions" / "1.20.1" / "1.20.1.jar"
+    bootstrap = libraries / "bootstraplauncher.jar"
+    securejarhandler = libraries / "securejarhandler.jar"
+    client.parent.mkdir(parents=True)
+    libraries.mkdir(parents=True)
+    client.write_bytes(b"minecraft")
+    bootstrap.write_bytes(b"bootstrap")
+    securejarhandler.write_bytes(b"secure")
+    module_path = os.pathsep.join((str(bootstrap), str(client), str(securejarhandler)))
+
+    monkeypatch.setattr(Paths, "client", lambda version: client)
+    monkeypatch.setattr(Paths, "libraries", lambda: libraries)
+    monkeypatch.setattr(ClasspathBuilder, "build", lambda *args: f"library.jar{os.pathsep}{client}")
+    monkeypatch.setattr(
+        ArgumentBuilder,
+        "build",
+        lambda *args: (
+            [
+                "--module-path",
+                module_path,
+                "-DignoreList=bootstraplauncher,forge-1.20.1-47.4.22.jar",
+                "-cp",
+                f"library.jar{os.pathsep}{client}",
+            ],
+            ["--launchTarget", "forgeclient"],
+        ),
+    )
+
+    version = make_version(
+        main_class="cpw.mods.bootstraplauncher.BootstrapLauncher",
+        raw_json={
+            "inheritsFrom": "1.20.1",
+            "forge": {"loaderVersion": "47.4.22"},
+        },
+    )
+    result = LauncherManager.build(version=version, context={}, settings=make_settings(), account=make_account())
+
+    module_path_index = result.index("--module-path")
+    assert result[module_path_index + 1] == os.pathsep.join((str(bootstrap), str(securejarhandler)))
+    classpath_index = result.index("-cp")
+    assert str(client) in result[classpath_index + 1].split(os.pathsep)
+    ignore_list = next(value for value in result if value.startswith("-DignoreList="))
+    assert "1.20.1.jar" in ignore_list.split("=", 1)[1].split(",")

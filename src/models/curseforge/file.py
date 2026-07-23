@@ -27,6 +27,11 @@ class CurseForgeFile:
     game_versions: tuple[str, ...]
     dependencies: tuple[CurseForgeDependency, ...]
     is_available: bool = True
+    loaders: tuple[str, ...] = ()
+
+    @property
+    def version_number(self) -> str:
+        return self.display_name
 
     @property
     def size(self) -> int:

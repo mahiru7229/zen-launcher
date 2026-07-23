@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -197,6 +198,10 @@ def test_build_contains_minecraft_paths_as_strings(
     assert context["assets_root"] == str(
         mocked_paths["assets"]
     )
+    assert context["library_directory"] == str(
+        mocked_paths["libraries"]
+    )
+    assert context["classpath_separator"] == os.pathsep
 
     assert isinstance(
         context["natives_directory"],
@@ -387,6 +392,8 @@ def test_build_returns_exact_public_context_keys(
 
     assert set(context) == {
         "classpath",
+        "library_directory",
+        "classpath_separator",
         "natives_directory",
         "launcher_name",
         "launcher_version",

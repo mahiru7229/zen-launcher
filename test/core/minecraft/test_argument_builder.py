@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -229,6 +230,37 @@ def test_build_resolves_game_placeholders():
         "Steve",
         "--version",
         "1.20.1",
+    ]
+
+
+def test_build_resolves_forge_module_path_placeholders(tmp_path: Path):
+    libraries = tmp_path / "libraries"
+    module_a = libraries / "bootstraplauncher.jar"
+    module_b = libraries / "securejarhandler.jar"
+    version = make_version(
+        jvm_arguments=[
+            "-p",
+            "${library_directory}/bootstraplauncher.jar${classpath_separator}${library_directory}/securejarhandler.jar",
+            "--add-modules",
+            "ALL-MODULE-PATH",
+        ]
+    )
+
+    jvm_args, _ = ArgumentBuilder.build(
+        version=version,
+        context={
+            "library_directory": str(libraries),
+            "classpath_separator": os.pathsep,
+        },
+        settings=make_settings(),
+        account=make_account(),
+    )
+
+    assert jvm_args[-4:] == [
+        "-p",
+        os.pathsep.join((str(module_a), str(module_b))),
+        "--add-modules",
+        "ALL-MODULE-PATH",
     ]
 
 

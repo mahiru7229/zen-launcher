@@ -493,7 +493,7 @@ class ModManagerDialog(QDialog):
         for button in (self.refresh_button, self.analyze_button, self.open_folder_button, self.add_button, self.enable_button, self.disable_button, self.remove_button):
             button.setEnabled(enabled)
         self.modrinth_button.setEnabled(enabled and self._is_modded_instance())
-        self.curseforge_button.setEnabled(enabled and self._is_forge_instance() and CurseForgeConfigManager.is_configured())
+        self.curseforge_button.setEnabled(enabled and self._is_modded_instance() and CurseForgeConfigManager.is_configured())
         self.check_updates_button.setEnabled(enabled and not self._update_checking)
         self._update_action_state()
 

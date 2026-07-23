@@ -4,13 +4,12 @@ from PySide6.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QLabel, QLin
 
 from src.core.instance.instance_manager import InstanceManager
 from src.core.language.language_manager import tr
-from src.gui.mod_instance_compatibility import normalize_supported_loader
+from src.gui.mod_instance_compatibility import CompatibleModVersion, normalize_supported_loader
 from src.gui.window_sizing import resize_dialog_to_screen
-from src.models.modrinth.version import ModrinthVersion
 
 
 class CreateCompatibleInstanceDialog(QDialog):
-    def __init__(self, version: ModrinthVersion, loader: str, parent=None) -> None:
+    def __init__(self, version: CompatibleModVersion, loader: str, parent=None) -> None:
         super().__init__(parent)
         self._version = version
         self._loader = normalize_supported_loader(loader)

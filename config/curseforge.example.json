@@ -1,0 +1,5 @@
+{
+  "schema_version": 2,
+  "gateway_url": "https://mcw-curseforge-gateway.vercel.app/api/curseforge",
+  "client_token": ""
+}
