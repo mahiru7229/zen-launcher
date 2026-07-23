@@ -306,7 +306,6 @@ class MainWindow(QMainWindow):
         self.instance_controller.selected_instance_changed.connect(self._instance_selected)
         self.instance_controller.forge_diagnostics_finished.connect(self._forge_diagnostics_finished)
         self.instance_controller.export_finished.connect(self._show_export_finished)
-        self.instance_controller.instance_created.connect(self._on_instance_created)
 
         self.instance_settings_controller.settings_loaded.connect(self.instance_settings_page.set_settings)
         self.gui_settings_controller.settings_changed.connect(self._apply_gui_settings)
@@ -380,6 +379,7 @@ class MainWindow(QMainWindow):
         self.task_runner.task_succeeded.connect(self._on_task_completed)
         self.task_runner.task_succeeded.connect(self._on_task_succeeded)
         self.task_runner.task_failed.connect(self._on_task_completed)
+        self.task_runner.task_settled.connect(self._on_task_settled)
         self.task_runner.busy_changed.connect(self._set_busy)
         self.task_runner.busy_changed.connect(self.mod_manager_dialog.set_busy)
         self.task_runner.task_rejected.connect(lambda message: QMessageBox.information(self, tr("MCW Launcher"), tr(message)))
@@ -573,6 +573,7 @@ class MainWindow(QMainWindow):
             self._pending_mod_install_after_create = {
                 "instance_name": dialog.created_instance_name,
                 "version_id": str(getattr(version, "version_id", "")),
+                "loader": str(loader).strip().lower(),
                 "allowed_version_types": tuple(allowed_version_types),
             }
             started = self.instance_controller.create(
@@ -588,17 +589,64 @@ class MainWindow(QMainWindow):
         instance_name = dialog.selected_instance_name
         if not instance_name:
             return
+        try:
+            target_instance = InstanceManager.load(instance_name)
+        except Exception as error:
+            self._show_error(tr("mods.instance_dialog.title"), str(error))
+            return
+        self.mod_controller.set_instance(target_instance, refresh=False)
         self.modrinth_controller.install_mod(instance_name, str(getattr(version, "version_id", "")), tuple(allowed_version_types))
 
-    def _on_instance_created(self, instance: object) -> None:
-        pending = self._pending_mod_install_after_create
-        if pending is None or str(getattr(instance, "name", "")) != str(pending.get("instance_name", "")):
+    def _on_task_settled(self, task_id: str, succeeded: bool, result: object) -> None:
+        if task_id != self.instance_controller.CREATE_TASK_ID:
             return
+
+        pending = self._pending_mod_install_after_create
+        if pending is None:
+            return
+
         self._pending_mod_install_after_create = None
-        instance_name = str(getattr(instance, "name", ""))
+        if not succeeded:
+            self.logs_page.append(tr("mods.instance_create.followup_cancelled"))
+            return
+
+        instance_name = str(getattr(result, "name", ""))
+        expected_name = str(pending.get("instance_name", ""))
+        if not instance_name or instance_name != expected_name:
+            self._show_error(
+                tr("mods.instance_create.title"),
+                tr("mods.instance_create.result_mismatch", name=expected_name),
+            )
+            return
+
+        try:
+            instance = InstanceManager.load(instance_name)
+            actual_loader, _ = ModLoaderManager.normalize(instance.mod_loader)
+        except Exception as error:
+            self._show_error(tr("mods.instance_create.title"), str(error))
+            return
+
+        expected_loader = str(pending.get("loader", "")).strip().lower()
+        if actual_loader != expected_loader:
+            self._show_error(
+                tr("mods.instance_create.title"),
+                tr(
+                    "mods.instance_create.loader_mismatch",
+                    expected=expected_loader.title(),
+                    actual=actual_loader.title(),
+                ),
+            )
+            return
+
         version_id = str(pending.get("version_id", ""))
         allowed_version_types = tuple(pending.get("allowed_version_types", ("release",)))
-        QTimer.singleShot(0, lambda: self.modrinth_controller.install_mod(instance_name, version_id, allowed_version_types))
+        self.mod_controller.set_instance(instance, refresh=False)
+        started = self.modrinth_controller.install_mod(instance_name, version_id, allowed_version_types)
+        if not started:
+            self._show_error(
+                tr("modrinth.mod.install"),
+                tr("mods.instance_create.install_start_failed", name=instance_name),
+            )
 
     def _set_modrinth_results(self, project_type: str, loader: str, result: object) -> None:
         dialog = self.modrinth_mod_dialog if project_type == "mod" else self.modrinth_modpack_dialog

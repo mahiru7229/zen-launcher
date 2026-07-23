@@ -27,12 +27,13 @@ def _start_update_cleanup() -> None:
         UpdateCleanupWorker(cleanup_request).start()
 
 
-def _write_startup_error(error: BaseException) -> Path | None:
+def _write_startup_error(error: BaseException, stage_key: str = "startup.starting", traceback_text: str | None = None) -> Path | None:
     payload = (
         f"MCW Launcher startup failure\n"
         f"Timestamp: {datetime.now().isoformat(timespec='seconds')}\n"
+        f"Stage: {stage_key}\n"
         f"Error: {type(error).__name__}: {error}\n\n"
-        f"{traceback.format_exc()}"
+        f"{traceback_text or traceback.format_exc()}"
     )
 
     candidate_directories: list[Path] = []
@@ -69,37 +70,52 @@ def main() -> None:
     splash = StartupSplash()
     splash.show()
     splash.update_progress(2, "startup.starting")
+    startup_stage_key = "startup.starting"
 
     try:
         from src.core.bootstrap import initialize_application
+        from src.core.startup_runner import run_startup_task
 
-        settings = initialize_application(splash.update_progress)
+        def update_startup_progress(percent: int, message_key: str) -> None:
+            nonlocal startup_stage_key
+            startup_stage_key = str(message_key)
+            splash.update_progress(percent, startup_stage_key)
+
+        settings = run_startup_task(initialize_application, update_startup_progress, app.processEvents)
 
         from src.core.language.language_manager import language_manager, tr
 
         language_manager.reload()
         language_manager.set_language(settings.get("gui", {}).get("language", "en-US"), notify=False)
         splash.retranslate()
-        splash.update_progress(93, "startup.loading_interface")
+        startup_stage_key = "startup.loading_interface"
+        splash.update_progress(93, startup_stage_key)
 
-        # Import the main window only after writable directories and databases are ready.
-        # Some GUI controllers load account data during import or construction.
+        # Import and construct Qt widgets only on the GUI thread. Persistent I/O
+        # above is isolated so a locked database cannot freeze the splash forever.
         from src.gui.main_window_2 import MainWindow
 
         window = MainWindow()
-        splash.update_progress(99, "startup.finalizing")
+        startup_stage_key = "startup.finalizing"
+        splash.update_progress(99, startup_stage_key)
         window.show()
         app.processEvents()
-        splash.update_progress(100, "startup.ready", "startup.ready_detail")
+        startup_stage_key = "startup.ready"
+        splash.update_progress(100, startup_stage_key, "startup.ready_detail")
         splash.finish(window)
     except Exception as error:
         from PySide6.QtWidgets import QMessageBox
         from src.core.language.language_manager import tr
+        from src.core.startup_runner import StartupWorkerError
 
-        error_path = _write_startup_error(error)
+        traceback_text = error.traceback_text if isinstance(error, StartupWorkerError) else traceback.format_exc()
+        error_path = _write_startup_error(error, startup_stage_key, traceback_text)
         splash.show_error()
+        splash.raise_()
+        splash.activateWindow()
         path_text = str(error_path) if error_path is not None else tr("startup.error_log_unavailable")
-        QMessageBox.critical(None, tr("startup.failed_title"), tr("startup.failed_message", error=error, path=path_text))
+        stage_text = tr(startup_stage_key)
+        QMessageBox.critical(splash, tr("startup.failed_title"), tr("startup.failed_message", error=error, stage=stage_text, path=path_text))
         splash.close()
         raise SystemExit(1) from None
 

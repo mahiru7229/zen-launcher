@@ -1,6 +1,6 @@
 # Forge + Modrinth workflow
 
-MCW Launcher `v0.6.0-rc.1` supports Modrinth mods and `.mrpack` modpacks for both Fabric and Forge.
+MCW Launcher `v0.6.0-rc.2` supports Modrinth mods and `.mrpack` modpacks for both Fabric and Forge.
 
 ## Browse Mods
 

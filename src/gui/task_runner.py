@@ -38,6 +38,7 @@ class TaskRunner(QObject):
     task_failed = Signal(str, object)
     busy_changed = Signal(bool)
     task_rejected = Signal(str)
+    task_settled = Signal(str, bool, object)
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -99,6 +100,7 @@ class TaskRunner(QObject):
             return
         self.task_succeeded.emit(task_id, result)
         self._finish_context(context)
+        self.task_settled.emit(task_id, True, result)
 
     @Slot(str, object)
     def _finish_failure(self, task_id: str, error: Exception) -> None:
@@ -107,6 +109,7 @@ class TaskRunner(QObject):
             return
         self.task_failed.emit(task_id, error)
         self._finish_context(context)
+        self.task_settled.emit(task_id, False, error)
 
     def _finish_context(self, context: TaskContext) -> None:
         if context.blocking:

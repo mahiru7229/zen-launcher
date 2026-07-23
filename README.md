@@ -22,11 +22,11 @@
 <p align="center">
   <a href="#tiếng-việt">Tiếng Việt</a> ·
   <a href="#english">English</a> ·
-  <a href="docs/RELEASE-v0.6.0-rc.1.md">RC 1 release notes</a>
+  <a href="docs/RELEASE-v0.6.0-rc.2.md">RC 2 release notes</a>
 </p>
 
 > [!WARNING]
-> `v0.6.0-rc.1` là Release Candidate đầu tiên của dòng 0.6 và vẫn dành cho tester trước khi lên Stable. Hãy sao lưu world quan trọng trước khi cập nhật modpack, sửa chữa instance hoặc thử Forge trên các phiên bản Minecraft cũ.
+> `v0.6.0-rc.2` là Release Candidate thứ hai của dòng 0.6 và vẫn dành cho tester trước khi lên Stable. Hãy sao lưu world quan trọng trước khi cập nhật modpack, sửa chữa instance hoặc thử Forge trên các phiên bản Minecraft cũ.
 
 ---
 
@@ -104,14 +104,14 @@ Quy tắc release của dự án: chỉ build khi test không có `failed` hoặ
 
 ```powershell
 python -m PyInstaller --clean mcw_launcher.spec
-python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.6.0-rc.1"
+python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.6.0-rc.2"
 ```
 
 Kết quả updater package:
 
 ```text
-MCW-Launcher-v0.6.0-rc.1-windows-x64.zip
-MCW-Launcher-v0.6.0-rc.1-windows-x64.zip.sha256
+MCW-Launcher-v0.6.0-rc.2-windows-x64.zip
+MCW-Launcher-v0.6.0-rc.2-windows-x64.zip.sha256
 ```
 
 Xem thêm [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -191,14 +191,14 @@ The release flow requires zero failed tests and zero collection/runtime errors b
 
 ```powershell
 python -m PyInstaller --clean mcw_launcher.spec
-python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.6.0-rc.1"
+python tools/build_release_zip.py --exe ".\dist\MCW Launcher.exe" --version "0.6.0-rc.2"
 ```
 
 Expected updater assets:
 
 ```text
-MCW-Launcher-v0.6.0-rc.1-windows-x64.zip
-MCW-Launcher-v0.6.0-rc.1-windows-x64.zip.sha256
+MCW-Launcher-v0.6.0-rc.2-windows-x64.zip
+MCW-Launcher-v0.6.0-rc.2-windows-x64.zip.sha256
 ```
 
 See [`docs/UPDATE_PACKAGES.md`](docs/UPDATE_PACKAGES.md).
@@ -288,7 +288,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 | Document | Purpose |
 |---|---|
-| [`docs/RELEASE-v0.6.0-rc.1.md`](docs/RELEASE-v0.6.0-rc.1.md) | Complete RC 1 release notes |
+| [`docs/RELEASE-v0.6.0-rc.2.md`](docs/RELEASE-v0.6.0-rc.2.md) | Complete RC 2 release notes |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Core architecture |
 | [`docs/INSTANCE_SYSTEM.md`](docs/INSTANCE_SYSTEM.md) | Instance metadata and lifecycle |
 | [`docs/MODRINTH_INTEGRATION.md`](docs/MODRINTH_INTEGRATION.md) | Modrinth integration |
@@ -301,7 +301,7 @@ The GUI calls public core services instead of implementing Minecraft behavior di
 
 ## Support status
 
-| Component | Status in v0.6.0-rc.1 |
+| Component | Status in v0.6.0-rc.2 |
 |---|---|
 | Vanilla instances | Available |
 | Fabric Loader and mods | Available |

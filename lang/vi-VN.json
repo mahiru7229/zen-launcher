@@ -698,6 +698,10 @@
     "mods.instance_create.name_exists": "Instance có tên '{name}' đã tồn tại.",
     "mods.instance_create.select_version": "Hãy chọn phiên bản Minecraft trước.",
     "mods.instance_create.no_game_versions": "Phiên bản mod này không khai báo phiên bản Minecraft được hỗ trợ.",
+    "mods.instance_create.followup_cancelled": "Đã hủy bước tự động cài mod vì quá trình tạo instance không hoàn tất thành công.",
+    "mods.instance_create.result_mismatch": "Instance vừa tạo không khớp với mục tiêu cài đặt '{name}'. Mod chưa được cài.",
+    "mods.instance_create.loader_mismatch": "Instance mới đang dùng {actual}, nhưng mod đã chọn yêu cầu {expected}. Mod chưa được cài.",
+    "mods.instance_create.install_start_failed": "Instance '{name}' đã được tạo, nhưng tác vụ cài mod không thể bắt đầu. Hãy mở Nhật ký rồi thử cài mod lại.",
     "settings.unsaved.title": "Cài đặt chưa được lưu",
     "settings.unsaved.message": "Có thay đổi chưa được lưu trong {scope}. Lưu trước khi tiếp tục?",
     "settings.unsaved.detail": "Lưu sẽ giữ giá trị mới. Bỏ thay đổi sẽ khôi phục giá trị đã lưu gần nhất. Hủy sẽ quay lại trang cài đặt.",
@@ -718,7 +722,7 @@
     "startup.failed": "MCW Launcher không thể khởi động.",
     "startup.failed_detail": "Launcher đang chuẩn bị báo cáo lỗi.",
     "startup.failed_title": "MCW Launcher khởi động thất bại",
-    "startup.failed_message": "MCW Launcher không thể hoàn tất khởi động.\n\nLỗi: {error}\n\nBáo cáo khởi động:\n{path}",
+    "startup.failed_message": "MCW Launcher không thể hoàn tất khởi động.\n\nDừng tại bước: {stage}\nLỗi: {error}\n\nBáo cáo khởi động:\n{path}",
     "startup.error_log_unavailable": "Không thể lưu báo cáo khởi động."
   },
   "aliases": {

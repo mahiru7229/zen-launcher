@@ -36,14 +36,14 @@ class ModrinthController(BaseController):
         task_id = f"modrinth.versions.{project_type}.{normalized_loader}.{project_id}"
         self._task_runner.run(task_id, lambda: (project_type, project_id, normalized_loader, ModrinthClient.list_project_versions(project_id, loader=normalized_loader, game_version=game_version, version_types=("release", "beta", "alpha"))), f"Loading compatible Modrinth {normalized_loader.title()} versions...", blocking=False)
 
-    def install_mod(self, instance_name: str, version_id: str, allowed_version_types: tuple[str, ...] = ("release",)) -> None:
+    def install_mod(self, instance_name: str, version_id: str, allowed_version_types: tuple[str, ...] = ("release",)) -> bool:
         reporter = ProgressReporter(self.progress_received.emit)
 
         def task() -> object:
             instance = InstanceManager.load(instance_name)
             return ModrinthModInstaller.install(instance, version_id, install_dependencies=True, allowed_version_types=allowed_version_types, reporter=reporter)
 
-        self._task_runner.run("modrinth.install.mod", task, f"Installing Modrinth mod into '{instance_name}'...")
+        return self._task_runner.run("modrinth.install.mod", task, f"Installing Modrinth mod into '{instance_name}'...")
 
     def install_modpack(self, project_id: str, version_id: str, instance_name: str, install_optional_files: bool, allowed_version_types: tuple[str, ...] = ("release",), loader: str = ModLoaderManager.FABRIC) -> None:
         reporter = ProgressReporter(self.progress_received.emit)

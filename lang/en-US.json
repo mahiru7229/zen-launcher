@@ -698,6 +698,10 @@
     "mods.instance_create.name_exists": "An instance named '{name}' already exists.",
     "mods.instance_create.select_version": "Select a Minecraft version first.",
     "mods.instance_create.no_game_versions": "This mod version does not declare a supported Minecraft version.",
+    "mods.instance_create.followup_cancelled": "Automatic mod installation was cancelled because instance creation did not finish successfully.",
+    "mods.instance_create.result_mismatch": "The created instance did not match the pending installation target '{name}'. The mod was not installed.",
+    "mods.instance_create.loader_mismatch": "The new instance uses {actual}, but the selected mod requires {expected}. The mod was not installed.",
+    "mods.instance_create.install_start_failed": "The instance '{name}' was created, but the mod installation could not start. Open Logs and try installing the mod again.",
     "settings.unsaved.title": "Unsaved settings",
     "settings.unsaved.message": "You have unsaved changes in {scope}. Save them before continuing?",
     "settings.unsaved.detail": "Save keeps the new values. Discard restores the last saved values. Cancel returns to the settings page.",
@@ -718,7 +722,7 @@
     "startup.failed": "MCW Launcher could not start.",
     "startup.failed_detail": "An error report is being prepared.",
     "startup.failed_title": "MCW Launcher startup failed",
-    "startup.failed_message": "MCW Launcher could not finish starting.\n\nError: {error}\n\nStartup report:\n{path}",
+    "startup.failed_message": "MCW Launcher could not finish starting.\n\nStopped at: {stage}\nError: {error}\n\nStartup report:\n{path}",
     "startup.error_log_unavailable": "The startup report could not be saved."
   },
   "aliases": {

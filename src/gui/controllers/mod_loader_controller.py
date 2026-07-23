@@ -24,6 +24,8 @@ class ModLoaderController(BaseController):
             return
 
         task_id = f"fabric.versions:{game_version}"
+        if self._task_runner.is_task_active(task_id):
+            return
         self._task_runner.run(task_id, lambda: (game_version, FabricMetaClient.list_loader_versions(game_version)), f"Loading Fabric versions for Minecraft {game_version}...", blocking=False)
 
     def load_forge_versions(self, game_version: str) -> None:
@@ -31,6 +33,8 @@ class ModLoaderController(BaseController):
         if not game_version:
             return
         task_id = f"forge.versions:{game_version}"
+        if self._task_runner.is_task_active(task_id):
+            return
         self._task_runner.run(task_id, lambda: (game_version, ForgeMetadataClient.list_versions(game_version)), f"Loading Forge versions for Minecraft {game_version}...", blocking=False)
 
     @Slot(str, object)

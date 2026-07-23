@@ -38,7 +38,7 @@ class ModController(BaseController):
     def current_instance(self) -> Instance | None:
         return self._instance
 
-    def set_instance(self, instance: Instance | None) -> None:
+    def set_instance(self, instance: Instance | None, *, refresh: bool = True) -> None:
         self._instance = instance
         self._scan_pending = False
         self.instance_changed.emit(instance)
@@ -46,7 +46,8 @@ class ModController(BaseController):
         if instance is None:
             self.mods_changed.emit([])
             return
-        self.refresh()
+        if refresh:
+            self.refresh()
 
     def refresh(self) -> None:
         instance = self._require_instance()

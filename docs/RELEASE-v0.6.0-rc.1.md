@@ -6,6 +6,21 @@
 
 ## Tiếng Việt
 
+### Sửa luồng tạo instance rồi cài mod
+
+- Tác vụ cài mod không còn được khởi chạy khi tác vụ tạo instance vẫn chưa giải phóng trạng thái blocking.
+- Thêm tín hiệu `task_settled`, chỉ chạy bước cài mod sau khi task loader đã được dọn dẹp hoàn toàn.
+- Xác minh lại tên instance và loader thực tế trước khi tiếp tục cài mod.
+- Các request tải danh sách Fabric/Forge version trùng nhau được bỏ qua im lặng, không còn hiện thông báo `Task ... is already running`.
+- Nếu bước cài mod tiếp theo không thể bắt đầu, launcher báo rõ rằng instance đã tạo nhưng mod chưa được cài.
+
+### Sửa startup splash bị đứng
+
+- Các bước bootstrap có I/O được chạy ngoài Qt GUI thread, giúp splash tiếp tục phản hồi khi database hoặc bảo mật tài khoản mất nhiều thời gian.
+- Startup có timeout 45 giây và báo chính xác bước đang bị kẹt.
+- Báo cáo `startup-error.log` giờ ghi thêm startup stage và giữ nguyên traceback từ worker thread.
+- Hộp thoại lỗi được đặt làm con của splash, tránh bị splash luôn-on-top che phía sau.
+
 ### Progress mod loader kết thúc đúng trạng thái
 
 - Sau khi tạo instance có Fabric/Forge, thay loader, repair loader hoặc khôi phục Forge trước đó, thanh progress chuyển sang `100%` và badge `READY`.
@@ -65,8 +80,8 @@
 ### Kiểm thử
 
 ```text
-746 passed
-42 skipped
+749 passed
+44 skipped
 0 failed
 0 errors
 ```
@@ -84,6 +99,21 @@ UPDATE_CHANNEL = "beta"
 ---
 
 ## English
+
+### Fixed create-instance-then-install flow
+
+- Mod installation no longer starts while the instance creation task still owns the blocking task state.
+- Added a `task_settled` signal so the selected mod is installed only after loader task cleanup has completed.
+- The created instance name and actual loader are verified before continuing.
+- Duplicate Fabric/Forge version-list requests are ignored silently instead of showing `Task ... is already running`.
+- If the follow-up install cannot start, the launcher clearly reports that the instance exists but the mod was not installed.
+
+### Fixed startup splash stalls
+
+- I/O-heavy bootstrap steps now run outside the Qt GUI thread, keeping the splash responsive while account data or security checks are busy.
+- Startup now has a 45-second timeout and reports the exact stage where it stopped.
+- `startup-error.log` includes the startup stage and preserves worker-thread tracebacks.
+- The startup error dialog is parented to the splash so the always-on-top splash cannot hide it.
 
 ### Terminal mod-loader progress
 
@@ -142,8 +172,8 @@ UPDATE_CHANNEL = "beta"
 ### Regression
 
 ```text
-746 passed
-42 skipped
+749 passed
+44 skipped
 0 failed
 0 errors
 ```
